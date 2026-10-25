@@ -1,6 +1,6 @@
 # Step 7d — Supply chain: store indents, requests, issues, transfers
 
-Status: **done** (2026-10-26). Previous: [step 7c](07c-scm-stock.md) · Next: step 7e (department stock, supplier
+Status: **done** (2026-10-26). Previous: [step 7c](07c-scm-stock.md) · Next: [step 7e](07e-scm-department-returns.md) (department stock, supplier
 returns, gate pass).
 
 ## Where the old logic lives

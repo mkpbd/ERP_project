@@ -1,0 +1,14 @@
+{{#with data.pass}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 18%">Gate pass no</td><td><b>{{number}}</b></td><td style="width: 18%">Date</td><td>{{date date}}</td></tr>
+    <tr><td>Purpose</td><td>{{../data.kind}}</td><td>Reference</td><td>{{storeName}}</td></tr>
+    <tr><td>Taken by</td><td colspan="3"><b>{{partyName}}</b></td></tr>
+    {{#if note}}<tr><td>Note</td><td colspan="3">{{note}}</td></tr>{{/if}}
+  </tbody>
+</table>
+<p>The goods described in the reference above may leave the premises.</p>
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Store</td><td>Security</td><td>Authorised by</td></tr>
+</table>
+{{/with}}

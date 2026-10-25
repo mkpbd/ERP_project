@@ -622,7 +622,16 @@ export const stockLots = pgTable(
   ],
 );
 
-export const STOCK_MOVEMENT_KINDS = ['opening', 'receive', 'issue', 'transfer'] as const;
+export const STOCK_MOVEMENT_KINDS = [
+  'opening',
+  'receive',
+  'issue',
+  'transfer',
+  'consumption',
+  'department_return',
+  'adjustment',
+  'supplier_return',
+] as const;
 
 // Every quantity in or out of a store, by lot, with its unit cost. Stock is the sum; the old system added up
 // receive, transfer, issue and return tables in each report.
@@ -632,6 +641,7 @@ export const stockMovements = pgTable(
     id: uuid('id').primaryKey(),
     mainStoreId: uuid('main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
     subStoreId: uuid('sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    departmentId: uuid('department_id').references(() => storeDepartments.id, { onDelete: 'restrict' }),
     variantId: uuid('variant_id')
       .notNull()
       .references(() => itemVariants.id, { onDelete: 'restrict' }),
@@ -649,11 +659,15 @@ export const stockMovements = pgTable(
   (t) => [
     index('stock_movements_main_idx').on(t.mainStoreId, t.variantId, t.movedOn),
     index('stock_movements_sub_idx').on(t.subStoreId, t.variantId, t.movedOn),
+    index('stock_movements_department_idx').on(t.departmentId, t.variantId, t.movedOn),
     index('stock_movements_lot_idx').on(t.lotId),
     index('stock_movements_document_idx').on(t.documentId),
-    check('stock_movements_store_ck', sql`(${t.mainStoreId} is null) <> (${t.subStoreId} is null)`),
+    check('stock_movements_store_ck', sql`num_nonnulls(${t.mainStoreId}, ${t.subStoreId}, ${t.departmentId}) = 1`),
     check('stock_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
-    check('stock_movements_kind_ck', sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer')`),
+    check(
+      'stock_movements_kind_ck',
+      sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer', 'consumption', 'department_return', 'adjustment', 'supplier_return')`,
+    ),
   ],
 );
 
@@ -1070,6 +1084,232 @@ export const stockTransferLines = pgTable(
     check(
       'stock_transfer_lines_qty_ck',
       sql`${t.qty} > 0 and (${t.acceptedQty} is null or ${t.acceptedQty} between 0 and ${t.qty})`,
+    ),
+  ],
+);
+
+const moveLineColumns = () => ({
+  position: smallint('position').notNull(),
+  variantId: uuid('variant_id')
+    .notNull()
+    .references(() => itemVariants.id, { onDelete: 'restrict' }),
+  qty: quantity('qty').notNull(),
+  lotId: uuid('lot_id').references(() => stockLots.id, { onDelete: 'restrict' }),
+});
+
+// Old DeptStockConsumptions (DCN…).
+export const departmentConsumptions = pgTable(
+  'department_consumptions',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    consumedOn: day('consumed_on').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['posted', 'cancelled'] }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    cancelReason: text('cancel_reason'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('department_consumptions_number_uq').on(t.number),
+    index('department_consumptions_department_idx').on(t.departmentId, t.consumedOn),
+    check('department_consumptions_status_ck', sql`${t.status} in ('posted', 'cancelled')`),
+  ],
+);
+
+export const departmentConsumptionLines = pgTable(
+  'department_consumption_lines',
+  { consumptionId: uuid('consumption_id').notNull(), ...moveLineColumns() },
+  (t) => [
+    primaryKey({ columns: [t.consumptionId, t.position] }),
+    foreignKey({
+      name: 'department_consumption_lines_fk',
+      columns: [t.consumptionId],
+      foreignColumns: [departmentConsumptions.id],
+    }).onDelete('cascade'),
+    check('department_consumption_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old DeptStockReturns (DRT…).
+export const departmentReturns = pgTable(
+  'department_returns',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    subStoreId: uuid('sub_store_id')
+      .notNull()
+      .references(() => subStores.id, { onDelete: 'restrict' }),
+    returnDate: day('return_date').notNull(),
+    reason: text('reason'),
+    status: text('status', { enum: ['pending', 'received', 'cancelled'] }).notNull(),
+    receivedOn: day('received_on'),
+    receivedBy: uuid('received_by').references(() => users.id, { onDelete: 'set null' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('department_returns_number_uq').on(t.number),
+    index('department_returns_store_idx').on(t.subStoreId, t.status),
+    check('department_returns_status_ck', sql`${t.status} in ('pending', 'received', 'cancelled')`),
+    check('department_returns_received_ck', sql`(${t.status} = 'received') = (${t.receivedOn} is not null)`),
+  ],
+);
+
+export const departmentReturnLines = pgTable(
+  'department_return_lines',
+  { returnId: uuid('return_id').notNull(), ...moveLineColumns() },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.position] }),
+    foreignKey({
+      name: 'department_return_lines_fk',
+      columns: [t.returnId],
+      foreignColumns: [departmentReturns.id],
+    }).onDelete('cascade'),
+    check('department_return_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old DeptStockAdjustments (DAJ…): physical counts by lot.
+export const departmentAdjustments = pgTable(
+  'department_adjustments',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    countedOn: day('counted_on').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status', { enum: ['pending', 'approved', 'rejected', 'cancelled'] }).notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at'),
+    decisionRemarks: text('decision_remarks'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('department_adjustments_number_uq').on(t.number),
+    index('department_adjustments_department_idx').on(t.departmentId, t.status),
+    check('department_adjustments_status_ck', sql`${t.status} in ('pending', 'approved', 'rejected', 'cancelled')`),
+  ],
+);
+
+export const departmentAdjustmentLines = pgTable(
+  'department_adjustment_lines',
+  {
+    adjustmentId: uuid('adjustment_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => stockLots.id, { onDelete: 'restrict' }),
+    systemQty: quantity('system_qty').notNull(),
+    physicalQty: quantity('physical_qty').notNull(),
+    adjustQty: quantity('adjust_qty'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.adjustmentId, t.position] }),
+    foreignKey({
+      name: 'department_adjustment_lines_fk',
+      columns: [t.adjustmentId],
+      foreignColumns: [departmentAdjustments.id],
+    }).onDelete('cascade'),
+    check('department_adjustment_lines_qty_ck', sql`${t.physicalQty} >= 0`),
+  ],
+);
+
+// Old GatePasses (GP-000001, MAX + 1): goods leaving the premises.
+export const gatePasses = pgTable(
+  'gate_passes',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    passDate: day('pass_date').notNull(),
+    kind: text('kind', { enum: ['supplier_return', 'maintenance', 'other'] }).notNull(),
+    reference: text('reference'),
+    partyName: text('party_name').notNull(),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('gate_passes_number_uq').on(t.number),
+    index('gate_passes_date_idx').on(t.passDate),
+    check('gate_passes_kind_ck', sql`${t.kind} in ('supplier_return', 'maintenance', 'other')`),
+    nameLength('gate_passes', t.partyName, 200),
+  ],
+);
+
+// Old SCMSupplierReturnIndents / Details.
+export const supplierReturns = pgTable(
+  'supplier_returns',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'restrict' }),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    returnDate: day('return_date').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status', { enum: ['draft', 'sent', 'settled'] }).notNull(),
+    sentVoucherId: uuid('sent_voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    sentVoucherNumber: text('sent_voucher_number'),
+    gatePassId: uuid('gate_pass_id').references(() => gatePasses.id, { onDelete: 'set null' }),
+    settledOn: day('settled_on'),
+    settledVoucherId: uuid('settled_voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    settledVoucherNumber: text('settled_voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('supplier_returns_number_uq').on(t.number),
+    index('supplier_returns_supplier_idx').on(t.supplierId, t.returnDate),
+    check('supplier_returns_status_ck', sql`${t.status} in ('draft', 'sent', 'settled')`),
+  ],
+);
+
+export const supplierReturnLines = pgTable(
+  'supplier_return_lines',
+  {
+    returnId: uuid('return_id').notNull(),
+    ...moveLineColumns(),
+    unitCost: unitCost('unit_cost'),
+    receivedQty: quantity('received_qty'),
+    replacementVariantId: uuid('replacement_variant_id'),
+    replacementBatchNo: text('replacement_batch_no'),
+    replacementExpiryDate: day('replacement_expiry_date'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.position] }),
+    foreignKey({
+      name: 'supplier_return_lines_fk',
+      columns: [t.returnId],
+      foreignColumns: [supplierReturns.id],
+    }).onDelete('cascade'),
+    foreignKey({
+      name: 'supplier_return_lines_replacement_fk',
+      columns: [t.replacementVariantId],
+      foreignColumns: [itemVariants.id],
+    }).onDelete('restrict'),
+    check(
+      'supplier_return_lines_qty_ck',
+      sql`${t.qty} > 0 and (${t.receivedQty} is null or ${t.receivedQty} between 0 and ${t.qty})`,
     ),
   ],
 );

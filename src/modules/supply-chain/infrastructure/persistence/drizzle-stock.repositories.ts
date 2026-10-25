@@ -16,7 +16,7 @@ import {
   type NewMovement,
   type OpeningRecord,
   type PayableSupplier,
-  type StoreRef,
+  type StockPlace,
 } from '../../domain/repositories.js';
 import type { LotBalance } from '../../domain/allocation.js';
 import { StockReceive } from '../../domain/stock-receive.js';
@@ -65,10 +65,19 @@ async function translated<T>(write: () => Promise<T>): Promise<T> {
   }
 }
 
-const storeColumns = (store: NewMovement['store']) =>
-  'mainStoreId' in store
-    ? { mainStoreId: store.mainStoreId, subStoreId: null }
-    : { mainStoreId: null, subStoreId: store.subStoreId };
+const placeColumns = (place: StockPlace) => ({
+  mainStoreId: 'mainStoreId' in place ? place.mainStoreId : null,
+  subStoreId: 'subStoreId' in place ? place.subStoreId : null,
+  departmentId: 'departmentId' in place ? place.departmentId : null,
+});
+
+/** The movements of one place. */
+export const atPlace = (place: StockPlace) =>
+  'mainStoreId' in place
+    ? eq(stockMovements.mainStoreId, place.mainStoreId)
+    : 'subStoreId' in place
+      ? eq(stockMovements.subStoreId, place.subStoreId)
+      : eq(stockMovements.departmentId, place.departmentId);
 
 @Injectable()
 export class DrizzleStockLedger extends StockLedger {
@@ -98,10 +107,9 @@ export class DrizzleStockLedger extends StockLedger {
     return existing!.id;
   }
 
-  async balances(store: StoreRef, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>> {
+  async balances(place: StockPlace, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>> {
     const balances = new Map<string, LotBalance[]>();
     if (variantIds.length === 0) return balances;
-    const columns = storeColumns(store);
     const rows = await this.context.db
       .select({
         variantId: stockMovements.variantId,
@@ -113,18 +121,33 @@ export class DrizzleStockLedger extends StockLedger {
       })
       .from(stockMovements)
       .innerJoin(stockLots, eq(stockLots.id, stockMovements.lotId))
-      .where(
-        and(
-          columns.mainStoreId
-            ? eq(stockMovements.mainStoreId, columns.mainStoreId)
-            : eq(stockMovements.subStoreId, columns.subStoreId!),
-          inArray(stockMovements.variantId, [...new Set(variantIds)]),
-        ),
-      )
+      .where(and(atPlace(place), inArray(stockMovements.variantId, [...new Set(variantIds)])))
       .groupBy(stockMovements.variantId, stockMovements.lotId, stockLots.batchNo, stockLots.expiryDate)
       .having(sql`sum(${stockMovements.qty}) > 0`);
     for (const { variantId, ...lot } of rows) balances.set(variantId, [...(balances.get(variantId) ?? []), lot]);
     return balances;
+  }
+
+  async lotCost(lotId: string): Promise<number> {
+    const [row] = await this.context.db
+      .select({
+        cost: sql<number>`coalesce(sum(${stockMovements.qty} * ${stockMovements.unitCost}) / nullif(sum(${stockMovements.qty}), 0), 0)`.mapWith(
+          Number,
+        ),
+      })
+      .from(stockMovements)
+      .where(and(eq(stockMovements.lotId, lotId), inArray(stockMovements.kind, ['opening', 'receive'])));
+    return Math.round((row?.cost ?? 0) * 10_000) / 10_000;
+  }
+
+  async reverse(documentId: string, on: string): Promise<void> {
+    const rows = await this.context.db.select().from(stockMovements).where(eq(stockMovements.documentId, documentId));
+    if (rows.length === 0) return;
+    await this.context.db
+      .insert(stockMovements)
+      .values(
+        rows.map(({ id: _id, createdAt: _at, ...row }) => ({ ...row, id: randomUUID(), qty: -row.qty, movedOn: on })),
+      );
   }
 
   async add(movements: readonly NewMovement[]): Promise<void> {
@@ -133,7 +156,7 @@ export class DrizzleStockLedger extends StockLedger {
       this.context.db.insert(stockMovements).values(
         movements.map(({ store, ...movement }) => ({
           id: randomUUID(),
-          ...storeColumns(store),
+          ...placeColumns(store),
           ...movement,
         })),
       ),
@@ -253,6 +276,7 @@ export class DrizzleOpeningRepository extends OpeningRepository {
   }
 
   async insert({ store, ...opening }: OpeningRecord): Promise<void> {
-    await translated(() => this.context.db.insert(stockOpenings).values({ ...opening, ...storeColumns(store) }));
+    const { departmentId: _department, ...columns } = placeColumns(store);
+    await translated(() => this.context.db.insert(stockOpenings).values({ ...opening, ...columns }));
   }
 }

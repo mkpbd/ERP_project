@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gte, ilike, inArray, lt, lte, or, sql, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lt, lte, or, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
 import { escapeLike } from '../../../../shared/infrastructure/persistence/pg-errors.js';
@@ -12,7 +12,8 @@ import {
   type StockFilter,
   type StockRow,
 } from '../../application/stock.messages.js';
-import type { StoreRef } from '../../domain/repositories.js';
+import type { StockPlace } from '../../domain/repositories.js';
+import { atPlace } from './drizzle-stock.repositories.js';
 import {
   itemGroups,
   items,
@@ -24,14 +25,11 @@ import {
   stockMovements,
   stockReceiveLines,
   stockReceives,
+  storeDepartments,
   subStores,
   suppliers,
 } from './supply-chain.schema.js';
 
-const inStore = (store: StoreRef): SQL =>
-  'mainStoreId' in store
-    ? eq(stockMovements.mainStoreId, store.mainStoreId)
-    : eq(stockMovements.subStoreId, store.subStoreId);
 const qty3 = (value: number) => Math.round(value * 1000) / 1000;
 const cents = (value: number) => Math.round(value * 100) / 100;
 
@@ -163,7 +161,7 @@ export class DrizzleStockReadRepository extends StockReadRepository {
       .innerJoin(stockLots, eq(stockLots.id, stockMovements.lotId))
       .where(
         and(
-          inStore(filter.store),
+          atPlace(filter.store),
           filter.asOf ? lte(stockMovements.movedOn, filter.asOf) : undefined,
           filter.variantId ? eq(stockMovements.variantId, filter.variantId) : undefined,
         ),
@@ -220,7 +218,7 @@ export class DrizzleStockReadRepository extends StockReadRepository {
       .filter((row) => !filter.belowReorderOnly || row.belowReorder);
   }
 
-  async card(store: StoreRef, variantId: string, from: string, to: string): Promise<StockCard | null> {
+  async card(store: StockPlace, variantId: string, from: string, to: string): Promise<StockCard | null> {
     const [variant] = await this.context.db
       .select({
         variantId: itemVariants.id,
@@ -233,7 +231,7 @@ export class DrizzleStockReadRepository extends StockReadRepository {
       .innerJoin(items, eq(items.id, itemVariants.itemId))
       .where(eq(itemVariants.id, variantId));
     if (!variant) return null;
-    const scope = and(inStore(store), eq(stockMovements.variantId, variantId));
+    const scope = and(atPlace(store), eq(stockMovements.variantId, variantId));
     const [[before], rows] = await Promise.all([
       this.context.db
         .select({ qty: sql<number>`coalesce(sum(${stockMovements.qty}), 0)`.mapWith(Number) })
@@ -267,17 +265,22 @@ export class DrizzleStockReadRepository extends StockReadRepository {
     return { ...variant, opening, rows: cardRows, totalIn, totalOut, closing: balance };
   }
 
-  async storeName(store: StoreRef): Promise<string | null> {
+  async storeName(store: StockPlace): Promise<string | null> {
     const [row] =
       'mainStoreId' in store
         ? await this.context.db
             .select({ name: mainStores.name })
             .from(mainStores)
             .where(eq(mainStores.id, store.mainStoreId))
-        : await this.context.db
-            .select({ name: subStores.name })
-            .from(subStores)
-            .where(eq(subStores.id, store.subStoreId));
+        : 'subStoreId' in store
+          ? await this.context.db
+              .select({ name: subStores.name })
+              .from(subStores)
+              .where(eq(subStores.id, store.subStoreId))
+          : await this.context.db
+              .select({ name: storeDepartments.name })
+              .from(storeDepartments)
+              .where(eq(storeDepartments.id, store.departmentId));
     return row?.name ?? null;
   }
 }

@@ -155,7 +155,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | store indents (draft, edit, submit, cancel), store requests | `scm:indent` (+ department access) |
 | `POST /scm/store-indents/:id/decision` | the indent approval level's role |
 | `POST /scm/store-indents/:id/acknowledge` | the person who raised the indent |
-| issues, transfers, accepting transfers | `scm:issue` (+ store access) |
+| issues, transfers, accepting transfers, receiving department returns, gate passes | `scm:issue` (+ store access) |
+| department consumption, returns and counts | `scm:department` (+ department access) |
+| approving or rejecting department counts | `scm:adjust` (not the counter) |
+| supplier returns (draft, send, settle) | `scm:receive` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |

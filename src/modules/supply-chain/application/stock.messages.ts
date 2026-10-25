@@ -1,7 +1,7 @@
 import { Command, Query } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
 import type { Page } from '../../../shared/application/pagination.js';
-import type { StoreRef } from '../domain/repositories.js';
+import type { StockPlace, StoreRef } from '../domain/repositories.js';
 import type { ReceiveHeader, ReceiveLineInput, ReceiveStatus } from '../domain/stock-receive.js';
 import type { DocumentFilter, ItemRef } from './purchase.messages.js';
 
@@ -73,7 +73,7 @@ export interface StockRow extends ItemRef {
 }
 
 export interface StockFilter {
-  readonly store: StoreRef;
+  readonly store: StockPlace;
   readonly variantId?: string | undefined;
   readonly groupId?: string | undefined;
   /** Item, variant or code, partial. */
@@ -110,8 +110,8 @@ export abstract class StockReadRepository {
   abstract getReceive(id: string): Promise<ReceiveView | null>;
   abstract stock(filter: StockFilter): Promise<StockRow[]>;
   /** Null when the variant does not exist. */
-  abstract card(store: StoreRef, variantId: string, from: string, to: string): Promise<StockCard | null>;
-  abstract storeName(store: StoreRef): Promise<string | null>;
+  abstract card(store: StockPlace, variantId: string, from: string, to: string): Promise<StockCard | null>;
+  abstract storeName(store: StockPlace): Promise<string | null>;
 }
 
 export class CreateReceiveCommand extends Command<{ id: string; number: string }> {
@@ -217,7 +217,7 @@ export class GetStockQuery extends Query<StockRow[]> {
 export class GetStockCardQuery extends Query<StockCard> {
   constructor(
     readonly actor: Actor,
-    readonly store: StoreRef,
+    readonly store: StockPlace,
     readonly variantId: string,
     readonly from: string,
     readonly to: string,

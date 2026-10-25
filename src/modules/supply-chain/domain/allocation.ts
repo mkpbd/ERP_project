@@ -29,11 +29,13 @@ export function allocate(params: {
   qty: number;
   on: string;
   lotId?: string | null;
+  /** Returns and stock counts take expired lots too. */
+  includeExpired?: boolean;
   at: string;
 }): Allocation[] {
   const usable = params.lots
     .filter((lot) => lot.qty > 0 && (!params.lotId || lot.lotId === params.lotId))
-    .filter((lot) => lot.expiryDate === null || lot.expiryDate > params.on)
+    .filter((lot) => params.includeExpired || lot.expiryDate === null || lot.expiryDate > params.on)
     .sort(
       (a, b) =>
         (a.expiryDate ?? '9999-12-31').localeCompare(b.expiryDate ?? '9999-12-31') ||
@@ -52,7 +54,7 @@ export function allocate(params: {
     const available = qty3(usable.reduce((sum, lot) => sum + lot.qty, 0));
     throw new DomainError(
       'insufficient_stock',
-      `${params.at}: only ${available} is in stock${params.lotId ? ' in that lot' : ''} (expired lots left out)`,
+      `${params.at}: only ${available} is in stock${params.lotId ? ' in that lot' : ''}${params.includeExpired ? '' : ' (expired lots left out)'}`,
     );
   }
   return parts;

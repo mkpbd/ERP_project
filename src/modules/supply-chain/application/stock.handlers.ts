@@ -16,6 +16,7 @@ import {
   type NewMovement,
   type PayableSupplier,
 } from '../domain/repositories.js';
+import { placeRecord } from '../domain/places.js';
 import { StockReceive, type ReceiveHeader } from '../domain/stock-receive.js';
 import { PurchaseDesk } from './purchase.handlers.js';
 import {
@@ -364,7 +365,7 @@ export class GetStockHandler implements IQueryHandler<GetStockQuery> {
   async execute({ actor, filter }: GetStockQuery): Promise<StockRow[]> {
     await this.access.authorize(actor.userId, { permissions: [SCM_READ] });
     if ((await this.read.storeName(filter.store)) === null) {
-      throw new NotFoundError('mainStoreId' in filter.store ? 'main_store' : 'sub_store');
+      throw new NotFoundError(placeRecord(filter.store));
     }
     return this.read.stock(filter);
   }

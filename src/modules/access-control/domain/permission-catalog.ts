@@ -53,6 +53,8 @@ export const PERMISSION_CATALOG = [
   { key: 'scm:receive', description: 'Draft and post stock receives and note GRN faults' },
   { key: 'scm:indent', description: 'Raise store indents and requests to the main store' },
   { key: 'scm:issue', description: 'Issue from sub-stores to departments and transfer between stores' },
+  { key: 'scm:department', description: 'Record consumption, returns and stock counts of your departments' },
+  { key: 'scm:adjust', description: 'Approve or reject department stock counts (not your own)' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

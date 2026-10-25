@@ -66,8 +66,14 @@ export class PurchaseDesk {
     readonly orders: OrderRepository,
   ) {}
 
-  /** PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request, IS issue, TR transfer. */
-  async number(kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR', date: string): Promise<string> {
+  /**
+   * PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request, IS issue, TR transfer,
+   * DC consumption, DR department return, DA stock count, RT supplier return, GP gate pass.
+   */
+  async number(
+    kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR' | 'DC' | 'DR' | 'DA' | 'RT' | 'GP',
+    date: string,
+  ): Promise<string> {
     const year = Number(date.slice(0, 4));
     return documentNumber(kind, year, await this.sequences.next(kind, year));
   }

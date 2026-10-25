@@ -1,9 +1,11 @@
 import type { LotBalance } from './allocation.js';
 import type { ComparativeStudy } from './comparative-study.js';
+import type { DepartmentAdjustment, DepartmentConsumption, DepartmentReturn } from './department.js';
 import type { ApprovalLevel } from './documents.js';
 import type { PurchaseOrder } from './purchase-order.js';
 import type { PurchaseRequisition } from './requisition.js';
 import type { StockReceive } from './stock-receive.js';
+import type { SupplierReturn } from './supplier-return.js';
 import type { MoveLine, StoreIndent, StoreRequest, TransferKind, TransferStatus } from './store-documents.js';
 
 /** Serial numbers per document kind and year. */
@@ -58,10 +60,14 @@ export abstract class OrderRepository {
 
 export type StoreRef = { readonly mainStoreId: string } | { readonly subStoreId: string };
 
-export type MovementKind = 'opening' | 'receive' | 'issue' | 'transfer';
+/** Where stock is held: a store, or a department that was issued goods (old fnDeptStockLedger). */
+export type StockPlace = StoreRef | { readonly departmentId: string };
+
+export type MovementKind =
+  'opening' | 'receive' | 'issue' | 'transfer' | 'consumption' | 'department_return' | 'adjustment' | 'supplier_return';
 
 export interface NewMovement {
-  readonly store: StoreRef;
+  readonly store: StockPlace;
   readonly variantId: string;
   readonly lotId: string;
   /** Positive in, negative out. */
@@ -78,7 +84,11 @@ export abstract class StockLedger {
   abstract lot(variantId: string, batchNo: string | null, expiryDate: string | null): Promise<string>;
   abstract add(movements: readonly NewMovement[]): Promise<void>;
   /** What the store holds of each variant, by lot (lots with nothing left are left out). */
-  abstract balances(store: StoreRef, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>>;
+  abstract balances(place: StockPlace, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>>;
+  /** A lot's average cost over everything received into it (for counted stock found without a balance). */
+  abstract lotCost(lotId: string): Promise<number>;
+  /** Puts back what a document moved: the same lots and costs with the signs turned, dated on the given day. */
+  abstract reverse(documentId: string, on: string): Promise<void>;
 }
 
 export interface CatalogueVariant {
@@ -185,4 +195,43 @@ export abstract class StoreAccess {
   abstract mainStoreOf(subStoreId: string): Promise<string | null>;
   abstract mayIndentFor(userId: string, departmentId: string): Promise<boolean>;
   abstract mayIssueFrom(userId: string, subStoreId: string): Promise<boolean>;
+}
+
+export abstract class ConsumptionRepository {
+  abstract findForUpdate(id: string): Promise<DepartmentConsumption | null>;
+  abstract insert(consumption: DepartmentConsumption): Promise<void>;
+  abstract update(consumption: DepartmentConsumption): Promise<void>;
+}
+
+export abstract class DepartmentReturnRepository {
+  abstract findForUpdate(id: string): Promise<DepartmentReturn | null>;
+  abstract insert(departmentReturn: DepartmentReturn): Promise<void>;
+  abstract update(departmentReturn: DepartmentReturn): Promise<void>;
+}
+
+export abstract class AdjustmentRepository {
+  abstract findForUpdate(id: string): Promise<DepartmentAdjustment | null>;
+  abstract insert(adjustment: DepartmentAdjustment): Promise<void>;
+  abstract update(adjustment: DepartmentAdjustment): Promise<void>;
+}
+
+export abstract class SupplierReturnRepository {
+  abstract findForUpdate(id: string): Promise<SupplierReturn | null>;
+  abstract insert(supplierReturn: SupplierReturn): Promise<void>;
+  abstract update(supplierReturn: SupplierReturn): Promise<void>;
+  abstract delete(id: string): Promise<void>;
+}
+
+export interface NewGatePass {
+  readonly id: string;
+  readonly number: string;
+  readonly passDate: string;
+  readonly kind: 'supplier_return' | 'maintenance' | 'other';
+  readonly reference: string | null;
+  readonly partyName: string;
+  readonly note: string | null;
+}
+
+export abstract class GatePassRepository {
+  abstract insert(pass: NewGatePass): Promise<void>;
 }

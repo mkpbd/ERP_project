@@ -1,0 +1,49 @@
+{{#with data.document}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Return no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date date}}</td></tr>
+    <tr><td>Supplier</td><td><b>{{partyName}}</b></td><td>From</td><td>{{storeName}}</td></tr>
+    <tr>
+      <td>Gate pass</td><td>{{fields.gatePassNumber}}</td>
+      <td>Debit note</td><td>{{fields.sentVoucherNumber}}{{#if fields.settledVoucherNumber}} · back {{fields.settledVoucherNumber}}{{/if}}</td>
+    </tr>
+    <tr><td>Reason</td><td colspan="3">{{note}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Unit</th><th class="num">Sent</th>
+      <th class="num">Unit cost</th><th class="num">Came back</th><th>Instead</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{#if unitCost}}{{money unitCost}}{{/if}}</td>
+      <td class="num">{{receivedQty}}</td>
+      <td>{{replacementName}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if parts.length}}
+<table class="report" style="margin-top: 10px">
+  <thead><tr><th>Lot sent</th><th>Expiry</th><th class="num">Qty</th><th class="num">Value</th></tr></thead>
+  <tbody>
+    {{#each parts}}
+    <tr>
+      <td>{{itemName}} — batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}}</td>
+      <td>{{#if expiryDate}}{{date expiryDate}}{{/if}}</td>
+      <td class="num">{{qty}}</td><td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="3">Value returned</td><td class="num">{{money value}}</td></tr>
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

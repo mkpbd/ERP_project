@@ -34,3 +34,7 @@ export const GRN_FAULT = 'grn_fault';
 export const SCM_INDENT = 'scm:indent';
 /** Issuing from sub-stores and transferring between stores. */
 export const SCM_ISSUE = 'scm:issue';
+/** Consuming, returning and counting the stock of departments the user works for. */
+export const SCM_DEPARTMENT = 'scm:department';
+/** Approving department stock counts. */
+export const SCM_ADJUST = 'scm:adjust';

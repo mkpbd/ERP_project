@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 20 });
+    expect(applied.rows[0]).toEqual({ n: 21 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -66,7 +66,13 @@ describe('migrations', () => {
       'cost_centers',
       'countries',
       'cs_approval_levels',
+      'department_adjustment_lines',
+      'department_adjustments',
+      'department_consumption_lines',
+      'department_consumptions',
       'department_incharges',
+      'department_return_lines',
+      'department_returns',
       'department_store_access',
       'designations',
       'discount_categories',
@@ -81,6 +87,7 @@ describe('migrations', () => {
       'festivals',
       'fiscal_years',
       'fs_line_items',
+      'gate_passes',
       'gl_accounts',
       'gl_item_descriptions',
       'gl_roles',
@@ -190,6 +197,8 @@ describe('migrations', () => {
       'sub_ledger_types',
       'sub_ledgers',
       'sub_stores',
+      'supplier_return_lines',
+      'supplier_returns',
       'supplier_types',
       'suppliers',
       'tds_rules',

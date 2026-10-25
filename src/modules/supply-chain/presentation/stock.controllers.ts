@@ -23,6 +23,7 @@ import {
   type StockRow,
 } from '../application/stock.messages.js';
 import { GRN_FAULT } from '../application/supply-chain.constants.js';
+import { placeOf } from '../domain/places.js';
 import type { StoreRef } from '../domain/repositories.js';
 import { CreatedDocumentResponseDto, DocumentListQueryDto, VersionDto, VersionQueryDto } from './dto/purchase.dto.js';
 import {
@@ -119,8 +120,8 @@ export class StockController {
   @ApiOperation({ summary: "A store's stock by item and lot, with value and reorder flags" })
   @ApiOkResponse({ type: StockResponseDto })
   async stock(@CurrentUser() actor: Actor, @Query() query: StockQueryDto): Promise<{ items: StockRow[] }> {
-    const { mainStoreId: _main, subStoreId: _sub, ...filter } = query;
-    return { items: await this.queryBus.execute(new GetStockQuery(actor, { ...filter, store: storeOf(query) })) };
+    const { mainStoreId: _main, subStoreId: _sub, departmentId: _department, ...filter } = query;
+    return { items: await this.queryBus.execute(new GetStockQuery(actor, { ...filter, store: placeOf(query) })) };
   }
 
   @Get('stock/card')
@@ -128,7 +129,7 @@ export class StockController {
   @ApiOperation({ summary: "One item's movements in a store, with running balance (stock card)" })
   @ApiOkResponse({ type: StockCardResponseDto })
   card(@CurrentUser() actor: Actor, @Query() query: StockCardQueryDto): Promise<StockCard> {
-    return this.queryBus.execute(new GetStockCardQuery(actor, storeOf(query), query.variantId, query.from, query.to));
+    return this.queryBus.execute(new GetStockCardQuery(actor, placeOf(query), query.variantId, query.from, query.to));
   }
 
   @Post('opening-stock')

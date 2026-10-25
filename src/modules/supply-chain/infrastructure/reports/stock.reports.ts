@@ -3,24 +3,20 @@ import { z } from 'zod';
 import { defineReport, type ReportDefinition } from '../../../../shared/application/reports.js';
 import { DomainError, NotFoundError } from '../../../../shared/domain/errors.js';
 import type { StockReadRepository } from '../../application/stock.messages.js';
-import type { StoreRef } from '../../domain/repositories.js';
+import { placeOf, placeRecord } from '../../domain/places.js';
+import type { StockPlace } from '../../domain/repositories.js';
 
 const template = (name: string) => fileURLToPath(new URL(`./${name}.hbs`, import.meta.url));
 const day = z.iso.date();
 const store = {
   mainStoreId: z.uuid().optional(),
   subStoreId: z.uuid().optional(),
-};
-const storeOf = (params: { mainStoreId?: string | undefined; subStoreId?: string | undefined }): StoreRef => {
-  if ((params.mainStoreId === undefined) === (params.subStoreId === undefined)) {
-    throw new DomainError('invalid_store', 'Give either a main store or a sub-store');
-  }
-  return params.mainStoreId ? { mainStoreId: params.mainStoreId } : { subStoreId: params.subStoreId! };
+  departmentId: z.uuid().optional(),
 };
 
-async function storeName(read: StockReadRepository, ref: StoreRef): Promise<string> {
+async function storeName(read: StockReadRepository, ref: StockPlace): Promise<string> {
   const name = await read.storeName(ref);
-  if (name === null) throw new NotFoundError('mainStoreId' in ref ? 'main_store' : 'sub_store');
+  if (name === null) throw new NotFoundError(placeRecord(ref));
   return name;
 }
 
@@ -57,7 +53,7 @@ export function stockReport(read: StockReadRepository): ReportDefinition {
       withLots: z.boolean().default(false),
     }),
     async load(params) {
-      const ref = storeOf(params);
+      const ref = placeOf(params);
       const rows = await read.stock({
         store: ref,
         groupId: params.groupId,
@@ -97,7 +93,7 @@ export function stockCardReport(read: StockReadRepository): ReportDefinition {
     params: z.strictObject({ ...store, variantId: z.uuid(), from: day, to: day }),
     async load(params) {
       if (params.from > params.to) throw new DomainError('invalid_period', 'The start date is after the end date');
-      const ref = storeOf(params);
+      const ref = placeOf(params);
       const card = await read.card(ref, params.variantId, params.from, params.to);
       if (!card) throw new NotFoundError('item_variant');
       return { store: await storeName(read, ref), card };

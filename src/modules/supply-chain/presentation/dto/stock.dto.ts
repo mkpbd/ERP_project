@@ -116,6 +116,13 @@ export class ReceiveResponseDto extends responseDto({
 
 /** One store: a main store or a sub-store. */
 const storeShape = { mainStoreId: ref.optional(), subStoreId: ref.optional() };
+const placeShape = { ...storeShape, departmentId: ref.optional() };
+const onePlace = (value: {
+  mainStoreId?: string | undefined;
+  subStoreId?: string | undefined;
+  departmentId?: string | undefined;
+}) => [value.mainStoreId, value.subStoreId, value.departmentId].filter((id) => id !== undefined).length === 1;
+const onePlaceIssue = { message: 'Give one main store, sub-store or department', path: ['mainStoreId'] };
 const oneStore = (value: { mainStoreId?: string | undefined; subStoreId?: string | undefined }) =>
   (value.mainStoreId === undefined) !== (value.subStoreId === undefined);
 const oneStoreIssue = { message: 'Give either a main store or a sub-store', path: ['mainStoreId'] };
@@ -127,7 +134,7 @@ const flag = z
 export class StockQueryDto extends createZodDto(
   z
     .object({
-      ...storeShape,
+      ...placeShape,
       variantId: ref.optional(),
       groupId: ref.optional(),
       q: z.string().trim().min(1).max(100).optional(),
@@ -135,11 +142,11 @@ export class StockQueryDto extends createZodDto(
       includeEmpty: flag,
       asOf: day.optional(),
     })
-    .refine(oneStore, oneStoreIssue),
+    .refine(onePlace, onePlaceIssue),
 ) {}
 
 export class StockCardQueryDto extends createZodDto(
-  z.object({ ...storeShape, variantId: ref, from: day, to: day }).refine(oneStore, oneStoreIssue),
+  z.object({ ...placeShape, variantId: ref, from: day, to: day }).refine(onePlace, onePlaceIssue),
 ) {}
 
 export class StockResponseDto extends responseDto({

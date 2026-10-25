@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { allocate, type Allocation } from '../domain/allocation.js';
-import { StockLedger, type NewMovement, type StoreRef } from '../domain/repositories.js';
+import { StockLedger, type NewMovement, type StockPlace } from '../domain/repositories.js';
 
 export interface OutLine {
   readonly variantId: string;
@@ -22,8 +22,12 @@ export interface StockDocument {
   readonly on: string;
 }
 
-const storeKey = (store: StoreRef) =>
-  'mainStoreId' in store ? `main:${store.mainStoreId}` : `sub:${store.subStoreId}`;
+const storeKey = (store: StockPlace) =>
+  'mainStoreId' in store
+    ? `main:${store.mainStoreId}`
+    : 'subStoreId' in store
+      ? `sub:${store.subStoreId}`
+      : `department:${store.departmentId}`;
 
 /**
  * Moves stock for store documents. Taking out locks the store's variants for the transaction (in a fixed
@@ -38,10 +42,11 @@ export class StockKeeper {
   ) {}
 
   async takeOut(
-    store: StoreRef,
+    store: StockPlace,
     lines: readonly OutLine[],
     document: StockDocument,
     kind: NewMovement['kind'],
+    options: { includeExpired?: boolean } = {},
   ): Promise<Taken[]> {
     const variantIds = [...new Set(lines.map((line) => line.variantId))].sort();
     for (const variantId of variantIds) await this.tx.lock(`scm:stock:${storeKey(store)}:${variantId}`);
@@ -59,6 +64,7 @@ export class StockKeeper {
         qty: line.qty,
         on: document.on,
         lotId: line.lotId ?? null,
+        includeExpired: options.includeExpired ?? false,
         at: `Line ${index + 1}`,
       });
       taken.push(...parts.map((part) => ({ ...part, variantId: line.variantId, line: index })));
@@ -80,7 +86,7 @@ export class StockKeeper {
   }
 
   async putIn(
-    store: StoreRef,
+    store: StockPlace,
     parts: readonly Taken[],
     document: StockDocument,
     kind: NewMovement['kind'],

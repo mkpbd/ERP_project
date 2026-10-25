@@ -17,7 +17,7 @@ export function testEnvironment(): Record<string, string> {
   }
   return {
     NODE_ENV: 'test',
-    LOG_LEVEL: 'silent',
+    LOG_LEVEL: process.env['DEBUG_LOG'] ? 'error' : 'silent',
     DATABASE_URL: url,
     DATABASE_POOL_MAX: '10',
     JWT_ISSUER: 'erp-test',

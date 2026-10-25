@@ -340,12 +340,10 @@ export class CreateIssueHandler implements ICommandHandler<CreateIssueCommand> {
         issuedBy: actor.userId,
         lines,
       });
-      await this.stores.keeper.takeOut(
-        { subStoreId: issue.subStoreId },
-        lines,
-        { id, number, on: issue.issueDate },
-        'issue',
-      );
+      // The goods leave the sub-store and become the department's stock, lot by lot.
+      const document = { id, number, on: issue.issueDate };
+      const taken = await this.stores.keeper.takeOut({ subStoreId: issue.subStoreId }, lines, document, 'issue');
+      await this.stores.keeper.putIn({ departmentId: issue.departmentId }, taken, document, 'issue');
       await desk.record('store_issue', 'issued', actor, id, { number, lines: lines.length });
       return { id, number };
     });

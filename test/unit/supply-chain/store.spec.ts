@@ -152,6 +152,12 @@ describe('StockKeeper', () => {
     constructor(private readonly lots: Map<string, LotBalance[]>) {
       super();
     }
+    reverse(): Promise<void> {
+      return Promise.resolve();
+    }
+    lotCost(): Promise<number> {
+      return Promise.resolve(0);
+    }
     lot(): Promise<string> {
       throw new Error('not used');
     }

@@ -63,8 +63,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 7b | Supply chain: purchase requisitions and approval levels, comparative studies, purchase orders | **Done** | [07b-scm-purchase.md](07b-scm-purchase.md) |
 | 7c | Supply chain: stock receive, lots, stock ledger, opening stock, GRN faults, posting to accounts, supplier ledger | **Done** | [07c-scm-stock.md](07c-scm-stock.md) |
 | 7d | Supply chain: store indents and approval, store requests, issues, transfers (FEFO by lot) | **Done** | [07d-scm-store-operations.md](07d-scm-store-operations.md) |
-| 7e | Supply chain: department stock (consumption, returns, adjustments), supplier returns, gate pass | Next | |
-| 7f | Supply chain: fixed assets (depreciation, maintenance, discard) | Planned | |
+| 7e | Supply chain: department stock (consumption, returns, counts), supplier returns with debit notes, gate passes | **Done** | [07e-scm-department-returns.md](07e-scm-department-returns.md) |
+| 7f | Supply chain: fixed assets (depreciation, maintenance, discard) | Next | |
 | 7g | Supply chain: reports | Planned | |
 | 8 | Pharmacy | Planned | |
 | 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |

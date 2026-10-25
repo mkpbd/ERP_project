@@ -2,6 +2,8 @@ import { Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { DEPARTMENT_HANDLERS } from './application/department.handlers.js';
+import { DepartmentReadRepository } from './application/department.messages.js';
 import { PURCHASE_HANDLERS } from './application/purchase.handlers.js';
 import { PurchaseReadRepository } from './application/purchase.messages.js';
 import { STOCK_HANDLERS } from './application/stock.handlers.js';
@@ -9,8 +11,12 @@ import { STORE_HANDLERS } from './application/store.handlers.js';
 import { StoreReadRepository } from './application/store.messages.js';
 import { StockReadRepository } from './application/stock.messages.js';
 import {
+  AdjustmentRepository,
   ApprovalLevels,
   CatalogueFacts,
+  ConsumptionRepository,
+  DepartmentReturnRepository,
+  GatePassRepository,
   IndentRepository,
   OpeningRepository,
   OrderRepository,
@@ -22,6 +28,7 @@ import {
   StoreAccess,
   StoreMoveRepository,
   StudyRepository,
+  SupplierReturnRepository,
 } from './domain/repositories.js';
 import { DrizzlePurchaseReadRepository } from './infrastructure/persistence/drizzle-purchase.read-repository.js';
 import {
@@ -38,10 +45,20 @@ import {
   DrizzleReceiveRepository,
   DrizzleStockLedger,
 } from './infrastructure/persistence/drizzle-stock.repositories.js';
+import { gatePassReport, supplierReturnReport } from './infrastructure/reports/department.reports.js';
 import { stockCardReport, stockReceiveReport, stockReport } from './infrastructure/reports/stock.reports.js';
 import { stockTransferReport, storeIndentReport, storeIssueReport } from './infrastructure/reports/store.reports.js';
 import { STOCK_CONTROLLERS } from './presentation/stock.controllers.js';
 import { STORE_CONTROLLERS } from './presentation/store.controllers.js';
+import { DEPARTMENT_CONTROLLERS } from './presentation/department.controllers.js';
+import { DrizzleDepartmentReadRepository } from './infrastructure/persistence/drizzle-department.read-repository.js';
+import {
+  DrizzleAdjustmentRepository,
+  DrizzleConsumptionRepository,
+  DrizzleDepartmentReturnRepository,
+  DrizzleGatePassRepository,
+  DrizzleSupplierReturnRepository,
+} from './infrastructure/persistence/drizzle-department.repositories.js';
 import { DrizzleStoreReadRepository } from './infrastructure/persistence/drizzle-store.read-repository.js';
 import {
   DrizzleIndentRepository,
@@ -64,14 +81,28 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
  * (category / group → item → variant) and suppliers (step 7a); purchase requisitions, comparative studies
  * and purchase orders with their approval levels (step 7b); stock receives, lots, the stock movement ledger,
  * opening stock and GRN faults, posting purchases to accounts (step 7c); store indents and their approval,
- * store requests, issues to departments and transfers between stores (step 7d).
+ * store requests, issues to departments and transfers between stores (step 7d); department stock (consumption,
+ * returns, counts), supplier returns and gate passes (step 7e).
  */
 @Module({
-  controllers: [...SCM_RECORD_CONTROLLERS, ...PURCHASE_CONTROLLERS, ...STOCK_CONTROLLERS, ...STORE_CONTROLLERS],
+  controllers: [
+    ...SCM_RECORD_CONTROLLERS,
+    ...PURCHASE_CONTROLLERS,
+    ...STOCK_CONTROLLERS,
+    ...STORE_CONTROLLERS,
+    ...DEPARTMENT_CONTROLLERS,
+  ],
   providers: [
     ...PURCHASE_HANDLERS,
     ...STOCK_HANDLERS,
     ...STORE_HANDLERS,
+    ...DEPARTMENT_HANDLERS,
+    { provide: ConsumptionRepository, useClass: DrizzleConsumptionRepository },
+    { provide: DepartmentReturnRepository, useClass: DrizzleDepartmentReturnRepository },
+    { provide: AdjustmentRepository, useClass: DrizzleAdjustmentRepository },
+    { provide: SupplierReturnRepository, useClass: DrizzleSupplierReturnRepository },
+    { provide: GatePassRepository, useClass: DrizzleGatePassRepository },
+    { provide: DepartmentReadRepository, useClass: DrizzleDepartmentReadRepository },
     { provide: IndentRepository, useClass: DrizzleIndentRepository },
     { provide: RequestRepository, useClass: DrizzleRequestRepository },
     { provide: StoreMoveRepository, useClass: DrizzleStoreMoveRepository },
@@ -98,6 +129,7 @@ export class SupplyChainModule implements OnModuleInit {
     private readonly purchases: PurchaseReadRepository,
     private readonly stock: StockReadRepository,
     private readonly store: StoreReadRepository,
+    private readonly departments: DepartmentReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -113,5 +145,7 @@ export class SupplyChainModule implements OnModuleInit {
     this.reports.register(storeIndentReport(this.store));
     this.reports.register(storeIssueReport(this.store));
     this.reports.register(stockTransferReport(this.store));
+    this.reports.register(supplierReturnReport(this.departments));
+    this.reports.register(gatePassReport(this.departments));
   }
 }
