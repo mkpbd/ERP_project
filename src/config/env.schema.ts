@@ -85,6 +85,21 @@ export const envSchema = z
     OUTBOX_POLL_INTERVAL_MS: z.coerce.number().int().min(0).default(2000),
 
     SWAGGER_ENABLED: booleanString.default(true),
+
+    REPORT_TIME_ZONE: z
+      .string()
+      .refine((zone) => {
+        try {
+          new Intl.DateTimeFormat('en', { timeZone: zone });
+          return true;
+        } catch {
+          return false;
+        }
+      }, 'REPORT_TIME_ZONE must be an IANA time zone such as Asia/Dhaka')
+      .default('Asia/Dhaka'),
+    REPORT_RENDER_CONCURRENCY: z.coerce.number().int().min(1).max(16).default(2),
+    /** Leave unset to use the Chromium installed by `npx playwright install chromium-headless-shell`. */
+    CHROMIUM_EXECUTABLE_PATH: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.MAIL_TRANSPORT === 'smtp' && !env.SMTP_URL) {

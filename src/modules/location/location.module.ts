@@ -1,7 +1,9 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
+import { ReportRegistry } from '../../shared/application/reports.js';
 import { locationRecordTypes } from './infrastructure/persistence/location.record-stores.js';
+import { districtsReport } from './infrastructure/reports/districts.report.js';
 import { CountriesController, DistrictsController, DivisionsController } from './presentation/location.controllers.js';
 
 /** Countries, divisions and districts. Ported from the old API's Location feature and Admin.Countries. */
@@ -9,10 +11,12 @@ import { CountriesController, DistrictsController, DivisionsController } from '.
 export class LocationModule implements OnModuleInit {
   constructor(
     private readonly registry: RecordTypeRegistry,
+    private readonly reports: ReportRegistry,
     private readonly context: DbContext,
   ) {}
 
   onModuleInit(): void {
     for (const type of locationRecordTypes(this.context)) this.registry.register(type);
+    this.reports.register(districtsReport(this.context));
   }
 }

@@ -5,6 +5,9 @@
   "compilerOptions": {
     "deleteOutDir": true,
     "tsConfigPath": "tsconfig.build.json",
-    "assets": [{ "include": "database/migrations/**/*", "watchAssets": false }]
+    "assets": [
+      { "include": "database/migrations/**/*", "watchAssets": false },
+      { "include": "modules/**/*.hbs", "watchAssets": true }
+    ]
   }
 }

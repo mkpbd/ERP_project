@@ -12,9 +12,15 @@ COPY src ./src
 RUN npm run build && npm prune --omit=dev
 
 FROM node:24-bookworm-slim AS runtime
-ENV NODE_ENV=production
+ENV NODE_ENV=production \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
+# Reports: headless Chromium for HTML → PDF, plus Noto fonts (fonts-noto-core includes Noto Sans Bengali).
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends fonts-noto-core \
+  && npx playwright install --with-deps chromium-headless-shell \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --from=build --chown=node:node /app/package.json ./
 USER node

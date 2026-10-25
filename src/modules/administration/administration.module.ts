@@ -1,6 +1,8 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
+import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
+import { ReportRegistry } from '../../shared/application/reports.js';
 import {
   GetSettingsHandler,
   GetTenantLogoHandler,
@@ -14,6 +16,8 @@ import {
   DrizzleSettingsRepository,
   DrizzleTenantLogoRepository,
 } from './infrastructure/persistence/drizzle-administration.repositories.js';
+import { DrizzleOrganizationProfile } from './infrastructure/persistence/drizzle-organization-profile.js';
+import { serviceUnitsReport } from './infrastructure/reports/service-units.report.js';
 import {
   AdminDepartmentsController,
   DiscountCategoriesController,
@@ -32,8 +36,9 @@ import {
 
 /**
  * Admin masters, tenants and application settings. Ported from the old API's
- * Admin feature and SuperAdmin AppSettings.
+ * Admin feature and SuperAdmin AppSettings. Publishes OrganizationProfile (report letterhead).
  */
+@Global()
 @Module({
   controllers: [
     AdminDepartmentsController,
@@ -59,15 +64,19 @@ import {
     GetSettingsHandler,
     { provide: TenantLogoRepository, useClass: DrizzleTenantLogoRepository },
     { provide: SettingsRepository, useClass: DrizzleSettingsRepository },
+    { provide: OrganizationProfile, useClass: DrizzleOrganizationProfile },
   ],
+  exports: [OrganizationProfile],
 })
 export class AdministrationModule implements OnModuleInit {
   constructor(
     private readonly registry: RecordTypeRegistry,
+    private readonly reports: ReportRegistry,
     private readonly context: DbContext,
   ) {}
 
   onModuleInit(): void {
     for (const type of administrationRecordTypes(this.context)) this.registry.register(type);
+    this.reports.register(serviceUnitsReport(this.context));
   }
 }

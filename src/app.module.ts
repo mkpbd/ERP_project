@@ -18,6 +18,7 @@ import { LocationModule } from './modules/location/location.module.js';
 import { NavigationModule } from './modules/navigation/navigation.module.js';
 import { MenuAccessGuard } from './modules/navigation/presentation/menu-access.guard.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { ReportingModule } from './modules/reporting/reporting.module.js';
 import { RequestContext } from './shared/infrastructure/request-context.js';
 import { AUTH_RATE_LIMIT_KEY } from './shared/presentation/auth.decorators.js';
 import { SharedKernelModule } from './shared/shared-kernel.module.js';
@@ -83,6 +84,7 @@ export class AppModule {
         NavigationModule,
         LocationModule,
         AdministrationModule,
+        ReportingModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

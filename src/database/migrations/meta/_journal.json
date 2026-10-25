@@ -22,6 +22,13 @@
       "when": 1792931090602,
       "tag": "0002_admin_masters_locations",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1792933553151,
+      "tag": "0003_reporting",
+      "breakpoints": true
     }
   ]
 }

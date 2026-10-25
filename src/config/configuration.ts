@@ -37,6 +37,11 @@ export interface AppConfig {
     readonly appPublicUrl: string;
     readonly outboxPollIntervalMs: number;
   };
+  readonly reports: {
+    readonly timeZone: string;
+    readonly renderConcurrency: number;
+    readonly chromiumExecutablePath: string | undefined;
+  };
 }
 
 export class ConfigValidationError extends Error {
@@ -95,6 +100,11 @@ export function loadConfig(source: NodeJS.ProcessEnv = process.env): AppConfig {
       fileDir: env.MAIL_FILE_DIR,
       appPublicUrl: env.APP_PUBLIC_URL.replace(/\/+$/, ''),
       outboxPollIntervalMs: env.OUTBOX_POLL_INTERVAL_MS,
+    },
+    reports: {
+      timeZone: env.REPORT_TIME_ZONE,
+      renderConcurrency: env.REPORT_RENDER_CONCURRENCY,
+      chromiumExecutablePath: env.CHROMIUM_EXECUTABLE_PATH,
     },
   };
 }

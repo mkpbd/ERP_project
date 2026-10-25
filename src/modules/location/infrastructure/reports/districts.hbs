@@ -1,0 +1,20 @@
+{{#if data.length}}
+  <table class='report'>
+    <thead>
+      <tr><th class='center' style='width: 32px'>#</th><th>Division</th><th>District</th><th>জেলা</th></tr>
+    </thead>
+    <tbody>
+      {{#each data}}
+        <tr>
+          <td class='center'>{{inc @index}}</td>
+          <td>{{division}}</td>
+          <td>{{district}}</td>
+          <td>{{#if districtBn}}{{districtBn}}{{else}}<span class='muted'>—</span>{{/if}}</td>
+        </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  <p class='muted'>Total districts: {{data.length}}</p>
+{{else}}
+  <p class='empty'>No districts.</p>
+{{/if}}

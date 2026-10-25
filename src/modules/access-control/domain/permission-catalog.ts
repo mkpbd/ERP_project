@@ -23,6 +23,9 @@ export const PERMISSION_CATALOG = [
   { key: 'masters:manage', description: 'Create, edit and delete admin master data (departments, service units, …)' },
   { key: 'tenants:manage', description: 'Create, edit and delete tenants and their logos' },
   { key: 'settings:manage', description: 'Change application settings' },
+  { key: 'reports:read', description: 'See every report and which roles may run it' },
+  { key: 'reports:assign', description: 'Grant reports to roles (only reports you can run)' },
+  { key: 'reports:access-all', description: 'Run every report without a role grant' },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]['key'];

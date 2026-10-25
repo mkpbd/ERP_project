@@ -15,6 +15,7 @@ Design and security rationale: [docs/architecture.md](docs/architecture.md).
 
 ```bash
 npm ci
+npx playwright install chromium-headless-shell   # once: Chromium for PDF reports
 cp .env.example .env          # then edit: DATABASE_URL, TEST_DATABASE_URL, JWT_SIGNING_KEYS, ...
 npm run db:migrate            # apply migrations (use a schema-owner role)
 npm run start:dev             # http://localhost:3000/api/docs
@@ -107,6 +108,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `/admin/{departments,service-units,serve-types,discount-categories,printers,payment-modes,payment-channels,editor-shortcuts}`, `/admin/page-controls/{ipd-admission,investigation-entry}` | read: authenticated; write: `masters:manage` |
 | `/admin/tenants`, `/admin/tenants/:id/logos/:slot` | read: authenticated; write: `tenants:manage` |
 | `/admin/settings/{general,editor-margins}` | `GET`: authenticated; `PATCH`: `settings:manage` |
+| `GET /reports`, `GET /reports/:key`, `POST /reports/:key/render` | authenticated; the report must be granted to one of your roles (or `reports:access-all`) |
+| `GET /reports/catalog`, `GET /roles/:id/reports` / `PUT /roles/:id/reports` | `reports:read` / `reports:assign` + may only grant reports you can run |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

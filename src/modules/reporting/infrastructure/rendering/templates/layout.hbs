@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <title>{{title}}</title>
+    <style>
+      @page {
+        margin: 0;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: 'Noto Sans', 'Noto Sans Bengali', 'Nirmala UI', 'Segoe UI', Arial, sans-serif;
+        font-size: 10.5px;
+        color: #111;
+      }
+      .letterhead {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border-bottom: 2px solid #222;
+        padding-bottom: 8px;
+      }
+      .letterhead img {
+        max-height: 56px;
+        max-width: 120px;
+      }
+      .letterhead .org {
+        flex: 1;
+        text-align: center;
+      }
+      .letterhead .name {
+        font-size: 17px;
+        font-weight: 700;
+      }
+      .letterhead .alt {
+        font-size: 13px;
+      }
+      .letterhead .contact {
+        font-size: 10px;
+        color: #333;
+      }
+      h1 {
+        font-size: 14px;
+        text-align: center;
+        margin: 10px 0 2px;
+        text-transform: uppercase;
+        letter-spacing: 0.3px;
+      }
+      .filters {
+        text-align: center;
+        font-size: 10px;
+        color: #333;
+        margin-bottom: 8px;
+      }
+      table.report {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      table.report th,
+      table.report td {
+        border: 1px solid #999;
+        padding: 3px 5px;
+        vertical-align: top;
+      }
+      table.report th {
+        background: #eee;
+        text-align: left;
+      }
+      table.report thead {
+        display: table-header-group;
+      }
+      table.report tr {
+        page-break-inside: avoid;
+      }
+      .num {
+        text-align: right;
+        white-space: nowrap;
+      }
+      .center {
+        text-align: center;
+      }
+      .muted {
+        color: #666;
+      }
+      .group-row td {
+        background: #f6f6f6;
+        font-weight: 700;
+      }
+      .empty {
+        text-align: center;
+        padding: 16px;
+        color: #666;
+      }
+    </style>
+  </head>
+  <body>
+    <header class='letterhead'>
+      {{#if header.logoDataUri}}<img src='{{header.logoDataUri}}' alt='' />{{/if}}
+      <div class='org'>
+        <div class='name'>{{header.organizationName}}</div>
+        {{#if header.organizationNameAlt}}<div class='alt'>{{header.organizationNameAlt}}</div>{{/if}}
+        {{#if header.address}}<div class='contact'>{{header.address}}</div>{{/if}}
+        {{#if header.hotline}}<div class='contact'>Hotline: {{header.hotline}}</div>{{/if}}
+      </div>
+      {{#if header.logoDataUri}}<div style='width: 56px'></div>{{/if}}
+    </header>
+    <h1>{{title}}</h1>
+    {{#if filters}}<div class='filters'>{{filters}}</div>{{/if}}
+    <main>{{body}}</main>
+  </body>
+</html>

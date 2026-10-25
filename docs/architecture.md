@@ -25,7 +25,8 @@ src/
     ├── notifications/   transactional outbox + mail transports
     ├── navigation/      menu tree, role menu grants, page-level access (@MenuAccess)
     ├── location/        countries, divisions, districts (simple records)
-    ├── administration/  admin masters, tenants + logos, settings documents
+    ├── administration/  admin masters, tenants + logos, settings documents, OrganizationProfile
+    ├── reporting/       report catalog, role grants, PDF (Chromium / pdfmake) and Excel rendering
     └── health/          liveness/readiness
 ```
 
@@ -96,6 +97,16 @@ row (`23503`/`23001`) to 409 `<name>_in_use`. `createRecordController()` builds 
 `GET / GET :id / POST / PATCH :id / DELETE :id` controller from Zod DTOs; it applies the same parameter
 metadata a hand-written controller would, so validation and OpenAPI work unchanged. As soon as a table
 needs rules of its own, it gets a regular aggregate and handlers.
+
+### Reports
+
+A report is code in the module that owns its data: `defineReport({ key, params: zodSchema, load, pdf, xlsx })`,
+registered in the shared `ReportRegistry`. The reporting module checks the grant (`role_reports` or
+`reports:access-all`), validates the parameters with the report's schema, loads, renders and audits
+`report.rendered`. HTML layouts render in a shared headless Chromium with JavaScript disabled and all network
+requests aborted; pdfmake may read only its bundled fonts. Templates are Handlebars (escaped by default).
+The letterhead comes from the `OrganizationProfile` contract. See
+[migration/03-reporting-foundation.md](migration/03-reporting-foundation.md).
 
 ### Transactions
 

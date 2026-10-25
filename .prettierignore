@@ -1,0 +1,2 @@
+# Prettier's Handlebars (Glimmer) printer drops <!doctype html> from report layouts.
+*.hbs

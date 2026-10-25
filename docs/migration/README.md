@@ -11,7 +11,7 @@ one module at a time. Each step has its own document in this folder.
 | Database | PostgreSQL. SQL Server schemas (`Admin`, `Menu`, `Identity`, …) become plain tables in `public`, snake_case. |
 | API contract | **New design**, not wire-compatible. `/api/v1/...` REST routes, plain JSON bodies, RFC 9457 errors, JWT + rotating refresh token. The old `{ succeeded, messages, data }` envelope and the per-user `x-api-key` header are gone. Every step document has an old → new route table for the frontend. |
 | Data | Schema and code first. SQL Server → PostgreSQL data copy (ETL) is a **later phase**; each step records the column mapping it will need. |
-| Reports (RDLC) | Converted **with each module**. The rendering approach is decided in the step that first needs it (see the plan). |
+| Reports (RDLC, QuestPDF) | Converted **with each module** using the step 3 recipe: HTML + Chromium by default (Bangla-safe), pdfmake for small Latin-only receipts/labels, exceljs for spreadsheets. |
 | gRPC (`Server.Grpc`, 41 protos) | Converted **with each module**, if a consumer still needs it; otherwise dropped and noted. |
 
 ## Conventions for every step
@@ -45,7 +45,7 @@ Order follows dependencies: later modules reference earlier ones.
 |---|---|---|---|
 | 1 | Menus, page access; identity/role mapping | **Done** | [01-menus-and-page-access.md](01-menus-and-page-access.md) |
 | 2 | Admin masters (departments, service units, serve types, printers, discount categories, payment modes/channels, editor shortcuts, page controls), tenants + logos, locations, settings (AppSettings, EditorMargins); shared simple-record toolkit | **Done** | [02-admin-masters-locations-settings.md](02-admin-masters-locations-settings.md) |
-| 3 | Reporting foundation: replacement for RDLC (`Web/Report`, `ReportAndSp`, `ReportPermission`, `DynamicReportQuery`) | Next — needs a decision on the rendering approach | |
+| 3 | Reporting foundation: Chromium HTML→PDF + pdfmake + exceljs, report catalog in code, role grants, audited runs (replaces `Web/Report`, `ReportAndSps`, `ReportPermissions`, dynamic SP reports) | **Done** | [03-reporting-foundation.md](03-reporting-foundation.md) |
 | 4 | HR (staff records, departments, designations), Attendance | Planned | |
 | 5 | Payroll, PFBook, TDS/VAT/TAX | Planned | |
 | 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
