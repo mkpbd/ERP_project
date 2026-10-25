@@ -1,0 +1,35 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Group</th><th>Item</th><th>Unit</th>
+      <th class="num">Quantity</th><th class="num">Reorder level</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{groupName}}</td>
+      <td>{{itemName}} — {{variantName}}{{#if code}} ({{code}}){{/if}}{{#if belowReorder}} <b>⚠ reorder</b>{{/if}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{integer reorderLevel}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{#if ../data.withLots}}
+    {{#each lots}}
+    <tr>
+      <td></td><td></td>
+      <td style="padding-left: 24px"><small>Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · expiry {{#if expiryDate}}{{date expiryDate}}{{else}}—{{/if}}</small></td>
+      <td></td><td class="num"><small>{{qty}}</small></td><td></td><td class="num"><small>{{money value}}</small></td>
+    </tr>
+    {{/each}}
+    {{/if}}
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Total value</td><td class="num">{{money data.value}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>Nothing in stock.</p>
+{{/if}}

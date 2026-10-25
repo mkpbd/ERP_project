@@ -25,3 +25,7 @@ export const SCM_READ = 'scm:read';
 export const SCM_MANAGE = 'scm:manage';
 /** Raising and editing requisitions, comparative studies and purchase orders. */
 export const SCM_PURCHASE = 'scm:purchase';
+/** Taking goods into stock: drafting and posting stock receives, GRN faults. */
+export const SCM_RECEIVE = 'scm:receive';
+
+export const GRN_FAULT = 'grn_fault';

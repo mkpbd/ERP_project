@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { glAccounts, subLedgers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
+import { glAccounts, subLedgers, vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
 import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { roles } from '../../../access-control/infrastructure/persistence/access-control.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
@@ -594,5 +594,190 @@ export const purchaseOrderLines = pgTable(
       'purchase_order_lines_amounts_ck',
       sql`${t.qty} > 0 and ${t.rate} >= 0 and ${t.vatPercent} between 0 and 100 and ${t.receivedQty} >= 0`,
     ),
+  ],
+);
+
+const unitCost = (name: string) => numeric(name, { precision: 16, scale: 4, mode: 'number' });
+
+// Old SupplyChain.LotRecords: one lot per item variant, batch and expiry (the old lots were shared by every
+// product with the same batch and expiry text, with three different date formats).
+export const stockLots = pgTable(
+  'stock_lots',
+  {
+    id: uuid('id').primaryKey(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    batchNo: text('batch_no'),
+    expiryDate: day('expiry_date'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('stock_lots_uq').on(
+      t.variantId,
+      sql`coalesce(upper(${t.batchNo}), '')`,
+      sql`coalesce(${t.expiryDate}, '9999-12-31'::date)`,
+    ),
+    index('stock_lots_expiry_idx').on(t.expiryDate),
+  ],
+);
+
+export const STOCK_MOVEMENT_KINDS = ['opening', 'receive'] as const;
+
+// Every quantity in or out of a store, by lot, with its unit cost. Stock is the sum; the old system added up
+// receive, transfer, issue and return tables in each report.
+export const stockMovements = pgTable(
+  'stock_movements',
+  {
+    id: uuid('id').primaryKey(),
+    mainStoreId: uuid('main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
+    subStoreId: uuid('sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => stockLots.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+    movedOn: day('moved_on').notNull(),
+    kind: text('kind', { enum: STOCK_MOVEMENT_KINDS }).notNull(),
+    documentId: uuid('document_id').notNull(),
+    documentNumber: text('document_number').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('stock_movements_main_idx').on(t.mainStoreId, t.variantId, t.movedOn),
+    index('stock_movements_sub_idx').on(t.subStoreId, t.variantId, t.movedOn),
+    index('stock_movements_lot_idx').on(t.lotId),
+    index('stock_movements_document_idx').on(t.documentId),
+    check('stock_movements_store_ck', sql`(${t.mainStoreId} is null) <> (${t.subStoreId} is null)`),
+    check('stock_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
+    check('stock_movements_kind_ck', sql`${t.kind} in ('opening', 'receive')`),
+  ],
+);
+
+// Old OpeningQty / OpeningDate on BrandExtensions: opening stock entered per store.
+export const stockOpenings = pgTable(
+  'stock_openings',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    mainStoreId: uuid('main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
+    subStoreId: uuid('sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    openedOn: day('opened_on').notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('stock_openings_number_uq').on(t.number),
+    check('stock_openings_store_ck', sql`(${t.mainStoreId} is null) <> (${t.subStoreId} is null)`),
+  ],
+);
+
+// Old StockReceives / StockReceiveDetails.
+export const stockReceives = pgTable(
+  'stock_receives',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'restrict' }),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    purchaseOrderId: uuid('purchase_order_id').references(() => purchaseOrders.id, { onDelete: 'restrict' }),
+    receivedOn: day('received_on').notNull(),
+    supplierInvoiceNo: text('supplier_invoice_no'),
+    supplierInvoiceDate: day('supplier_invoice_date'),
+    challanNo: text('challan_no'),
+    remarks: text('remarks'),
+    status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    vat: money('vat').notNull(),
+    ait: money('ait').notNull(),
+    total: money('total').notNull(),
+    voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    postedBy: uuid('posted_by').references(() => users.id, { onDelete: 'set null' }),
+    postedAt: tz('posted_at'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('stock_receives_number_uq').on(t.number),
+    uniqueIndex('stock_receives_invoice_uq')
+      .on(t.supplierId, sql`upper(${t.supplierInvoiceNo})`)
+      .where(sql`${t.supplierInvoiceNo} is not null`),
+    uniqueIndex('stock_receives_challan_uq')
+      .on(t.supplierId, sql`upper(${t.challanNo})`)
+      .where(sql`${t.challanNo} is not null`),
+    index('stock_receives_supplier_idx').on(t.supplierId, t.receivedOn),
+    index('stock_receives_order_idx').on(t.purchaseOrderId),
+    index('stock_receives_status_idx').on(t.status, t.receivedOn),
+    check('stock_receives_status_ck', sql`${t.status} in ('draft', 'posted')`),
+    check('stock_receives_posted_ck', sql`(${t.status} = 'posted') = (${t.postedAt} is not null)`),
+  ],
+);
+
+export const stockReceiveLines = pgTable(
+  'stock_receive_lines',
+  {
+    receiveId: uuid('receive_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    rate: money('rate').notNull(),
+    discountPercent: percent('discount_percent').notNull(),
+    vatPercent: percent('vat_percent').notNull(),
+    aitPercent: percent('ait_percent').notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    vat: money('vat').notNull(),
+    ait: money('ait').notNull(),
+    total: money('total').notNull(),
+    batchNo: text('batch_no'),
+    expiryDate: day('expiry_date'),
+    warrantyNote: text('warranty_note'),
+    lotId: uuid('lot_id').references(() => stockLots.id, { onDelete: 'restrict' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.receiveId, t.position] }),
+    foreignKey({
+      name: 'stock_receive_lines_receive_fk',
+      columns: [t.receiveId],
+      foreignColumns: [stockReceives.id],
+    }).onDelete('cascade'),
+    index('stock_receive_lines_variant_idx').on(t.variantId),
+    check('stock_receive_lines_amounts_ck', sql`${t.qty} > 0 and ${t.rate} >= 0 and ${t.total} >= 0`),
+  ],
+);
+
+// Old GRNs / GRNFaultDescriptions: faults noted on the goods of a purchase order (kept on their own, as before).
+export const grnFaults = pgTable(
+  'grn_faults',
+  {
+    id: uuid('id').primaryKey(),
+    purchaseOrderId: uuid('purchase_order_id')
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: 'cascade' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    description: text('description').notNull(),
+    notedOn: day('noted_on').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('grn_faults_order_idx').on(t.purchaseOrderId),
+    check('grn_faults_qty_ck', sql`${t.qty} > 0`),
+    check('grn_faults_description_len_ck', sql`char_length(${t.description}) between 1 and 1000`),
   ],
 );

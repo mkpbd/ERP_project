@@ -1,0 +1,54 @@
+{{#with data.receive}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr>
+      <td style="width: 13%">Receive no</td><td><b>{{number}}</b></td>
+      <td style="width: 13%">Received on</td><td>{{date receivedOn}}</td>
+      <td style="width: 13%">Store</td><td>{{mainStoreName}}</td>
+    </tr>
+    <tr>
+      <td>Supplier</td><td><b>{{supplierName}}</b>{{#if supplierAddress}}<br />{{supplierAddress}}{{/if}}</td>
+      <td>Invoice</td><td>{{supplierInvoiceNo}}{{#if supplierInvoiceDate}} of {{date supplierInvoiceDate}}{{/if}}</td>
+      <td>Challan</td><td>{{challanNo}}</td>
+    </tr>
+    <tr>
+      <td>Purchase order</td><td>{{#if purchaseOrderNumber}}{{purchaseOrderNumber}}{{else}}without order{{/if}}</td>
+      <td>Voucher</td><td>{{voucherNumber}}</td>
+      <td>Status</td><td>{{status}}</td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Batch</th><th>Expiry</th>
+      <th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num">Discount</th>
+      <th class="num">VAT</th><th class="num">AIT</th><th class="num">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}} ({{unit}}){{#if warrantyNote}}<br /><small>{{warrantyNote}}</small>{{/if}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{#if expiryDate}}{{date expiryDate}}{{/if}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{money rate}}</td>
+      <td class="num">{{money amount}}</td>
+      <td class="num">{{money discount}}{{#if discountPercent}} <small>({{discountPercent}}%)</small>{{/if}}</td>
+      <td class="num">{{money vat}}{{#if vatPercent}} <small>({{vatPercent}}%)</small>{{/if}}</td>
+      <td class="num">{{money ait}}{{#if aitPercent}} <small>({{aitPercent}}%)</small>{{/if}}</td>
+      <td class="num">{{money total}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="6">Total</td>
+      <td class="num">{{money amount}}</td><td class="num">{{money discount}}</td><td class="num">{{money vat}}</td>
+      <td class="num">{{money ait}}</td><td class="num">{{money total}}</td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords total}}</p>
+{{#if remarks}}<p><b>Remarks:</b> {{remarks}}</p>{{/if}}
+{{/with}}

@@ -1,6 +1,6 @@
-/** One line of a voucher posted by another module; the account is a GL code or a configured GL role. */
+/** One line of a voucher posted by another module; the account is a GL id, a GL code or a configured GL role. */
 export interface LedgerPostingLine {
-  readonly account: { readonly code: string } | { readonly role: string };
+  readonly account: { readonly id: string } | { readonly code: string } | { readonly role: string };
   readonly debit: number;
   readonly credit: number;
   readonly narration?: string | null;

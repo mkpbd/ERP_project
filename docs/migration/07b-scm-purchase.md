@@ -1,6 +1,6 @@
 # Step 7b — Supply chain: requisitions, comparative studies, purchase orders
 
-Status: **done** (2026-10-26). Previous: [step 7a](07a-scm-masters.md) · Next: step 7c (stock receive and stock
+Status: **done** (2026-10-26). Previous: [step 7a](07a-scm-masters.md) · Next: [step 7c](07c-scm-stock.md) (stock receive and stock
 ledger).
 
 ## Where the old logic lives

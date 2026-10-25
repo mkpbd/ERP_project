@@ -305,10 +305,19 @@ export class VoucherLedgerPosting extends LedgerPosting {
       ]);
       if (!journal) throw new DomainError('invalid_voucher', `Unknown journal type ${request.journal}`);
       const lines: VoucherLine[] = request.lines.map((line, index) => {
-        const glAccountId = 'code' in line.account ? byCode.get(line.account.code) : byRole.get(line.account.role);
-        if (!glAccountId) {
-          const what = 'code' in line.account ? `account ${line.account.code}` : `GL role ${line.account.role}`;
-          throw new DomainError('invalid_voucher', `Line ${index + 1}: unknown ${what}`);
+        const { account } = line;
+        let glAccountId: string | undefined;
+        if ('id' in account) {
+          // An unknown id is refused with the other account checks when the chart is loaded.
+          glAccountId = account.id;
+        } else if ('code' in account) {
+          glAccountId = byCode.get(account.code);
+          if (!glAccountId)
+            throw new DomainError('invalid_voucher', `Line ${index + 1}: unknown account ${account.code}`);
+        } else {
+          glAccountId = byRole.get(account.role);
+          if (!glAccountId)
+            throw new DomainError('invalid_voucher', `Line ${index + 1}: unknown GL role ${account.role}`);
         }
         return {
           glAccountId,

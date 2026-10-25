@@ -1,0 +1,27 @@
+{{#with data.card}}
+<p><b>{{itemName}} — {{variantName}}</b>{{#if code}} ({{code}}){{/if}} · {{unit}} · {{../data.store}}</p>
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 80px">Date</th><th>Document</th><th>Kind</th><th>Batch</th><th>Expiry</th>
+      <th class="num">In</th><th class="num">Out</th><th class="num">Balance</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="group-row"><td colspan="7">Opening balance</td><td class="num">{{opening}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td>{{date movedOn}}</td><td>{{documentNumber}}</td><td>{{kind}}</td><td>{{batchNo}}</td>
+      <td>{{#if expiryDate}}{{date expiryDate}}{{/if}}</td>
+      <td class="num">{{#if in}}{{in}}{{/if}}</td>
+      <td class="num">{{#if out}}{{out}}{{/if}}</td>
+      <td class="num">{{balance}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">Closing balance</td><td class="num">{{totalIn}}</td><td class="num">{{totalOut}}</td>
+      <td class="num">{{closing}}</td>
+    </tr>
+  </tbody>
+</table>
+{{/with}}

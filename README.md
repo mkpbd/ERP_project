@@ -147,7 +147,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /scm/*` (stores, store access, item catalogue, suppliers) | `scm:read` |
 | the same (write), purchase and comparative study approval levels | `scm:manage` |
 | `GET /scm/{purchase-requisitions,comparative-studies,purchase-orders}[/:id]` | `scm:read` |
-| raise, edit, submit, cancel requisitions, studies and orders | `scm:purchase` |
+| raise, edit, submit, cancel requisitions, studies and orders; close part-received orders | `scm:purchase` |
+| `GET /scm/stock`, `/scm/stock/card`, `/scm/stock-receives[/:id]`, GRN faults (read) | `scm:read` |
+| stock receives (draft, edit, post, delete), GRN faults (write) | `scm:receive` |
+| `POST /scm/opening-stock` | `scm:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |

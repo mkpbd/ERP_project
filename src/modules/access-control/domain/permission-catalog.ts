@@ -50,6 +50,7 @@ export const PERMISSION_CATALOG = [
   { key: 'scm:read', description: 'See stores, store access, the item catalogue and suppliers' },
   { key: 'scm:manage', description: 'Set up stores, store access, the item catalogue, suppliers and approval levels' },
   { key: 'scm:purchase', description: 'Raise and edit purchase requisitions, comparative studies and purchase orders' },
+  { key: 'scm:receive', description: 'Draft and post stock receives and note GRN faults' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

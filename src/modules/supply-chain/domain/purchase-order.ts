@@ -151,6 +151,61 @@ export class PurchaseOrder {
     this.touch(now);
   }
 
+  /**
+   * Adds what a posted stock receive brought (variant → quantity). Nothing beyond the ordered quantity is
+   * taken (the old receive page capped it only when a line was edited).
+   */
+  receive(quantities: ReadonlyMap<string, number>, now: Date): void {
+    if (this.props.status !== 'open' && this.props.status !== 'partially_received') {
+      throw new DomainError(
+        'purchase_order_state',
+        `A ${this.props.status.replace('_', ' ')} order cannot be received`,
+      );
+    }
+    for (const variantId of quantities.keys()) {
+      if (!this.props.lines.some((line) => line.variantId === variantId)) {
+        throw new DomainError('not_on_order', 'An item received is not on the purchase order');
+      }
+    }
+    this.props.lines = this.props.lines.map((line, index) => {
+      const receivedQty = Math.round((line.receivedQty + (quantities.get(line.variantId) ?? 0)) * 1000) / 1000;
+      if (receivedQty > line.qty) {
+        throw new DomainError(
+          'receive_exceeds_order',
+          `Line ${index + 1}: only ${Math.round((line.qty - line.receivedQty) * 1000) / 1000} is still to be received`,
+        );
+      }
+      return { ...line, receivedQty };
+    });
+    this.props.status = this.props.lines.every((line) => line.receivedQty >= line.qty)
+      ? 'received'
+      : 'partially_received';
+    this.touch(now);
+  }
+
+  /** Stops waiting for the rest of a partly received order. */
+  close(reason: string, now: Date): void {
+    if (this.props.status !== 'partially_received') {
+      throw new DomainError('purchase_order_state', 'Only a partly received order can be closed');
+    }
+    const text = reason.trim();
+    if (text.length === 0 || text.length > 500)
+      throw new DomainError('invalid_remarks', 'Give a reason (1-500 characters)');
+    this.props.status = 'closed';
+    this.props.cancelReason = text;
+    this.touch(now);
+  }
+
+  get supplierId(): string {
+    return this.props.supplierId;
+  }
+  get mainStoreId(): string {
+    return this.props.mainStoreId;
+  }
+  get number(): string {
+    return this.props.number;
+  }
+
   assertVersion(version: number): void {
     if (version !== this.props.version) {
       throw new ConflictError('stale_purchase_order', 'The order was changed by someone else; reload it');

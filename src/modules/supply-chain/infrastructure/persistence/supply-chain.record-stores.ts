@@ -5,9 +5,20 @@ import {
   type RecordStoreOptions,
   type RecordTable,
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
-import { SCM_MANAGE, SCM_READ, SCM_RECORDS as R } from '../../application/supply-chain.constants.js';
+import { and, eq, ne } from 'drizzle-orm';
+import { DomainError } from '../../../../shared/domain/errors.js';
+import {
+  GRN_FAULT,
+  SCM_MANAGE,
+  SCM_READ,
+  SCM_RECEIVE,
+  SCM_RECORDS as R,
+} from '../../application/supply-chain.constants.js';
 import {
   csApprovalLevels,
+  grnFaults,
+  purchaseOrderLines,
+  purchaseOrders,
   departmentStoreAccess,
   departmentUsers,
   issueStoreUsers,
@@ -184,5 +195,36 @@ export function supplyChainRecordTypes(context: DbContext): RecordType[] {
       unique: { cs_approval_levels_order_uq: taken('cs_approval_level_exists', 'This level exists') },
       references: { [fk('cs_approval_levels', 'approver_staff_id', 'staff_records')]: 'staff' },
     }),
+    {
+      name: GRN_FAULT,
+      readPermission: SCM_READ,
+      managePermission: SCM_RECEIVE,
+      store: new DrizzleRecordStore(context, grnFaults, {
+        name: GRN_FAULT,
+        orderBy: [grnFaults.notedOn, grnFaults.createdAt],
+        filters: { purchaseOrderId: grnFaults.purchaseOrderId },
+        references: {
+          [fk('grn_faults', 'purchase_order_id', 'purchase_orders')]: 'purchase_order',
+          [fk('grn_faults', 'variant_id', 'item_variants')]: R.variant,
+        },
+        // A fault is noted on an item of an order that is not cancelled.
+        guard: async (row) => {
+          const { purchaseOrderId, variantId } = row;
+          if (typeof purchaseOrderId !== 'string' || typeof variantId !== 'string') return;
+          const [line] = await context.db
+            .select({ status: purchaseOrders.status })
+            .from(purchaseOrderLines)
+            .innerJoin(purchaseOrders, eq(purchaseOrders.id, purchaseOrderLines.orderId))
+            .where(
+              and(
+                eq(purchaseOrderLines.orderId, purchaseOrderId),
+                eq(purchaseOrderLines.variantId, variantId),
+                ne(purchaseOrders.status, 'cancelled'),
+              ),
+            );
+          if (!line) throw new DomainError('not_on_order', 'The item is not on an open purchase order');
+        },
+      }),
+    },
   ];
 }
