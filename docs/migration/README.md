@@ -56,8 +56,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 5c | Payroll: festival bonus, leave encashment, PF ledger, staff dues | **Done** | [05c-payroll-bonus-ledgers.md](05c-payroll-bonus-ledgers.md) |
 | 5d | Payroll: income tax (tax years and slabs, monthly deductions, certificates) | **Done** | [05d-payroll-income-tax.md](05d-payroll-income-tax.md) |
 | 6a | Accounts: chart of accounts, statement heads, accounting masters | **Done** | [06a-accounts-chart.md](06a-accounts-chart.md) |
-| 6b | Accounts: vouchers (double entry, numbering, attachments, reversal), GL posting, account configuration | Next | |
-| 6c | Accounts: ledger, sub-ledger, cash/bank book, trial balance, profit and loss, balance sheet, cash flow | Planned | |
+| 6b | Accounts: vouchers (double entry, numbering, attachments, reversal), GL posting, account configuration | **Done** | [06b-accounts-vouchers.md](06b-accounts-vouchers.md) |
+| 6c | Accounts: ledger, sub-ledger, cash/bank book, trial balance, profit and loss, balance sheet, cash flow | Next | |
 | 6d | Accounts: party ledgers (supplier, consultant, IPD patient), due collection, PF book, TDS rules | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |

@@ -45,6 +45,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
     truncate table audit_logs, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,
       email_verification_tokens, role_reports, role_menus, menus,
+      voucher_attachments, voucher_lines, voucher_sequences, vouchers, gl_roles, posting_schedules,
       pos_terminals, bank_accounts, gl_statement_mappings, statement_sub_heads, statement_broad_heads,
       account_group_members, account_groups, gl_item_descriptions, gl_accounts, account_level5_heads,
       account_level4_heads, account_sub_categories, account_categories, account_natures, coa_descriptions,

@@ -28,3 +28,11 @@ export const ACCOUNT_RECORDS = {
 export const ACCOUNTS_READ = 'accounts:read';
 /** Setting up the chart of accounts and accounting masters. */
 export const ACCOUNTS_MANAGE = 'accounts:manage';
+
+/** Entering and editing draft vouchers and their attachments. */
+export const VOUCHERS_WRITE = 'vouchers:write';
+/** Posting and reversing vouchers. */
+export const VOUCHERS_POST = 'vouchers:post';
+
+export const GL_ROLE = 'gl_role';
+export const POSTING_SCHEDULE = 'posting_schedule';

@@ -1,8 +1,27 @@
 import { sql, type SQLWrapper } from 'drizzle-orm';
-import { boolean, check, date, index, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  check,
+  customType,
+  date,
+  index,
+  integer,
+  numeric,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  uniqueIndex,
+  uuid,
+  type AnyPgColumn,
+} from 'drizzle-orm/pg-core';
+import { serviceUnits } from '../../../administration/infrastructure/persistence/administration.schema.js';
+import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 const day = (name: string) => date(name, { mode: 'string' });
+const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 const timestamps = {
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -355,4 +374,153 @@ export const subLedgers = pgTable(
     ...timestamps,
   },
   (t) => [index('sub_ledgers_type_idx').on(t.typeId, t.name), nameLength('sub_ledgers', t.name, 200)],
+);
+
+const amount = (name: string) => numeric(name, { precision: 14, scale: 2, mode: 'number' });
+
+// Old Account.VoucherMasters. Drafts have no number or fiscal year yet; posting assigns both.
+export const vouchers = pgTable(
+  'vouchers',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number'),
+    journalTypeId: uuid('journal_type_id')
+      .notNull()
+      .references(() => journalTypes.id, { onDelete: 'restrict' }),
+    fiscalYearId: uuid('fiscal_year_id').references(() => fiscalYears.id, { onDelete: 'restrict' }),
+    voucherDate: day('voucher_date').notNull(),
+    documentDate: day('document_date'),
+    narration: text('narration'),
+    paidTo: text('paid_to'),
+    mode: text('mode'),
+    serviceUnitId: uuid('service_unit_id').references(() => serviceUnits.id, { onDelete: 'restrict' }),
+    status: text('status', { enum: ['draft', 'posted', 'reversed'] }).notNull(),
+    sourceModule: text('source_module'),
+    sourceReference: text('source_reference'),
+    reversalOfId: uuid('reversal_of_id').references((): AnyPgColumn => vouchers.id, { onDelete: 'restrict' }),
+    total: amount('total').notNull(),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    postedBy: uuid('posted_by').references(() => users.id, { onDelete: 'set null' }),
+    postedAt: tz('posted_at'),
+    version: integer('version').notNull().default(1),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('vouchers_number_uq').on(t.number),
+    index('vouchers_date_idx').on(t.voucherDate, t.status),
+    index('vouchers_source_idx').on(t.sourceModule, t.sourceReference),
+    // One reversal per voucher.
+    uniqueIndex('vouchers_reversal_uq').on(t.reversalOfId),
+    check('vouchers_status_ck', sql`${t.status} in ('draft', 'posted', 'reversed')`),
+    check(
+      'vouchers_posted_ck',
+      sql`(${t.status} = 'draft') = (${t.number} is null) and (${t.status} = 'draft') = (${t.fiscalYearId} is null)`,
+    ),
+    check('vouchers_source_ck', sql`(${t.sourceModule} is null) = (${t.sourceReference} is null)`),
+  ],
+);
+
+// Old Account.VoucherMasterDetails.
+export const voucherLines = pgTable(
+  'voucher_lines',
+  {
+    voucherId: uuid('voucher_id')
+      .notNull()
+      .references(() => vouchers.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    glAccountId: uuid('gl_account_id')
+      .notNull()
+      .references(() => glAccounts.id, { onDelete: 'restrict' }),
+    debit: amount('debit').notNull(),
+    credit: amount('credit').notNull(),
+    narration: text('narration'),
+    costCenterId: uuid('cost_center_id').references(() => costCenters.id, { onDelete: 'restrict' }),
+    subLedgerId: uuid('sub_ledger_id').references(() => subLedgers.id, { onDelete: 'restrict' }),
+    chequeNo: text('cheque_no'),
+    chequeDate: day('cheque_date'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.voucherId, t.position] }),
+    index('voucher_lines_account_idx').on(t.glAccountId),
+    index('voucher_lines_sub_ledger_idx').on(t.subLedgerId),
+    check(
+      'voucher_lines_amount_ck',
+      sql`${t.debit} >= 0 and ${t.credit} >= 0 and (${t.debit} > 0) <> (${t.credit} > 0)`,
+    ),
+  ],
+);
+
+// Next voucher serial per journal type and fiscal year.
+export const voucherSequences = pgTable(
+  'voucher_sequences',
+  {
+    journalTypeId: uuid('journal_type_id')
+      .notNull()
+      .references(() => journalTypes.id, { onDelete: 'restrict' }),
+    fiscalYearId: uuid('fiscal_year_id')
+      .notNull()
+      .references(() => fiscalYears.id, { onDelete: 'restrict' }),
+    last: integer('last').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.journalTypeId, t.fiscalYearId] })],
+);
+
+// Old Account.AttachedFileWithVouchers.
+export const voucherAttachments = pgTable(
+  'voucher_attachments',
+  {
+    id: uuid('id').primaryKey(),
+    voucherId: uuid('voucher_id')
+      .notNull()
+      .references(() => vouchers.id, { onDelete: 'cascade' }),
+    fileName: text('file_name').notNull(),
+    contentType: text('content_type').notNull(),
+    sizeBytes: integer('size_bytes').notNull(),
+    data: bytea('data').notNull(),
+    uploadedBy: uuid('uploaded_by').references(() => users.id, { onDelete: 'set null' }),
+    uploadedAt: tz('uploaded_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('voucher_attachments_voucher_idx').on(t.voucherId),
+    check(
+      'voucher_attachments_type_ck',
+      sql`${t.contentType} in ('application/pdf', 'image/png', 'image/jpeg', 'image/webp')`,
+    ),
+    check('voucher_attachments_size_ck', sql`octet_length(${t.data}) between 1 and 5242880`),
+  ],
+);
+
+// Old Account.Configuration (account type → account) and the GL ids hard-coded in AppConstant
+// (IPDReceivableGLId, IPDSaleGLId, …): the account each posting role uses.
+export const glRoles = pgTable(
+  'gl_roles',
+  {
+    id: uuid('id').primaryKey(),
+    role: text('role').notNull(),
+    glAccountId: uuid('gl_account_id')
+      .notNull()
+      .references(() => glAccounts.id, { onDelete: 'restrict' }),
+    description: text('description'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('gl_roles_role_uq').on(t.role),
+    check('gl_roles_role_ck', sql`${t.role} ~ '^[a-z][a-z0-9_.]{1,59}$'`),
+  ],
+);
+
+// Old SuperAdmin.AccountConfigurations: when a section (pharmacy sales, OPD billing, …) posts to the ledger.
+export const postingSchedules = pgTable(
+  'posting_schedules',
+  {
+    id: uuid('id').primaryKey(),
+    section: text('section').notNull(),
+    timing: text('timing', { enum: ['on_sale', 'end_of_day', 'weekly', 'monthly'] }).notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('posting_schedules_section_uq').on(t.section),
+    check('posting_schedules_timing_ck', sql`${t.timing} in ('on_sale', 'end_of_day', 'weekly', 'monthly')`),
+    check('posting_schedules_section_len_ck', sql`char_length(${t.section}) between 1 and 60`),
+  ],
 );

@@ -140,6 +140,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | tax years (write), income tax compute / hand entries | `payroll:manage` |
 | `GET /accounts/chart`, accounting masters (read) | `accounts:read` |
 | accounting masters (write) | `accounts:manage` |
+| `GET /accounts/vouchers[/:id]` | `accounts:read` |
+| draft vouchers and attachments | `vouchers:write` |
+| post / reverse vouchers | `vouchers:post` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

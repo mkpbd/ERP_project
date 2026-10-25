@@ -99,6 +99,13 @@
       "when": 1792945346531,
       "tag": "0013_accounts_chart",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1792946115078,
+      "tag": "0014_accounts_vouchers",
+      "breakpoints": true
     }
   ]
 }

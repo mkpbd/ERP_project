@@ -1,6 +1,6 @@
 # Step 6a — Accounts: chart of accounts and masters
 
-Status: **done** (2026-10-25). Previous: [step 5d](05d-payroll-income-tax.md) · Next: step 6b (vouchers and
+Status: **done** (2026-10-25). Previous: [step 5d](05d-payroll-income-tax.md) · Next: [step 6b](06b-accounts-vouchers.md) (vouchers and
 posting).
 
 Accounts is split like payroll:

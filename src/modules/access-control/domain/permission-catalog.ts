@@ -45,6 +45,8 @@ export const PERMISSION_CATALOG = [
   { key: 'payroll:manage', description: 'Set up salary policies and salaries; apply, commit and reverse increments' },
   { key: 'accounts:read', description: 'See the chart of accounts, books and financial statements' },
   { key: 'accounts:manage', description: 'Set up the chart of accounts and accounting masters' },
+  { key: 'vouchers:write', description: 'Enter and edit draft vouchers and their attachments' },
+  { key: 'vouchers:post', description: 'Post and reverse vouchers' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

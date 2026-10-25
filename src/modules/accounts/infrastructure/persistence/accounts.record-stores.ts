@@ -7,7 +7,13 @@ import {
   type RecordStoreOptions,
   type RecordTable,
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
-import { ACCOUNT_RECORDS as R, ACCOUNTS_MANAGE, ACCOUNTS_READ } from '../../application/accounts.constants.js';
+import {
+  ACCOUNT_RECORDS as R,
+  ACCOUNTS_MANAGE,
+  ACCOUNTS_READ,
+  GL_ROLE,
+  POSTING_SCHEDULE,
+} from '../../application/accounts.constants.js';
 import {
   accountCategories,
   accountGroupMembers,
@@ -23,8 +29,10 @@ import {
   fsLineItems,
   glAccounts,
   glItemDescriptions,
+  glRoles,
   glStatementMappings,
   journalTypes,
+  postingSchedules,
   posTerminals,
   statementBroadHeads,
   statementSubHeads,
@@ -216,6 +224,15 @@ export function accountRecordTypes(context: DbContext): RecordType[] {
       orderBy: [subLedgers.name],
       filters: { typeId: subLedgers.typeId },
       references: { [fk('sub_ledgers', 'type_id', 'sub_ledger_types')]: R.subLedgerType },
+    }),
+    record(GL_ROLE, glRoles, {
+      orderBy: [glRoles.role],
+      unique: { gl_roles_role_uq: taken('gl_role_exists', 'This role already has an account; change it instead') },
+      references: { [fk('gl_roles', 'gl_account_id', 'gl_accounts')]: R.glAccount },
+    }),
+    record(POSTING_SCHEDULE, postingSchedules, {
+      orderBy: [postingSchedules.section],
+      unique: { posting_schedules_section_uq: taken('posting_schedule_exists', 'This section already has a schedule') },
     }),
   ];
 }
