@@ -13,6 +13,7 @@ import {
   allowancePayments,
   festivalBonuses,
   festivalBonusLines,
+  incomeTaxDeductions,
   salaryArrears,
   salaryDeductions,
   salaryIncrements,
@@ -102,6 +103,11 @@ export class DrizzleSalarySheetRepository extends SalarySheetRepository {
       )
       .groupBy(festivalBonusLines.staffId);
     const bonuses = new Map(bonusRows.map((row) => [row.staffId, row.amount ?? 0]));
+    const taxRows = await this.context.db
+      .select({ staffId: incomeTaxDeductions.staffId, monthlyTax: incomeTaxDeductions.monthlyTax })
+      .from(incomeTaxDeductions)
+      .where(and(eq(incomeTaxDeductions.payYear, year), eq(incomeTaxDeductions.payMonth, month)));
+    const taxes = new Map(taxRows.map((row) => [row.staffId, row.monthlyTax]));
     const of = (totals: Totals, staffId: string, key: string) => totals.get(staffId)?.[key] ?? 0;
     return salaries.map((salary) => ({
       staffId: salary.staffId,
@@ -117,6 +123,7 @@ export class DrizzleSalarySheetRepository extends SalarySheetRepository {
       advance: of(payments, salary.staffId, 'advance'),
       paid: of(payments, salary.staffId, 'paid'),
       festivalBonus: bonuses.get(salary.staffId) ?? 0,
+      incomeTax: taxes.get(salary.staffId) ?? 0,
     }));
   }
 

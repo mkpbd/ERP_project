@@ -1,7 +1,6 @@
 # Step 5c — Payroll: festival bonus, leave encashment, PF ledger, staff dues
 
-Status: **done** (2026-10-25). Previous: [step 5b](05b-payroll-salary-sheet.md) · Next: step 5d (income tax, PF
-book).
+Status: **done** (2026-10-25). Previous: [step 5b](05b-payroll-salary-sheet.md) · Next: [step 5d](05d-payroll-income-tax.md) (income tax).
 
 ## Scope
 

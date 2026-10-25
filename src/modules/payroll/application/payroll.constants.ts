@@ -16,3 +16,4 @@ export const SALARY_STOP = 'salary_stop';
 export const FESTIVAL_BONUS = 'festival_bonus';
 export const PF_LEDGER_ENTRY = 'pf_ledger_entry';
 export const STAFF_DUE = 'staff_due';
+export const INCOME_TAX_YEAR = 'income_tax_year';

@@ -54,8 +54,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 5a | Payroll: salary policies, salary structure, yearly increments | **Done** | [05a-payroll-salaries.md](05a-payroll-salaries.md) |
 | 5b | Payroll: monthly salary (overtime, deductions, arrears, allowances, stop/start), salary sheet, approval, payment, payslip, bank/cash statements, salary envelope `Kham` | **Done** | [05b-payroll-salary-sheet.md](05b-payroll-salary-sheet.md) |
 | 5c | Payroll: festival bonus, leave encashment, PF ledger, staff dues | **Done** | [05c-payroll-bonus-ledgers.md](05c-payroll-bonus-ledgers.md) |
-| 5d | Payroll: income tax (slabs, certificates, TDS/VAT/TAX), PF book | Next | |
-| 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
+| 5d | Payroll: income tax (tax years and slabs, monthly deductions, certificates) | **Done** | [05d-payroll-income-tax.md](05d-payroll-income-tax.md) |
+| 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards; PF book; TDS rules | Next | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |
 | 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords` | Planned | |

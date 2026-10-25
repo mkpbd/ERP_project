@@ -135,6 +135,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /payroll/statements/{pf,dues}` (own) | authenticated |
 | festival bonuses and their sheets, leave encashments, PF ledger, staff dues, anyone's statements (read) | `payroll:read` |
 | the same (write), bonus approve / commit / reverse, encashment save / remove | `payroll:manage` |
+| `GET /payroll/tax-years`, own `GET /payroll/tax-certificates/:taxYearId` | authenticated |
+| `GET /payroll/income-tax/:y/:m`, anyone's certificate | `payroll:read` |
+| tax years (write), income tax compute / hand entries | `payroll:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

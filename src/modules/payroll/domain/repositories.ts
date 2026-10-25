@@ -1,3 +1,4 @@
+import type { IncomeTaxInput, TaxableMonth, TaxYearTerms } from './income-tax.js';
 import type { SalaryLineAmounts, SalarySheetStatus } from './salary-sheet.js';
 import type { SalaryBreakdown, SalaryIncrementProps, SalaryPolicyTerms, StaffSalary } from './salary.js';
 
@@ -38,6 +39,8 @@ export interface SalaryLineFacts {
   readonly paid: number;
   /** Approved festival bonuses paid with this month's salary. */
   readonly festivalBonus: number;
+  /** The income tax deduction for the month (worked out or entered). */
+  readonly incomeTax: number;
 }
 
 /** A person's line on an approved sheet, with their details as they were. */
@@ -145,4 +148,49 @@ export abstract class LeaveEncashmentRepository {
     approvedAt: Date,
   ): Promise<void>;
   abstract remove(payYear: number, payMonth: number): Promise<number>;
+}
+
+export interface TaxYear extends TaxYearTerms {
+  readonly id: string;
+  readonly label: string;
+}
+
+/** A person's income tax inputs for a tax year so far. */
+export interface TaxYearFacts {
+  readonly staffId: string;
+  readonly current: IncomeTaxInput['current'];
+  readonly months: readonly TaxableMonth[];
+  readonly bonuses: readonly { readonly amount: number; readonly basics: number }[];
+  readonly leaveEncashment: number;
+}
+
+export interface IncomeTaxDeduction {
+  readonly staffId: string;
+  readonly payYear: number;
+  readonly payMonth: number;
+  readonly taxYearId: string;
+  readonly taxableIncome: number | null;
+  readonly yearlyTax: number | null;
+  readonly monthlyTax: number;
+  readonly source: 'computed' | 'manual';
+  readonly remarks: string | null;
+}
+
+export abstract class IncomeTaxRepository {
+  /** The tax year a date falls in. */
+  abstract taxYearOn(date: string): Promise<TaxYear | null>;
+  abstract taxYear(id: string): Promise<TaxYear | null>;
+  /** Saved salary sheets, festival bonus sheets and leave encashments between the dates, for people with a salary. */
+  abstract facts(startsOn: string, endsOn: string, staffIds?: readonly string[]): Promise<TaxYearFacts[]>;
+  /** Replaces the month's worked-out deductions; deductions entered by hand are kept. */
+  abstract replaceComputed(
+    payYear: number,
+    payMonth: number,
+    rows: readonly IncomeTaxDeduction[],
+    updatedBy: string,
+    updatedAt: Date,
+  ): Promise<void>;
+  abstract setManual(row: IncomeTaxDeduction, updatedBy: string, updatedAt: Date): Promise<void>;
+  /** Removes a deduction entered by hand; false when there is none. */
+  abstract removeManual(staffId: string, payYear: number, payMonth: number): Promise<boolean>;
 }

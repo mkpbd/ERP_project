@@ -7,6 +7,7 @@ export interface StaffSummary {
   readonly designation: string;
   readonly joiningDate: string;
   readonly status: 'active' | 'inactive' | 'separated';
+  readonly sex: 'male' | 'female' | 'other' | null;
   readonly userId: string | null;
   /** Free text in the old data; salary statements treat "bank" (any case) as bank transfer. */
   readonly paymentMode: string | null;

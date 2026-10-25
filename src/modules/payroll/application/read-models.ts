@@ -2,6 +2,7 @@ import type { Page, PageRequest } from '../../../shared/application/pagination.j
 import type {
   FestivalBonusLine,
   FestivalBonusSchedule,
+  IncomeTaxDeduction,
   LeaveEncashmentLine,
   SalarySheetLine,
 } from '../domain/repositories.js';
@@ -122,6 +123,7 @@ export abstract class PayrollReadRepository {
   /** The bonus schedule with its saved sheet (lines empty when none), or null for an unknown bonus. */
   abstract festivalBonusSheet(bonusId: string): Promise<FestivalBonusSheet | null>;
   abstract leaveEncashments(payYear: number, payMonth: number): Promise<LeaveEncashmentLine[]>;
+  abstract incomeTaxDeductions(payYear: number, payMonth: number): Promise<IncomeTaxDeduction[]>;
   /** PF deducted on committed salary sheets plus PF ledger entries, with a running balance. */
   abstract pfStatement(staffId: string, from: string, to: string): Promise<LedgerStatement>;
   /** Dues owed (debit) less paid (credit), optionally for one service unit, with a running balance. */

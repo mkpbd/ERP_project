@@ -23,6 +23,7 @@ import {
   SalaryIncrementRepository,
   SalaryPolicyRepository,
   StaffSalaryRepository,
+  type IncomeTaxDeduction,
   type LeaveEncashmentLine,
   type SalarySheetLine,
 } from '../../domain/repositories.js';
@@ -36,6 +37,7 @@ import {
 import {
   festivalBonuses,
   festivalBonusLines,
+  incomeTaxDeductions,
   leaveEncashments,
   pfLedgerEntries,
   salaryIncrements,
@@ -429,6 +431,14 @@ export class DrizzlePayrollReadRepository extends PayrollReadRepository {
       to,
       (credit, debit) => debit - credit,
     );
+  }
+
+  async incomeTaxDeductions(payYear: number, payMonth: number): Promise<IncomeTaxDeduction[]> {
+    const rows = await this.context.db
+      .select()
+      .from(incomeTaxDeductions)
+      .where(and(eq(incomeTaxDeductions.payYear, payYear), eq(incomeTaxDeductions.payMonth, payMonth)));
+    return rows.map(({ updatedBy: _by, updatedAt: _at, ...row }) => row);
   }
 }
 

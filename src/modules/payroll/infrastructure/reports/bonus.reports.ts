@@ -111,10 +111,14 @@ export function pfMonthlyReport(read: PayrollReadRepository): ReportDefinition {
       const lines = saved.lines
         .filter((line) => line.pf > 0 && (!params.departmentId || line.departmentId === params.departmentId))
         .sort((a, b) => a.employeeNo.localeCompare(b.employeeNo));
-      return { lines, total: lines.reduce((sum, line) => sum + line.pf, 0) };
+      return {
+        label: 'PF',
+        lines: lines.map((line) => ({ ...line, amount: line.pf })),
+        total: lines.reduce((sum, line) => sum + line.pf, 0),
+      };
     },
     describe: (params) => `${MONTHS[params.month - 1]} ${params.year}`,
-    pdf: { engine: 'html', template: template('pf-monthly') },
+    pdf: { engine: 'html', template: template('deduction-statement') },
     xlsx: (data) => ({
       columns: [
         { key: 'employeeNo', header: 'Employee no', width: 12 },

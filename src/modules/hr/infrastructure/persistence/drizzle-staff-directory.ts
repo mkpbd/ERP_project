@@ -27,6 +27,7 @@ export class DrizzleStaffDirectory extends StaffDirectory {
         designation: designations.name,
         joiningDate: staffRecords.joiningDate,
         status: staffRecords.status,
+        sex: staffRecords.sex,
         userId: staffRecords.userId,
         paymentMode: staffRecords.paymentMode,
         bankAccountNo: staffRecords.bankAccountNo,

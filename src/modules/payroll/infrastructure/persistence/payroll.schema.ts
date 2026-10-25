@@ -18,6 +18,7 @@ import {
 import { serviceUnits } from '../../../administration/infrastructure/persistence/administration.schema.js';
 import { festivals, staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
+import type { TaxSlab } from '../../domain/income-tax.js';
 import type { SalarySnapshot } from '../../domain/salary.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -533,5 +534,65 @@ export const staffDues = pgTable(
     index('staff_dues_staff_idx').on(t.staffId, t.entryDate),
     check('staff_dues_particulars_len_ck', sql`char_length(${t.particulars}) between 1 and 300`),
     check('staff_dues_amount_ck', sql`${t.debit} >= 0 and ${t.credit} >= 0 and (${t.debit} > 0) <> (${t.credit} > 0)`),
+  ],
+);
+
+// Old Payroll.TaxSlabs (rows per gender and SlabStartEndDate such as '2025-2026', an 'Exempted' row) and the
+// constants hard-coded in the income tax procedures, kept per tax year.
+export const incomeTaxYears = pgTable(
+  'income_tax_years',
+  {
+    id: uuid('id').primaryKey(),
+    label: text('label').notNull(),
+    startsOn: day('starts_on').notNull(),
+    endsOn: day('ends_on').notNull(),
+    maleSlabs: jsonb('male_slabs').$type<TaxSlab[]>().notNull(),
+    femaleSlabs: jsonb('female_slabs').$type<TaxSlab[]>().notNull(),
+    maleExemptionCap: money('male_exemption_cap').notNull(),
+    femaleExemptionCap: money('female_exemption_cap').notNull(),
+    rebateOnTaxablePercent: percent('rebate_on_taxable_percent').notNull().default(3),
+    investmentAllowancePercent: percent('investment_allowance_percent').notNull().default(20),
+    rebateOnInvestmentPercent: percent('rebate_on_investment_percent').notNull().default(15),
+    rebateCap: money('rebate_cap').notNull().default(1000000),
+    minimumMonthlyTax: money('minimum_monthly_tax').notNull().default(417),
+    maleMinimumTaxGross: money('male_minimum_tax_gross').notNull(),
+    femaleMinimumTaxGross: money('female_minimum_tax_gross').notNull(),
+    expectedBonusBasics: numeric('expected_bonus_basics', { precision: 4, scale: 2, mode: 'number' })
+      .notNull()
+      .default(2.5),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('income_tax_years_label_uq').on(t.label),
+    uniqueIndex('income_tax_years_start_uq').on(t.startsOn),
+    check('income_tax_years_dates_ck', sql`${t.endsOn} > ${t.startsOn}`),
+    check('income_tax_years_label_len_ck', sql`char_length(${t.label}) between 1 and 20`),
+  ],
+);
+
+// Old Payroll.IndividualSalariesIncomeTax: the tax to deduct from a person's salary in a pay month, worked out
+// from the tax year so far or entered by hand (the old TaxAdjustmentListOfMay overrides).
+export const incomeTaxDeductions = pgTable(
+  'income_tax_deductions',
+  {
+    staffId: staffRef(),
+    ...payPeriod,
+    taxYearId: uuid('tax_year_id')
+      .notNull()
+      .references(() => incomeTaxYears.id, { onDelete: 'restrict' }),
+    // Empty for a deduction entered by hand.
+    taxableIncome: money('taxable_income'),
+    yearlyTax: money('yearly_tax'),
+    monthlyTax: money('monthly_tax').notNull(),
+    source: text('source', { enum: ['computed', 'manual'] }).notNull(),
+    remarks: text('remarks'),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: tz('updated_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.staffId, t.payYear, t.payMonth] }),
+    payPeriodCheck('income_tax_deductions', t),
+    check('income_tax_deductions_amount_ck', sql`${t.monthlyTax} >= 0`),
+    check('income_tax_deductions_source_ck', sql`${t.source} in ('computed', 'manual')`),
   ],
 );

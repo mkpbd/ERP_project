@@ -1,0 +1,38 @@
+<style>
+  h2 { font-size: 12px; margin: 12px 0 4px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+  table.kv { width: 70%; border-collapse: collapse; }
+  table.kv td { padding: 2px 6px; border-bottom: 1px solid #eee; }
+  table.kv td.n { text-align: right; width: 140px; }
+  table.kv tr.total td { font-weight: 700; border-top: 1px solid #999; }
+</style>
+{{#with data}}
+<p><b>{{staff.employeeNo}} — {{staff.fullName}}</b>, {{staff.designation}}, {{staff.department}} · joined {{date staff.joiningDate}}</p>
+<p>Tax year {{taxYear.label}} ({{date taxYear.startsOn}} to {{date taxYear.endsOn}}) · salary months paid {{certificate.monthsPaid}}, still ahead {{certificate.monthsAhead}}</p>
+
+<h2>Income</h2>
+<table class="kv">
+  {{#each incomeRows}}<tr><td>{{label}}</td><td class="n">{{money amount}}</td></tr>{{/each}}
+  <tr><td>Projected salary for the months ahead</td><td class="n">{{money certificate.projected.salary}}</td></tr>
+  <tr><td>Projected festival bonus</td><td class="n">{{money certificate.projected.bonus}}</td></tr>
+  <tr><td>Projected employer's PF contribution</td><td class="n">{{money certificate.projected.employerPf}}</td></tr>
+  <tr class="total"><td>Total income</td><td class="n">{{money certificate.totalIncome}}</td></tr>
+  <tr><td>Less exempt (one third, up to the cap)</td><td class="n">{{money certificate.exemption}}</td></tr>
+  <tr class="total"><td>Taxable income</td><td class="n">{{money certificate.taxableIncome}}</td></tr>
+</table>
+
+<h2>Tax</h2>
+<table class="report" style="width: 70%">
+  <thead><tr><th class="num">Taxed amount</th><th class="num">Rate</th><th class="num">Tax</th></tr></thead>
+  <tbody>
+    {{#each certificate.bands}}<tr><td class="num">{{money amount}}</td><td class="num">{{ratePercent}}%</td><td class="num">{{money tax}}</td></tr>{{/each}}
+  </tbody>
+</table>
+<table class="kv" style="margin-top: 6px">
+  <tr class="total"><td>Gross tax</td><td class="n">{{money certificate.grossTax}}</td></tr>
+  <tr><td>Less rebate</td><td class="n">{{money certificate.rebate}}</td></tr>
+  <tr class="total"><td>Net tax for the year</td><td class="n">{{money certificate.netTax}}</td></tr>
+  <tr><td>Tax deducted so far</td><td class="n">{{money certificate.taxPaid}}</td></tr>
+  <tr class="total"><td>Tax still to deduct</td><td class="n">{{money certificate.taxDue}}</td></tr>
+  <tr><td>Monthly deduction</td><td class="n">{{money certificate.monthlyTax}}</td></tr>
+</table>
+{{/with}}
