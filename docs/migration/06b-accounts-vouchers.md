@@ -1,6 +1,6 @@
 # Step 6b — Accounts: vouchers and posting
 
-Status: **done** (2026-10-25). Previous: [step 6a](06a-accounts-chart.md) · Next: step 6c (books and statements).
+Status: **done** (2026-10-25). Previous: [step 6a](06a-accounts-chart.md) · Next: [step 6c](06c-accounts-books.md) (books and statements).
 
 ## Scope
 

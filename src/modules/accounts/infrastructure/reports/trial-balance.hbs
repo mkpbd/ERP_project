@@ -1,0 +1,16 @@
+{{#with data}}
+{{#unless balanced}}<p style="color: #b00020; font-weight: 700">The trial balance does not balance; check for vouchers posted outside the system.</p>{{/unless}}
+<table class="report">
+  <thead>
+    <tr><th style="width: 90px">Code</th><th>Account</th><th class="num">Opening</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Closing debit</th><th class="num">Closing credit</th></tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr><td>{{code}}</td><td>{{name}} <span class="muted">({{nature}})</span></td><td class="num">{{money opening}}</td>
+      <td class="num">{{money debit}}</td><td class="num">{{money credit}}</td><td class="num">{{money closingDebit}}</td><td class="num">{{money closingCredit}}</td></tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="2">Total</td><td class="num">{{money totals.opening}}</td><td class="num">{{money totals.debit}}</td>
+      <td class="num">{{money totals.credit}}</td><td class="num">{{money totals.closingDebit}}</td><td class="num">{{money totals.closingCredit}}</td></tr>
+  </tbody>
+</table>
+{{/with}}

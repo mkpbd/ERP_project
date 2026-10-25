@@ -1,0 +1,15 @@
+{{#with data}}
+<table class="report">
+  <thead><tr><th style="width: 90px">Code</th><th>Account</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+    <tr class="group-row"><td colspan="2">Opening cash and bank</td><td class="num">{{money opening}}</td></tr>
+    <tr class="group-row"><td colspan="3">Receipts</td></tr>
+    {{#each receipts}}<tr><td>{{code}}</td><td>{{name}}</td><td class="num">{{money amount}}</td></tr>{{/each}}
+    <tr class="group-row"><td colspan="2">Total receipts</td><td class="num">{{money totalReceipts}}</td></tr>
+    <tr class="group-row"><td colspan="3">Payments</td></tr>
+    {{#each payments}}<tr><td>{{code}}</td><td>{{name}}</td><td class="num">{{money amount}}</td></tr>{{/each}}
+    <tr class="group-row"><td colspan="2">Total payments</td><td class="num">{{money totalPayments}}</td></tr>
+    <tr class="group-row"><td colspan="2">Closing cash and bank</td><td class="num">{{money closing}}</td></tr>
+  </tbody>
+</table>
+{{/with}}

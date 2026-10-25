@@ -4,6 +4,10 @@ import { LedgerPosting } from '../../shared/application/contracts/ledger-posting
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { ChartReadRepository, GetChartOfAccountsHandler } from './application/chart.js';
+import { BOOK_HANDLERS, BooksReadRepository } from './application/statements.js';
+import { DrizzleBooksReadRepository } from './infrastructure/persistence/drizzle-books.repository.js';
+import { bookReports } from './infrastructure/reports/books.reports.js';
+import { BooksController } from './presentation/books.controllers.js';
 import { VOUCHER_HANDLERS, VoucherBook, VoucherLedgerPosting } from './application/voucher.handlers.js';
 import { VoucherReadRepository } from './application/voucher.messages.js';
 import { LedgerFacts, VoucherRepository } from './domain/repositories.js';
@@ -24,7 +28,8 @@ import { ACCOUNTS_RECORD_CONTROLLERS, ChartOfAccountsController } from './presen
 
 /**
  * Accounts: the chart of accounts (nature → category → sub-category → level 4 → level 5 → GL account),
- * statement heads and accounting masters (step 6a); vouchers, posting and account configuration (step 6b).
+ * statement heads and accounting masters (step 6a); vouchers, posting and account configuration (step 6b);
+ * books and statements: ledgers, day book, trial balance, profit and loss, balance sheet (step 6c).
  * Publishes LedgerPosting so other modules can post vouchers.
  */
 @Global()
@@ -35,10 +40,13 @@ import { ACCOUNTS_RECORD_CONTROLLERS, ChartOfAccountsController } from './presen
     GlRolesController,
     PostingSchedulesController,
     VouchersController,
+    BooksController,
   ],
   providers: [
     GetChartOfAccountsHandler,
     ...VOUCHER_HANDLERS,
+    ...BOOK_HANDLERS,
+    { provide: BooksReadRepository, useClass: DrizzleBooksReadRepository },
     VoucherBook,
     { provide: ChartReadRepository, useClass: DrizzleChartReadRepository },
     { provide: VoucherRepository, useClass: DrizzleVoucherRepository },
@@ -55,11 +63,13 @@ export class AccountsModule implements OnModuleInit {
     private readonly context: DbContext,
     private readonly chart: ChartReadRepository,
     private readonly vouchers: VoucherReadRepository,
+    private readonly books: BooksReadRepository,
   ) {}
 
   onModuleInit(): void {
     for (const type of accountRecordTypes(this.context)) this.records.register(type);
     this.reports.register(chartOfAccountsReport(this.chart));
     this.reports.register(voucherReport(this.vouchers));
+    for (const report of bookReports(this.books)) this.reports.register(report);
   }
 }

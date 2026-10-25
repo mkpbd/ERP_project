@@ -1,0 +1,16 @@
+{{#if data.vouchers.length}}
+<table class="report">
+  <thead><tr><th style="width: 70px">Date</th><th style="width: 130px">Voucher</th><th>Account</th><th class="num">Debit</th><th class="num">Credit</th></tr></thead>
+  <tbody>
+    {{#each data.vouchers}}
+    <tr class="group-row"><td>{{date voucherDate}}</td><td>{{number}}</td><td colspan="3">{{narration}}</td></tr>
+    {{#each lines}}
+    <tr><td></td><td></td><td>{{code}} {{name}}</td><td class="num">{{#if debit}}{{money debit}}{{/if}}</td><td class="num">{{#if credit}}{{money credit}}{{/if}}</td></tr>
+    {{/each}}
+    {{/each}}
+    <tr class="group-row"><td colspan="3">Total ({{data.vouchers.length}} vouchers)</td><td class="num">{{money data.total}}</td><td class="num">{{money data.total}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No posted vouchers in this period.</p>
+{{/if}}

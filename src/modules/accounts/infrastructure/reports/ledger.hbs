@@ -1,0 +1,22 @@
+{{#with data}}
+<p><b>{{title}}</b></p>
+<table class="report">
+  <thead>
+    <tr><th style="width: 70px">Date</th><th style="width: 130px">Voucher</th><th>Particulars</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr>
+  </thead>
+  <tbody>
+    <tr class="group-row"><td colspan="5">Opening balance</td><td class="num">{{money opening.amount}} {{opening.side}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td>{{date date}}</td><td>{{voucherNumber}}</td>
+      <td>{{#if narration}}{{narration}}<br>{{/if}}<span class="muted">{{contra}}</span></td>
+      <td class="num">{{#if debit}}{{money debit}}{{/if}}</td><td class="num">{{#if credit}}{{money credit}}{{/if}}</td>
+      <td class="num">{{money side.amount}} {{side.side}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="3">Total for the period</td><td class="num">{{money totalDebit}}</td><td class="num">{{money totalCredit}}</td><td class="num">{{money closing.amount}} {{closing.side}}</td>
+    </tr>
+  </tbody>
+</table>
+{{/with}}

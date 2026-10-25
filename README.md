@@ -143,6 +143,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /accounts/vouchers[/:id]` | `accounts:read` |
 | draft vouchers and attachments | `vouchers:write` |
 | post / reverse vouchers | `vouchers:post` |
+| `GET /accounts/books/*`, `GET /accounts/statements/*` | `accounts:read` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

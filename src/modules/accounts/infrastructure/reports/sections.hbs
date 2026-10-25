@@ -1,0 +1,27 @@
+<style>
+  table.statement { width: 100%; border-collapse: collapse; }
+  table.statement td { padding: 2px 6px; }
+  table.statement td.n { text-align: right; width: 130px; }
+  table.statement tr.nature td { font-weight: 700; font-size: 12px; border-bottom: 1px solid #222; padding-top: 10px; }
+  table.statement tr.group td { font-weight: 600; padding-left: 14px; }
+  table.statement tr.account td.name { padding-left: 30px; }
+  table.statement tr.total td { font-weight: 700; border-top: 1px solid #999; }
+  table.statement tr.result td { font-weight: 700; font-size: 12px; border-top: 2px solid #222; border-bottom: 2px solid #222; }
+</style>
+{{#each data.sides}}
+{{#if title}}<h2 style="font-size: 13px; margin: 12px 0 2px">{{title}}</h2>{{/if}}
+<table class="statement">
+  {{#each sections}}
+  <tr class="nature"><td colspan="2">{{nature}}</td><td class="n"></td></tr>
+  {{#each groups}}
+  <tr class="group"><td colspan="2">{{title}}</td><td class="n"></td></tr>
+  {{#each accounts}}<tr class="account"><td class="name">{{code}} {{name}}</td><td class="n">{{money amount}}</td><td class="n"></td></tr>{{/each}}
+  <tr class="total"><td colspan="2" style="padding-left: 14px">Total {{title}}</td><td class="n">{{money total}}</td></tr>
+  {{/each}}
+  <tr class="total"><td colspan="2">Total {{nature}}</td><td class="n">{{money total}}</td></tr>
+  {{/each}}
+  {{#each extra}}<tr class="total"><td colspan="2">{{label}}</td><td class="n">{{money amount}}</td></tr>{{/each}}
+  {{#if total}}<tr class="result"><td colspan="2">{{total.label}}</td><td class="n">{{money total.amount}}</td></tr>{{/if}}
+</table>
+{{/each}}
+{{#if data.note}}<p style="margin-top: 10px; font-weight: 700{{#if data.warn}}; color: #b00020{{/if}}">{{data.note}}</p>{{/if}}
