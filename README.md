@@ -138,6 +138,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /payroll/tax-years`, own `GET /payroll/tax-certificates/:taxYearId` | authenticated |
 | `GET /payroll/income-tax/:y/:m`, anyone's certificate | `payroll:read` |
 | tax years (write), income tax compute / hand entries | `payroll:manage` |
+| `GET /accounts/chart`, accounting masters (read) | `accounts:read` |
+| accounting masters (write) | `accounts:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

@@ -92,6 +92,13 @@
       "when": 1792944513716,
       "tag": "0012_payroll_income_tax",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1792945346531,
+      "tag": "0013_accounts_chart",
+      "breakpoints": true
     }
   ]
 }

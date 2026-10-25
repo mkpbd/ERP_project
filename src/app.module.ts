@@ -8,6 +8,7 @@ import { ConfigModule } from './config/config.module.js';
 import type { AppConfig } from './config/configuration.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
+import { AccountsModule } from './modules/accounts/accounts.module.js';
 import { AuthorizationGuard } from './modules/access-control/presentation/authorization.guard.js';
 import { AdministrationModule } from './modules/administration/administration.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -89,6 +90,7 @@ export class AppModule {
         ReportingModule,
         HrModule,
         PayrollModule,
+        AccountsModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

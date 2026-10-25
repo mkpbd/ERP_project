@@ -1,0 +1,17 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead><tr><th style="width: 110px">Code</th><th>Name</th><th style="width: 120px">Level</th><th style="width: 70px">Kind</th></tr></thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr{{#if heading}} class="group-row"{{/if}}>
+      <td>{{code}}</td>
+      <td style="padding-left: {{indent}}px">{{name}}{{#if inactive}} <span class="muted">(inactive)</span>{{/if}}</td>
+      <td>{{level}}</td>
+      <td>{{kind}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">The chart of accounts is empty.</p>
+{{/if}}

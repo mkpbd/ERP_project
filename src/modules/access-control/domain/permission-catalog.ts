@@ -43,6 +43,8 @@ export const PERMISSION_CATALOG = [
   { key: 'recruitment:manage', description: 'Publish job circulars and record applicants, their status and CVs' },
   { key: 'payroll:read', description: "See everyone's salary structure and increments" },
   { key: 'payroll:manage', description: 'Set up salary policies and salaries; apply, commit and reverse increments' },
+  { key: 'accounts:read', description: 'See the chart of accounts, books and financial statements' },
+  { key: 'accounts:manage', description: 'Set up the chart of accounts and accounting masters' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

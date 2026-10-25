@@ -42,15 +42,25 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 13 });
+    expect(applied.rows[0]).toEqual({ n: 14 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
     expect(tables.rows.map((row) => row.table_name)).toEqual([
+      'account_categories',
+      'account_group_members',
+      'account_groups',
+      'account_level4_heads',
+      'account_level5_heads',
+      'account_natures',
+      'account_sub_categories',
       'admin_departments',
       'allowance_payments',
       'attendance_punches',
       'audit_logs',
+      'bank_accounts',
+      'coa_descriptions',
+      'cost_centers',
       'countries',
       'department_incharges',
       'designations',
@@ -64,6 +74,11 @@ describe('migrations', () => {
       'festival_bonus_lines',
       'festival_bonuses',
       'festivals',
+      'fiscal_years',
+      'fs_line_items',
+      'gl_accounts',
+      'gl_item_descriptions',
+      'gl_statement_mappings',
       'govt_holidays',
       'hr_departments',
       'hr_divisions',
@@ -75,6 +90,7 @@ describe('migrations', () => {
       'job_application_files',
       'job_applications',
       'job_circulars',
+      'journal_types',
       'leave_application_approvals',
       'leave_applications',
       'leave_approval_levels',
@@ -92,6 +108,7 @@ describe('migrations', () => {
       'payment_modes',
       'permissions',
       'pf_ledger_entries',
+      'pos_terminals',
       'printers',
       'refresh_tokens',
       'role_menus',
@@ -125,11 +142,16 @@ describe('migrations', () => {
       'staff_photos',
       'staff_records',
       'staff_salaries',
+      'statement_broad_heads',
+      'statement_sub_heads',
+      'sub_ledger_types',
+      'sub_ledgers',
       'tenant_logos',
       'tenants',
       'user_roles',
       'user_sessions',
       'users',
+      'voucher_types',
     ]);
   });
 });

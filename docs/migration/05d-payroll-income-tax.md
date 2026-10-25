@@ -1,6 +1,6 @@
 # Step 5d — Payroll: income tax
 
-Status: **done** (2026-10-25). Previous: [step 5c](05c-payroll-bonus-ledgers.md) · Next: step 6 (accounts).
+Status: **done** (2026-10-25). Previous: [step 5c](05c-payroll-bonus-ledgers.md) · Next: [step 6a](06a-accounts-chart.md) (accounts).
 
 This finishes payroll. The **PF book** (`PFBook`: chart of accounts, categories, level-4 heads, general ledger,
 vouchers, deposits, interest) and the **TDS rules** (`ITAXTDSController`, `IncomeTaxActAndTDSRules`: TDS
