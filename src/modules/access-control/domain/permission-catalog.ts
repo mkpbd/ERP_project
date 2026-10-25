@@ -39,6 +39,8 @@ export const PERMISSION_CATALOG = [
   { key: 'attendance:enter', description: 'Enter, edit, submit and cancel manual attendance' },
   { key: 'attendance:approve', description: 'Approve, reject and revoke manual attendance (not your own)' },
   { key: 'attendance:ingest', description: 'Send device punches (for the attendance device integration)' },
+  { key: 'recruitment:read', description: 'See job circulars, applicants and their CVs' },
+  { key: 'recruitment:manage', description: 'Publish job circulars and record applicants, their status and CVs' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

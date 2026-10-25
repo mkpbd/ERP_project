@@ -1,5 +1,6 @@
 import type { ManualAttendance, ManualStatus } from './attendance.js';
 import type { ApprovalLevel, LeaveApplication, LeavePolicyTerms } from './leave.js';
+import type { CvFile, CvType } from './recruitment.js';
 import type { Duty, ShiftType, StaffPlacement } from './roster.js';
 import type { EducationEntry, EmergencyContactEntry, StaffMember, StaffStatus } from './staff-member.js';
 import type { DocumentCategory, StoredFile } from './staff-file.js';
@@ -124,4 +125,31 @@ export abstract class StaffFileRepository {
   }): Promise<void>;
   abstract findDocument(staffId: string, documentId: string): Promise<(StoredFile & { fileName: string }) | null>;
   abstract removeDocument(staffId: string, documentId: string): Promise<boolean>;
+}
+
+export interface CvFileInfo {
+  readonly id: string;
+  readonly fileName: string;
+  readonly contentType: CvType;
+  readonly sizeBytes: number;
+  readonly uploadedAt: Date;
+  readonly uploadedBy: string | null;
+}
+
+export abstract class JobApplicationFileRepository {
+  /** Locks the application row until the surrounding transaction ends; false when it does not exist. */
+  abstract lockApplication(applicationId: string): Promise<boolean>;
+  abstract countFiles(applicationId: string): Promise<number>;
+  abstract addFile(file: {
+    id: string;
+    applicationId: string;
+    fileName: string;
+    file: CvFile;
+    uploadedBy: string;
+    now: Date;
+  }): Promise<void>;
+  /** null when the application does not exist. */
+  abstract listFiles(applicationId: string): Promise<CvFileInfo[] | null>;
+  abstract findFile(applicationId: string, fileId: string): Promise<(CvFile & { fileName: string }) | null>;
+  abstract removeFile(applicationId: string, fileId: string): Promise<boolean>;
 }

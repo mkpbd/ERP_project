@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import type { LocationDirectory } from '../../../../shared/application/contracts/location-directory.js';
@@ -195,5 +195,60 @@ export function employeeCvReport(context: DbContext, locations: LocationDirector
     },
     describe: (_params, data) => `${data.employeeNo} — ${data.fullName}`,
     pdf: { engine: 'html', template: template('employee-cv') },
+  });
+}
+
+const ID_CARDS_PER_PAGE = 4;
+
+/** Old IDCardDocument: front and back of each card on A4 sheets, four people a page, for cutting. */
+export function idCardReport(context: DbContext): ReportDefinition {
+  return defineReport({
+    key: 'hr.id-card',
+    title: 'Staff ID cards',
+    group: 'HR',
+    description: 'Printable ID cards (front and back, 54 × 85.6 mm) for chosen staff or a whole department.',
+    params: z
+      .strictObject({
+        staffIds: z.array(z.uuid()).min(1).max(200).optional(),
+        departmentId: z.uuid().optional(),
+      })
+      .refine((value) => (value.staffIds === undefined) !== (value.departmentId === undefined), {
+        message: 'Give either staffIds or departmentId',
+      }),
+    async load(params) {
+      const rows = await context.db
+        .select({
+          id: staffRecords.id,
+          employeeNo: staffRecords.employeeNo,
+          fullName: staffRecords.fullName,
+          department: hrDepartments.name,
+          designation: designations.name,
+          bloodGroup: staffRecords.bloodGroup,
+          joiningDate: staffRecords.joiningDate,
+          officialMobileNo: staffRecords.officialMobileNo,
+          photoType: staffPhotos.contentType,
+          photo: staffPhotos.data,
+        })
+        .from(staffRecords)
+        .innerJoin(hrDepartments, eq(hrDepartments.id, staffRecords.departmentId))
+        .innerJoin(designations, eq(designations.id, staffRecords.designationId))
+        .leftJoin(staffPhotos, eq(staffPhotos.staffId, staffRecords.id))
+        .where(
+          params.staffIds
+            ? inArray(staffRecords.id, params.staffIds)
+            : and(eq(staffRecords.departmentId, params.departmentId!), eq(staffRecords.status, 'active')),
+        )
+        .orderBy(asc(staffRecords.employeeNo));
+      if (params.staffIds && rows.length < new Set(params.staffIds).size) throw new NotFoundError('staff');
+      const cards = rows.map(({ photo, photoType, ...card }) => ({
+        ...card,
+        photoDataUri: photo && photoType ? `data:${photoType};base64,${photo.toString('base64')}` : null,
+      }));
+      const pages: (typeof cards)[] = [];
+      for (let i = 0; i < cards.length; i += ID_CARDS_PER_PAGE) pages.push(cards.slice(i, i + ID_CARDS_PER_PAGE));
+      return { pages, count: cards.length };
+    },
+    describe: (_params, data) => `${data.count} card${data.count === 1 ? '' : 's'}`,
+    pdf: { engine: 'html', template: template('id-card'), landscape: true, bare: true },
   });
 }

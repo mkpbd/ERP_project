@@ -1,0 +1,35 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 28px">#</th>
+      <th>Applicant</th>
+      <th>Mobile</th>
+      <th>Email</th>
+      <th>Applied for</th>
+      <th>Received</th>
+      <th>Status</th>
+      <th class="num">CV files</th>
+      <th>Remarks</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{applicantName}}</td>
+      <td>{{mobileNo}}</td>
+      <td>{{email}}</td>
+      <td>{{appliedFor}}</td>
+      <td>{{date receivedOn}}</td>
+      <td>{{statusLabel}}</td>
+      <td class="num">{{files}}</td>
+      <td>{{remarks}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p class="muted">{{data.rows.length}} applicant(s){{#each data.counts}} · {{label}}: {{count}}{{/each}}</p>
+{{else}}
+<p class="empty">No applications match these filters.</p>
+{{/if}}

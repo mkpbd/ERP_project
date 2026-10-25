@@ -1,0 +1,70 @@
+<style>
+  /* CR80 portrait cards; thin grey borders are the cutting lines. */
+  .sheet { display: grid; grid-template-columns: repeat(2, auto); gap: 10mm 14mm; justify-content: center; align-content: center; height: 199mm; page-break-after: always; }
+  .sheet:last-child { page-break-after: auto; }
+  .pair { display: flex; gap: 4mm; }
+  .card { width: 54mm; height: 85.6mm; border: 0.2mm solid #bbb; display: flex; flex-direction: column; overflow: hidden; text-align: center; font-size: 7pt; line-height: 1.25; }
+  .band { background: #00a658; color: #fff; padding: 2mm 2mm 1.6mm; }
+  .band img { height: 8mm; max-width: 20mm; object-fit: contain; display: block; margin: 0 auto 0.8mm; }
+  .band .org { font-weight: 700; font-size: 7.5pt; }
+  .band .kind { font-size: 6.5pt; letter-spacing: 0.6pt; text-transform: uppercase; }
+  .foot { background: #00a658; height: 3mm; margin-top: auto; }
+  .photo { width: 22mm; height: 27mm; margin: 2.5mm auto 1.5mm; border: 0.4mm solid #00a658; object-fit: cover; display: block; }
+  .photo.none { display: flex; align-items: center; justify-content: center; color: #999; font-size: 6pt; }
+  .name { font-weight: 700; font-size: 9pt; padding: 0 2mm; }
+  .facts { margin: 1.2mm 4mm 0; text-align: left; }
+  .facts div { display: flex; gap: 1.5mm; }
+  .facts .k { width: 17mm; color: #444; flex: none; white-space: nowrap; }
+  .sign { margin: auto 8mm 1.5mm; border-top: 0.25mm solid #00a658; padding-top: 0.6mm; font-size: 6pt; font-weight: 700; }
+  .back h3 { margin: 0; font-size: 7.5pt; }
+  .back .block { margin: 2.4mm 3mm 0; }
+  .back .label { font-style: italic; color: #333; border-bottom: 0.2mm solid #00a658; padding-bottom: 0.5mm; margin-bottom: 0.8mm; }
+  .back .strong { font-weight: 700; font-size: 7.5pt; }
+  .back .small { font-size: 6pt; color: #333; }
+  .empty { text-align: center; padding: 40mm 0; color: #666; }
+</style>
+{{#each data.pages}}
+<div class="sheet">
+  {{#each this}}
+  <div class="pair">
+    <div class="card front">
+      <div class="band">
+        {{#if @root.context.header.logoDataUri}}<img src="{{@root.context.header.logoDataUri}}" alt="">{{/if}}
+        <div class="org">{{@root.context.header.organizationName}}</div>
+        <div class="kind">Staff ID card</div>
+      </div>
+      {{#if photoDataUri}}<img class="photo" src="{{photoDataUri}}" alt="">{{else}}<div class="photo none">No photo</div>{{/if}}
+      <div class="name">{{fullName}}</div>
+      <div class="facts">
+        <div><span class="k">Designation</span><span>{{designation}}</span></div>
+        <div><span class="k">Department</span><span>{{department}}</span></div>
+        <div><span class="k">ID no</span><span><b>{{employeeNo}}</b></span></div>
+      </div>
+      <div class="sign">Authorised signature</div>
+      <div class="foot"></div>
+    </div>
+    <div class="card back">
+      <div class="band"><h3>Card holder's information</h3></div>
+      <div class="facts">
+        <div><span class="k">Blood group</span><span><b>{{#if bloodGroup}}{{bloodGroup}}{{else}}—{{/if}}</b></span></div>
+        <div><span class="k">Joined</span><span>{{date joiningDate}}</span></div>
+      </div>
+      <div class="block">
+        <div class="label">In case of emergency, please contact</div>
+        {{#if @root.context.header.hotline}}<div class="strong">{{@root.context.header.hotline}}</div>{{/if}}
+        {{#if officialMobileNo}}<div class="strong">{{officialMobileNo}}</div>{{/if}}
+      </div>
+      <div class="block">
+        <div class="label">If found, please return to</div>
+        <div class="strong">{{@root.context.header.organizationName}}</div>
+        <div class="small">{{@root.context.header.address}}</div>
+      </div>
+      <div class="block small">This card is the property of {{@root.context.header.organizationName}} and is not transferable.</div>
+      <div class="foot"></div>
+    </div>
+  </div>
+  {{/each}}
+</div>
+{{else}}
+<p class="empty">No active staff in this department.</p>
+{{/each}}

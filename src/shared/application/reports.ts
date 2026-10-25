@@ -53,6 +53,8 @@ export type PdfLayout<TData> =
       readonly template: string;
       readonly landscape?: boolean;
       readonly pageSize?: 'A4' | 'A5' | 'Letter' | 'Legal';
+      /** No letterhead, title or footer and 5 mm margins: for cards and labels printed on a sheet. */
+      readonly bare?: boolean;
     }
   | {
       /** pdfmake document, for small receipts and labels in Latin script. */

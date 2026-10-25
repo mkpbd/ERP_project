@@ -50,8 +50,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 4b | HR: leave types, policies, applications, multi-level approval, balances, recorded leave, leave reports | **Done** | [04b-hr-leave.md](04b-hr-leave.md) |
 | 4c | HR: shift types, monthly duty roster with days off, duty exchanges, extra duties, roster report | **Done** | [04c-hr-roster.md](04c-hr-roster.md) |
 | 4d | HR: attendance — device punch ingestion, manual attendance with approval, daily status, attendance reports | **Done** | [04d-hr-attendance.md](04d-hr-attendance.md) |
-| 4e | HR: recruitment (job circulars, CVs), remaining HR reports | Next | |
-| 5 | Payroll, PFBook, TDS/VAT/TAX | Planned | |
+| 4e | HR: recruitment (job circulars, applicants, CV files), staff ID cards | **Done** | [04e-hr-recruitment.md](04e-hr-recruitment.md) |
+| 5 | Payroll, PFBook, TDS/VAT/TAX (incl. the salary envelope print `Kham`) | Next | |
 | 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |

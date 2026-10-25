@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { Logger } from 'nestjs-pino';
 import type { AppConfig } from '../config/configuration.js';
+import { DOCX_TYPE } from '../shared/domain/file-types.js';
 import { ProblemDetailsFilter } from '../shared/presentation/problem-details.filter.js';
 import { requestContextMiddleware } from '../shared/presentation/request-context.middleware.js';
 import { patchOpenApiWithZodSchemas, ZodValidationPipe } from '../shared/presentation/zod/zod-dto.js';
@@ -15,9 +16,12 @@ export function configureApp(app: NestExpressApplication, config: AppConfig): vo
   app.set('trust proxy', config.trustProxy ? 1 : false);
   app.disable('x-powered-by');
   app.useBodyParser('json', { limit: '100kb' });
-  // File uploads (logos, staff photos and documents) are sent as raw bytes. This is the largest
+  // File uploads (logos, staff photos and documents, CVs) are sent as raw bytes. This is the largest
   // allowed size; each handler enforces its own limit and checks the bytes match the type.
-  app.useBodyParser('raw', { type: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf'], limit: '5mb' });
+  app.useBodyParser('raw', {
+    type: ['image/png', 'image/jpeg', 'image/webp', 'application/pdf', DOCX_TYPE],
+    limit: '5mb',
+  });
 
   app.use(requestContextMiddleware);
   app.use(helmet());

@@ -46,13 +46,14 @@ export class ReportRenderingService extends ReportRenderer implements OnModuleDe
       };
     }
     const body = this.templates.render(layout.template, { data, context, title, filters });
-    const html = this.templates.renderPage({ header: context.header, title, filters, body });
+    const bare = layout.bare ?? false;
+    const html = this.templates.renderPage({ header: context.header, title, filters, body, bare });
     return {
       contentType: PDF,
       data: await this.chromium.render(html, {
         landscape: layout.landscape ?? false,
         pageSize: layout.pageSize ?? 'A4',
-        footerText,
+        footerText: bare ? null : footerText,
       }),
     };
   }

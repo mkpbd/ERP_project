@@ -22,6 +22,31 @@ export function detectFileType(bytes: Uint8Array): DocumentType | null {
   return null;
 }
 
+export const DOCX_TYPE = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+const ascii = (text: string) => [...text].map((char) => char.charCodeAt(0));
+
+function contains(bytes: Uint8Array, needle: readonly number[]): boolean {
+  outer: for (let i = 0; i + needle.length <= bytes.length; i++) {
+    for (let j = 0; j < needle.length; j++) if (bytes[i + j] !== needle[j]) continue outer;
+    return true;
+  }
+  return false;
+}
+
+/**
+ * A Word .docx: a ZIP holding `[Content_Types].xml` and `word/document.xml` (entry names are
+ * stored in plain text). Macro-carrying packages (`vbaProject.bin`) and the old binary .doc are refused.
+ */
+export function isWordDocument(bytes: Uint8Array): boolean {
+  return (
+    startsWith(bytes, [0x50, 0x4b, 0x03, 0x04]) &&
+    contains(bytes, ascii('[Content_Types].xml')) &&
+    contains(bytes, ascii('word/document.xml')) &&
+    !contains(bytes, ascii('vbaProject.bin'))
+  );
+}
+
 export function detectImageType(bytes: Uint8Array): ImageType | null {
   const type = detectFileType(bytes);
   return type !== null && (IMAGE_TYPES as readonly string[]).includes(type) ? (type as ImageType) : null;

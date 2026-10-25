@@ -1,6 +1,6 @@
 # Step 4d — HR: attendance
 
-Status: **done** (2026-10-25). Previous: [step 4c](04c-hr-roster.md) · Next: step 4e (recruitment).
+Status: **done** (2026-10-25). Previous: [step 4c](04c-hr-roster.md) · Next: [step 4e](04e-hr-recruitment.md) (recruitment).
 
 ## Scope
 

@@ -8,8 +8,8 @@ export interface ChromiumOptions {
 export interface PdfPageOptions {
   readonly landscape: boolean;
   readonly pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
-  /** Plain text for the left side of the footer. */
-  readonly footerText: string;
+  /** Plain text for the left side of the footer; null prints no footer and uses narrow margins. */
+  readonly footerText: string | null;
 }
 
 const RENDER_TIMEOUT_MS = 30_000;
@@ -62,14 +62,18 @@ export class ChromiumPdfRenderer {
           format: page.pageSize,
           landscape: page.landscape,
           printBackground: true,
-          displayHeaderFooter: true,
-          headerTemplate: '<span></span>',
-          footerTemplate:
-            '<div style="font-size:8px;width:100%;padding:0 10mm;display:flex;justify-content:space-between;' +
-            'font-family:Arial,sans-serif;color:#444">' +
-            `<span>${escapeHtml(page.footerText)}</span>` +
-            '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>',
-          margin: { top: '12mm', bottom: '16mm', left: '10mm', right: '10mm' },
+          ...(page.footerText === null
+            ? { margin: { top: '5mm', bottom: '5mm', left: '5mm', right: '5mm' } }
+            : {
+                displayHeaderFooter: true,
+                headerTemplate: '<span></span>',
+                footerTemplate:
+                  '<div style="font-size:8px;width:100%;padding:0 10mm;display:flex;justify-content:space-between;' +
+                  'font-family:Arial,sans-serif;color:#444">' +
+                  `<span>${escapeHtml(page.footerText)}</span>` +
+                  '<span>Page <span class="pageNumber"></span> of <span class="totalPages"></span></span></div>',
+                margin: { top: '12mm', bottom: '16mm', left: '10mm', right: '10mm' },
+              }),
         });
       } finally {
         await context.close();

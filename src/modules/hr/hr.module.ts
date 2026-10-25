@@ -20,6 +20,7 @@ import {
   OrgStructureRepository,
   RosterRepository,
   StaffFacts,
+  JobApplicationFileRepository,
   StaffFileRepository,
   StaffRepository,
 } from './domain/repositories.js';
@@ -45,13 +46,27 @@ import {
 } from './infrastructure/persistence/drizzle-staff.repositories.js';
 import { hrRecordTypes } from './infrastructure/persistence/hr.record-stores.js';
 import { leaveRecordTypes } from './infrastructure/persistence/leave.record-stores.js';
+import { recruitmentRecordTypes } from './infrastructure/persistence/recruitment.record-stores.js';
 import { rosterRecordTypes } from './infrastructure/persistence/roster.record-stores.js';
+import { DrizzleJobApplicationFileRepository } from './infrastructure/persistence/drizzle-recruitment.repositories.js';
+import { jobApplicationsReport } from './infrastructure/reports/recruitment.reports.js';
+import { RECRUITMENT_HANDLERS } from './application/recruitment.handlers.js';
+import {
+  JobApplicationFilesController,
+  JobApplicationsController,
+  JobCircularsController,
+} from './presentation/recruitment.controllers.js';
 import {
   dailyAttendanceReport,
   individualAttendanceReport,
   monthlyAttendanceReport,
 } from './infrastructure/reports/attendance.reports.js';
-import { employeeCvReport, employeeListReport, newEmployeesReport } from './infrastructure/reports/hr.reports.js';
+import {
+  employeeCvReport,
+  employeeListReport,
+  idCardReport,
+  newEmployeesReport,
+} from './infrastructure/reports/hr.reports.js';
 import {
   leaveApplicationsReport,
   leaveBalancesReport,
@@ -88,7 +103,8 @@ import {
  * HR: organization structure, staff records, holidays and festivals (step 4a);
  * leave policies, applications with multi-level approval, balances (step 4b);
  * shift types, the monthly duty roster, days off, duty exchanges, extra duties (step 4c);
- * attendance: device punches, manual entries with approval, daily status (step 4d).
+ * attendance: device punches, manual entries with approval, daily status (step 4d);
+ * recruitment: job circulars, applicants and their CVs; staff ID cards (step 4e).
  */
 @Module({
   controllers: [
@@ -112,12 +128,16 @@ import {
     RosterController,
     AttendanceController,
     ManualAttendanceController,
+    JobCircularsController,
+    JobApplicationsController,
+    JobApplicationFilesController,
   ],
   providers: [
     ...STAFF_HANDLERS,
     ...LEAVE_HANDLERS,
     ...ROSTER_HANDLERS,
     ...ATTENDANCE_HANDLERS,
+    ...RECRUITMENT_HANDLERS,
     {
       provide: HR_SETTINGS,
       inject: [APP_CONFIG],
@@ -136,6 +156,7 @@ import {
     { provide: RosterReadRepository, useClass: DrizzleRosterReadRepository },
     { provide: AttendanceRepository, useClass: DrizzleAttendanceRepository },
     { provide: AttendanceReadRepository, useClass: DrizzleAttendanceReadRepository },
+    { provide: JobApplicationFileRepository, useClass: DrizzleJobApplicationFileRepository },
   ],
 })
 export class HrModule implements OnModuleInit {
@@ -151,6 +172,7 @@ export class HrModule implements OnModuleInit {
       ...hrRecordTypes(this.context),
       ...leaveRecordTypes(this.context),
       ...rosterRecordTypes(this.context),
+      ...recruitmentRecordTypes(this.context),
     ])
       this.records.register(type);
     this.reports.register(employeeListReport(this.context));
@@ -163,5 +185,7 @@ export class HrModule implements OnModuleInit {
     this.reports.register(dailyAttendanceReport(this.context));
     this.reports.register(monthlyAttendanceReport(this.context));
     this.reports.register(individualAttendanceReport(this.context));
+    this.reports.register(idCardReport(this.context));
+    this.reports.register(jobApplicationsReport(this.context));
   }
 }

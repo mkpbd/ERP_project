@@ -101,6 +101,7 @@
     </style>
   </head>
   <body>
+    {{#unless bare}}
     <header class='letterhead'>
       {{#if header.logoDataUri}}<img src='{{header.logoDataUri}}' alt='' />{{/if}}
       <div class='org'>
@@ -113,6 +114,7 @@
     </header>
     <h1>{{title}}</h1>
     {{#if filters}}<div class='filters'>{{filters}}</div>{{/if}}
+    {{/unless}}
     <main>{{body}}</main>
   </body>
 </html>

@@ -37,3 +37,9 @@ export const LEAVE_READ = 'leave:read';
 export const LEAVE_MANAGE = 'leave:manage';
 /** Decide any pending application at its current level (HR override when an approver is away). */
 export const LEAVE_APPROVE_ANY = 'leave:approve-any';
+
+export const JOB_CIRCULAR = 'job_circular';
+export const JOB_APPLICATION = 'job_application';
+/** Job circulars, applicants and their CVs (personal data: not open to every signed-in user). */
+export const RECRUITMENT_READ = 'recruitment:read';
+export const RECRUITMENT_MANAGE = 'recruitment:manage';

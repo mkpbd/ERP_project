@@ -124,6 +124,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `POST/PATCH /hr/attendance/manual`, submit / cancel | `attendance:enter` |
 | `POST /hr/attendance/manual/:id/{approve,reject}`, cancelling an approved entry | `attendance:approve` |
 | `POST /hr/attendance/punches` (device integration) | `attendance:ingest` |
+| `GET /hr/recruitment/{circulars,applications}[/:id]`, CV downloads | `recruitment:read` |
+| writes to circulars / applications, CV upload and removal | `recruitment:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:
