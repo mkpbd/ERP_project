@@ -9,6 +9,12 @@ export const LEAVE_TYPE = 'leave_type';
 export const LEAVE_APPROVAL_LEVEL = 'leave_approval_level';
 export const LEAVE_DELEGATE = 'leave_delegate';
 export const LEAVE_RECORD = 'leave_record';
+export const SHIFT_TYPE = 'shift_type';
+export const DUTY_EXCHANGE = 'duty_exchange';
+export const EXTRA_DUTY = 'extra_duty';
+
+/** Shift types, the duty roster, duty exchanges and extra-duty records. Reading rosters needs only sign-in. */
+export const ROSTER_MANAGE = 'roster:manage';
 
 /** Staff records hold personal data: reading them needs hr:read (or being that staff member). */
 export const HR_READ = 'hr:read';

@@ -34,6 +34,7 @@ export const PERMISSION_CATALOG = [
     key: 'leave:manage',
     description: 'Set leave policies, approval chains and delegates; record leave; cancel approved leave',
   },
+  { key: 'roster:manage', description: 'Set up shift types and edit duty rosters, duty exchanges and extra duties' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

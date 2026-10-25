@@ -1,4 +1,6 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
+import { APP_CONFIG } from '../../config/config.module.js';
+import type { AppConfig } from '../../config/configuration.js';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
@@ -6,11 +8,14 @@ import { ReportRegistry } from '../../shared/application/reports.js';
 import { LEAVE_HANDLERS } from './application/leave.handlers.js';
 import { LeaveReadRepository } from './application/leave.read-models.js';
 import { StaffReadRepository } from './application/read-models.js';
+import { HR_SETTINGS, ROSTER_HANDLERS } from './application/roster.handlers.js';
+import { RosterReadRepository } from './application/roster.read-models.js';
 import { STAFF_HANDLERS, StaffChanges } from './application/staff.handlers.js';
 import {
   LeavePolicyRepository,
   LeaveRepository,
   OrgStructureRepository,
+  RosterRepository,
   StaffFacts,
   StaffFileRepository,
   StaffRepository,
@@ -21,6 +26,10 @@ import {
   DrizzleLeaveRepository,
   DrizzleStaffFacts,
 } from './infrastructure/persistence/drizzle-leave.repositories.js';
+import {
+  DrizzleRosterReadRepository,
+  DrizzleRosterRepository,
+} from './infrastructure/persistence/drizzle-roster.repositories.js';
 import { DrizzleStaffReadRepository } from './infrastructure/persistence/drizzle-staff-read.repository.js';
 import {
   DrizzleOrgStructureRepository,
@@ -29,12 +38,14 @@ import {
 } from './infrastructure/persistence/drizzle-staff.repositories.js';
 import { hrRecordTypes } from './infrastructure/persistence/hr.record-stores.js';
 import { leaveRecordTypes } from './infrastructure/persistence/leave.record-stores.js';
+import { rosterRecordTypes } from './infrastructure/persistence/roster.record-stores.js';
 import { employeeCvReport, employeeListReport, newEmployeesReport } from './infrastructure/reports/hr.reports.js';
 import {
   leaveApplicationsReport,
   leaveBalancesReport,
   leaveStatementReport,
 } from './infrastructure/reports/leave.reports.js';
+import { dutyRosterReport } from './infrastructure/reports/roster.reports.js';
 import {
   DepartmentInchargesController,
   DesignationsController,
@@ -53,10 +64,17 @@ import {
   LeaveTypesController,
   StaffLeaveController,
 } from './presentation/leave.controllers.js';
+import {
+  DutyExchangesController,
+  ExtraDutiesController,
+  RosterController,
+  ShiftTypesController,
+} from './presentation/roster.controllers.js';
 
 /**
  * HR: organization structure, staff records, holidays and festivals (step 4a);
- * leave policies, applications with multi-level approval, balances (step 4b).
+ * leave policies, applications with multi-level approval, balances (step 4b);
+ * shift types, the monthly duty roster, days off, duty exchanges, extra duties (step 4c).
  */
 @Module({
   controllers: [
@@ -74,10 +92,20 @@ import {
     LeaveDelegatesController,
     LeaveRecordsController,
     LeaveApplicationsController,
+    ShiftTypesController,
+    DutyExchangesController,
+    ExtraDutiesController,
+    RosterController,
   ],
   providers: [
     ...STAFF_HANDLERS,
     ...LEAVE_HANDLERS,
+    ...ROSTER_HANDLERS,
+    {
+      provide: HR_SETTINGS,
+      inject: [APP_CONFIG],
+      useFactory: (config: AppConfig) => ({ timeZone: config.reports.timeZone }),
+    },
     StaffChanges,
     { provide: StaffRepository, useClass: DrizzleStaffRepository },
     { provide: OrgStructureRepository, useClass: DrizzleOrgStructureRepository },
@@ -87,6 +115,8 @@ import {
     { provide: LeavePolicyRepository, useClass: DrizzleLeavePolicyRepository },
     { provide: StaffFacts, useClass: DrizzleStaffFacts },
     { provide: LeaveReadRepository, useClass: DrizzleLeaveReadRepository },
+    { provide: RosterRepository, useClass: DrizzleRosterRepository },
+    { provide: RosterReadRepository, useClass: DrizzleRosterReadRepository },
   ],
 })
 export class HrModule implements OnModuleInit {
@@ -98,12 +128,18 @@ export class HrModule implements OnModuleInit {
   ) {}
 
   onModuleInit(): void {
-    for (const type of [...hrRecordTypes(this.context), ...leaveRecordTypes(this.context)]) this.records.register(type);
+    for (const type of [
+      ...hrRecordTypes(this.context),
+      ...leaveRecordTypes(this.context),
+      ...rosterRecordTypes(this.context),
+    ])
+      this.records.register(type);
     this.reports.register(employeeListReport(this.context));
     this.reports.register(newEmployeesReport(this.context));
     this.reports.register(employeeCvReport(this.context, this.locations));
     this.reports.register(leaveApplicationsReport(this.context));
     this.reports.register(leaveBalancesReport(this.context));
     this.reports.register(leaveStatementReport(this.context));
+    this.reports.register(dutyRosterReport(this.context));
   }
 }

@@ -1,4 +1,5 @@
 import type { ApprovalLevel, LeaveApplication, LeavePolicyTerms } from './leave.js';
+import type { Duty, ShiftType, StaffPlacement } from './roster.js';
 import type { EducationEntry, EmergencyContactEntry, StaffMember, StaffStatus } from './staff-member.js';
 import type { DocumentCategory, StoredFile } from './staff-file.js';
 
@@ -49,6 +50,29 @@ export abstract class StaffFacts {
   abstract placement(staffId: string): Promise<{ departmentId: string; status: StaffStatus } | null>;
   abstract staffIdForUser(userId: string): Promise<string | null>;
   abstract isDelegate(delegateStaffId: string, onBehalfOfStaffId: string): Promise<boolean>;
+}
+
+export interface DayOff {
+  readonly staffId: string;
+  readonly date: string;
+  readonly remarks: string | null;
+}
+
+export interface RosterWrites {
+  readonly inserts: ReadonlyArray<Duty & { departmentId: string; subDepartmentId: string }>;
+  readonly remarkUpdates: ReadonlyArray<{ id: string; remarks: string | null }>;
+  readonly deletes: readonly string[];
+  readonly daysOffSet: readonly DayOff[];
+  readonly daysOffCleared: ReadonlyArray<{ staffId: string; date: string }>;
+}
+
+export abstract class RosterRepository {
+  abstract shiftTypes(departmentId: string): Promise<ShiftType[]>;
+  abstract placements(staffIds: readonly string[]): Promise<Map<string, StaffPlacement>>;
+  /** Every duty of these people with a duty date in [from, to], in any department. */
+  abstract duties(staffIds: readonly string[], from: string, to: string): Promise<Duty[]>;
+  abstract daysOff(staffIds: readonly string[], from: string, to: string): Promise<DayOff[]>;
+  abstract apply(writes: RosterWrites, actorUserId: string, now: Date): Promise<void>;
 }
 
 export abstract class OrgStructureRepository {

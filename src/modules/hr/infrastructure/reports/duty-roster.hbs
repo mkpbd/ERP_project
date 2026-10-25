@@ -1,0 +1,38 @@
+<style>
+  table.roster { width: 100%; border-collapse: collapse; font-size: 8.5px; }
+  table.roster th, table.roster td { border: 1px solid #999; padding: 2px 2px; text-align: center; }
+  table.roster th.name, table.roster td.name { text-align: left; white-space: nowrap; padding: 2px 4px; }
+  table.roster thead { display: table-header-group; }
+  table.roster tr { page-break-inside: avoid; }
+  table.roster .holiday { background: #fdecea; }
+  table.roster .off { background: #e8f0fe; font-weight: 700; }
+  .legend { margin-top: 8px; font-size: 9px; }
+  .legend span { display: inline-block; margin-right: 14px; }
+</style>
+{{#if data.rows.length}}
+<table class="roster">
+  <thead>
+    <tr>
+      <th class="name">Employee</th>
+      {{#each data.days}}<th class="{{#if holiday}}holiday{{/if}}" title="{{holiday}}">{{day}}<br>{{weekday}}</th>{{/each}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="name">{{employeeNo}} {{fullName}}<br><span class="muted">{{designation}}</span></td>
+      {{#each cells}}<td class="{{#if off}}off{{else if holiday}}holiday{{/if}}">{{text}}</td>{{/each}}
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<div class="legend">
+  {{#each data.shiftTypes}}<span><b>{{code}}</b> {{name}} {{startTime}}–{{endTime}}</span>{{/each}}
+  <span><b>OFF</b> day off</span>
+</div>
+{{#if data.holidays.length}}
+<div class="legend">Government holidays: {{#each data.holidays}}<span>{{date date}} {{name}}</span>{{/each}}</div>
+{{/if}}
+{{else}}
+<p class="empty">Nobody is rostered in this sub-department.</p>
+{{/if}}
