@@ -1,3 +1,4 @@
+import type { PfEntryType } from './pf.js';
 import type { IncomeTaxInput, TaxableMonth, TaxYearTerms } from './income-tax.js';
 import type { SalaryLineAmounts, SalarySheetStatus } from './salary-sheet.js';
 import type { SalaryBreakdown, SalaryIncrementProps, SalaryPolicyTerms, StaffSalary } from './salary.js';
@@ -193,4 +194,18 @@ export abstract class IncomeTaxRepository {
   abstract setManual(row: IncomeTaxDeduction, updatedBy: string, updatedAt: Date): Promise<void>;
   /** Removes a deduction entered by hand; false when there is none. */
   abstract removeManual(staffId: string, payYear: number, payMonth: number): Promise<boolean>;
+}
+
+export interface NewPfEntry {
+  readonly staffId: string;
+  readonly entryDate: string;
+  readonly type: PfEntryType;
+  readonly credit: number;
+  readonly remarks: string | null;
+}
+
+export abstract class PfLedgerRepository {
+  /** Whether interest was already credited to anyone on that date. */
+  abstract hasInterestOn(date: string): Promise<boolean>;
+  abstract add(entries: readonly NewPfEntry[]): Promise<void>;
 }

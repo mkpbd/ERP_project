@@ -22,6 +22,9 @@ export const ACCOUNT_RECORDS = {
   posTerminal: 'pos_terminal',
   subLedgerType: 'sub_ledger_type',
   subLedger: 'sub_ledger',
+  pfDeposit: 'pf_deposit',
+  pfFixedDeposit: 'pf_fixed_deposit',
+  tdsRule: 'tds_rule',
 } as const;
 
 /** The chart of accounts, books and statements. */

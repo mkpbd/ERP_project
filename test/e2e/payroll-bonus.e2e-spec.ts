@@ -290,3 +290,83 @@ describe('leave encashment, PF and dues', () => {
       .expect(200, { removed: 3 });
   });
 });
+
+describe('PF fund', () => {
+  it('shares interest by balance once per date and works out the settlement', async () => {
+    await request(http).post('/api/v1/payroll/salary-sheets/2026/3/commit').set(bearer(officer)).expect(204);
+    await create(
+      'payroll/pf-ledger',
+      { staffId: jane.staffId, entryDate: '2026-01-01', type: 'opening', credit: 10_000 },
+      officer,
+    );
+    await create(
+      'payroll/pf-ledger',
+      { staffId: carl, entryDate: '2026-01-01', type: 'opening', credit: 5_000 },
+      officer,
+    );
+
+    // Jane: 10,000 opening + 1,800 own (March) + 1,800 employer's match = 13,600; Carl: 5,000; Bob: nothing.
+    const preview = await request(http)
+      .get('/api/v1/payroll/pf/interest/preview?asOf=2026-03-31&amount=1000')
+      .set(bearer(officer))
+      .expect(200);
+    expect(preview.body).toMatchObject({ totalBalance: 18_600, amount: 1_000, matchPercent: 100 });
+    expect(
+      preview.body.lines.map((line: { employeeNo: string; balance: number; interest: number }) => [
+        line.employeeNo,
+        line.balance,
+        line.interest,
+      ]),
+    ).toEqual([
+      ['N-001', 13_600, 731.18],
+      ['N-003', 5_000, 268.82],
+    ]);
+    await request(http)
+      .get('/api/v1/payroll/pf/interest/preview?asOf=2026-03-31&amount=1000')
+      .set(bearer(jane.token))
+      .expect(403);
+
+    const body = { asOf: '2026-03-31', amount: 1_000 };
+    await request(http).post('/api/v1/payroll/pf/interest').set(bearer(jane.token)).send(body).expect(403);
+    const done = await request(http).post('/api/v1/payroll/pf/interest').set(bearer(officer)).send(body).expect(200);
+    expect(done.body).toEqual({ members: 2, amount: 1_000 });
+    const again = await request(http).post('/api/v1/payroll/pf/interest').set(bearer(officer)).send(body).expect(409);
+    expect(again.body.code).toBe('pf_interest_exists');
+
+    const mine = await request(http)
+      .get('/api/v1/payroll/pf/settlement?asOf=2026-12-31')
+      .set(bearer(jane.token))
+      .expect(200);
+    expect(mine.body).toMatchObject({
+      staff: { employeeNo: 'N-001' },
+      opening: 10_000,
+      own: 1_800,
+      employer: 1_800,
+      interest: 731.18,
+      withdrawn: 0,
+      balance: 14_331.18,
+      years: [{ year: 2026, own: 1_800, employer: 1_800, interest: 731.18, withdrawn: 0 }],
+    });
+    const halfMatch = await request(http)
+      .get(`/api/v1/payroll/pf/settlement?asOf=2026-12-31&staffId=${jane.staffId}&matchPercent=50`)
+      .set(bearer(officer))
+      .expect(200);
+    expect(halfMatch.body).toMatchObject({ employer: 900, balance: 13_431.18 });
+    await request(http)
+      .get(`/api/v1/payroll/pf/settlement?asOf=2026-12-31&staffId=${carl}`)
+      .set(bearer(jane.token))
+      .expect(403);
+
+    for (const [key, params, format] of [
+      ['payroll.pf-settlement', { staffId: jane.staffId, asOf: '2026-12-31' }, 'pdf'],
+      ['payroll.pf-interest', { asOf: '2026-03-31', amount: 1_000 }, 'pdf'],
+      ['payroll.pf-interest', { asOf: '2026-03-31', amount: 1_000 }, 'xlsx'],
+    ] as const) {
+      const response = await request(http)
+        .post(`/api/v1/reports/${key}/render`)
+        .set(bearer(admin))
+        .send({ format, params });
+      expect(response.status, `${key} ${format}: ${JSON.stringify(response.body).slice(0, 200)}`).toBe(200);
+    }
+  });
+});

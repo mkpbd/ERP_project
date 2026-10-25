@@ -15,6 +15,7 @@ const account = (id: string, overrides: Partial<PostableAccount> = {}): Postable
   isActive: true,
   isControlAccount: false,
   requiresCostCenter: false,
+  book: 'main',
   ...overrides,
 });
 const accounts = new Map(
@@ -26,6 +27,7 @@ const accounts = new Map(
     account('expense', { requiresCostCenter: true }),
   ].map((entry) => [entry.id, entry]),
 );
+const chart = { book: 'main' as const, accounts };
 const line = (glAccountId: string, debit: number, credit: number, extra: Partial<VoucherLine> = {}): VoucherLine => ({
   glAccountId,
   debit,
@@ -50,29 +52,29 @@ const header = {
 
 describe('voucher lines (double entry)', () => {
   it('accepts balanced vouchers to the paisa', () => {
-    expect(voucherTotal(validLines([line('cash', 1000.1, 0), line('sales', 0, 1000.1)], accounts))).toBe(1000.1);
-    expect(validLines([line('cash', 0.1, 0), line('cash', 0.2, 0), line('sales', 0, 0.3)], accounts)).toHaveLength(3);
+    expect(voucherTotal(validLines([line('cash', 1000.1, 0), line('sales', 0, 1000.1)], chart))).toBe(1000.1);
+    expect(validLines([line('cash', 0.1, 0), line('cash', 0.2, 0), line('sales', 0, 0.3)], chart)).toHaveLength(3);
   });
 
   it('refuses unbalanced, one-sided, two-sided and over-precise lines', () => {
-    expect(() => validLines([line('cash', 100, 0), line('sales', 0, 99)], accounts)).toThrow(/must be equal/);
-    expect(() => validLines([line('cash', 100, 0)], accounts)).toThrow(/2 to/);
-    expect(() => validLines([line('cash', 100, 100), line('sales', 0, 0)], accounts)).toThrow(
+    expect(() => validLines([line('cash', 100, 0), line('sales', 0, 99)], chart)).toThrow(/must be equal/);
+    expect(() => validLines([line('cash', 100, 0)], chart)).toThrow(/2 to/);
+    expect(() => validLines([line('cash', 100, 100), line('sales', 0, 0)], chart)).toThrow(
       /either a debit or a credit/,
     );
-    expect(() => validLines([line('cash', 1.005, 0), line('sales', 0, 1.005)], accounts)).toThrow(/2 decimals/);
+    expect(() => validLines([line('cash', 1.005, 0), line('sales', 0, 1.005)], chart)).toThrow(/2 decimals/);
   });
 
   it('checks the accounts: active, cost centre, sub-ledger on control accounts', () => {
-    expect(() => validLines([line('old', 5, 0), line('sales', 0, 5)], accounts)).toThrow(/OLD is inactive/);
-    expect(() => validLines([line('expense', 5, 0), line('cash', 0, 5)], accounts)).toThrow(/cost centre/);
-    expect(() => validLines([line('payable', 0, 5), line('cash', 5, 0)], accounts)).toThrow(/sub-ledger/);
-    expect(() => validLines([line('nowhere', 5, 0), line('cash', 0, 5)], accounts)).toThrow(DomainError);
+    expect(() => validLines([line('old', 5, 0), line('sales', 0, 5)], chart)).toThrow(/OLD is inactive/);
+    expect(() => validLines([line('expense', 5, 0), line('cash', 0, 5)], chart)).toThrow(/cost centre/);
+    expect(() => validLines([line('payable', 0, 5), line('cash', 5, 0)], chart)).toThrow(/sub-ledger/);
+    expect(() => validLines([line('nowhere', 5, 0), line('cash', 0, 5)], chart)).toThrow(DomainError);
+    expect(() => validLines([line('cash', 5, 0), line('sales', 0, 5)], { ...chart, book: 'pf' })).toThrow(
+      /belongs to the main book/,
+    );
     expect(
-      validLines(
-        [line('expense', 5, 0, { costCenterId: 'cc' }), line('payable', 0, 5, { subLedgerId: 'aci' })],
-        accounts,
-      ),
+      validLines([line('expense', 5, 0, { costCenterId: 'cc' }), line('payable', 0, 5, { subLedgerId: 'aci' })], chart),
     ).toHaveLength(2);
   });
 });
@@ -83,7 +85,7 @@ describe('voucher lifecycle', () => {
       id: 'v1',
       header,
       lines: [line('cash', 500, 0), line('sales', 0, 500)],
-      accounts,
+      chart,
       source: null,
       createdBy: 'u1',
       now,
@@ -91,18 +93,16 @@ describe('voucher lifecycle', () => {
 
   it('edits drafts, posts with a number and refuses changes afterwards', () => {
     const voucher = draft();
-    voucher.edit({ lines: [line('cash', 600, 0), line('sales', 0, 600)] }, accounts, now);
-    voucher.post({ number: voucherNumber('jv', '2025-2026', 7), fiscalYearId: 'fy', accounts, by: 'u2', now });
+    voucher.edit({ lines: [line('cash', 600, 0), line('sales', 0, 600)] }, chart, now);
+    voucher.post({ number: voucherNumber('jv', '2025-2026', 7), fiscalYearId: 'fy', chart, by: 'u2', now });
     expect(voucher.toSnapshot()).toMatchObject({ status: 'posted', number: 'JV-2025-2026-00007', version: 3 });
-    expect(() => voucher.edit({ header: { narration: 'x' } }, accounts, now)).toThrow(
-      /posted voucher cannot be edited/,
-    );
+    expect(() => voucher.edit({ header: { narration: 'x' } }, chart, now)).toThrow(/posted voucher cannot be edited/);
     expect(() => voucher.assertDeletable()).toThrow(/cannot be deleted/);
   });
 
   it('reverses a posted voucher with debits and credits swapped, once', () => {
     const voucher = draft();
-    voucher.post({ number: 'JV-1', fiscalYearId: 'fy', accounts, by: 'u2', now });
+    voucher.post({ number: 'JV-1', fiscalYearId: 'fy', chart, by: 'u2', now });
     const reversal = voucher.reversal({
       id: 'v2',
       voucherDate: '2026-04-02',

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { StaffDirectory, type StaffSummary } from '../../../../shared/application/contracts/staff-directory.js';
 import { toPage, offsetOf, type Page } from '../../../../shared/application/pagination.js';
@@ -27,6 +27,7 @@ import {
   type LeaveEncashmentLine,
   type SalarySheetLine,
 } from '../../domain/repositories.js';
+import type { PfMovements } from '../../domain/pf.js';
 import {
   incrementArrear,
   isIncrementDue,
@@ -411,6 +412,51 @@ export class DrizzlePayrollReadRepository extends PayrollReadRepository {
         })),
     ];
     return statement(movements, from, to, (credit, debit) => credit - debit);
+  }
+
+  async pfMovements(staffId?: string): Promise<PfMovements[]> {
+    const [deductions, entries] = await Promise.all([
+      this.context.db
+        .select({
+          staffId: salarySheetLines.staffId,
+          year: salarySheets.year,
+          month: salarySheets.month,
+          pf: salarySheetLines.pf,
+        })
+        .from(salarySheetLines)
+        .innerJoin(salarySheets, eq(salarySheets.id, salarySheetLines.sheetId))
+        .where(
+          and(
+            eq(salarySheets.status, 'committed'),
+            gt(salarySheetLines.pf, 0),
+            staffId ? eq(salarySheetLines.staffId, staffId) : undefined,
+          ),
+        ),
+      this.context.db
+        .select({
+          staffId: pfLedgerEntries.staffId,
+          date: pfLedgerEntries.entryDate,
+          type: pfLedgerEntries.type,
+          credit: pfLedgerEntries.credit,
+          debit: pfLedgerEntries.debit,
+        })
+        .from(pfLedgerEntries)
+        .where(staffId ? eq(pfLedgerEntries.staffId, staffId) : undefined),
+    ]);
+    const people = new Map<
+      string,
+      { staffId: string; deductions: PfMovements['deductions'][number][]; entries: PfMovements['entries'][number][] }
+    >();
+    const person = (id: string) => {
+      const found = people.get(id) ?? { staffId: id, deductions: [], entries: [] };
+      people.set(id, found);
+      return found;
+    };
+    for (const row of deductions) {
+      person(row.staffId).deductions.push({ date: monthEnd(row.year, row.month), amount: row.pf });
+    }
+    for (const { staffId: id, ...entry } of entries) person(id).entries.push(entry);
+    return [...people.values()];
   }
 
   async duesStatement(staffId: string, from: string, to: string, serviceUnitId?: string): Promise<LedgerStatement> {

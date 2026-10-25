@@ -215,3 +215,172 @@ describe('books and statements', () => {
     }
   });
 });
+
+describe('PF book', () => {
+  it('keeps the trust’s vouchers and statements apart from the main books', async () => {
+    const asAdmin = async (path: string, body: Record<string, unknown>) => {
+      const response = await request(http).post(`/api/v1/${path}`).set(bearer(admin)).send(body);
+      expect(response.status, `${path}: ${JSON.stringify(response.body)}`).toBe(201);
+      return response.body.id as string;
+    };
+    const fundNature = await create('natures', {
+      code: 'P1',
+      name: 'PF fund assets',
+      statement: 'balance_sheet',
+      normalBalance: 'debit',
+      book: 'pf',
+    });
+    await create('natures', {
+      code: 'P2',
+      name: 'PF members',
+      statement: 'balance_sheet',
+      normalBalance: 'credit',
+      book: 'pf',
+    });
+    const fundBank = await account('P1', '', '', '', 'P101', 'PF bank account', { kind: 'bank' });
+    const members = await account('P2', '', '', '', 'P201', 'Members’ contributions', { isControlAccount: true });
+    const pfJournal = await create('journal-types', { shortName: 'PFJ', name: 'PF journal', book: 'pf' });
+    const natures = await request(http).get('/api/v1/accounts/natures?book=pf').set(bearer(accountant)).expect(200);
+    expect(natures.body.map((nature: { code: string }) => nature.code)).toEqual(['P1', 'P2']);
+
+    // A PF member is a sub-ledger linked to their staff record.
+    const division = await asAdmin('hr/divisions', { name: 'Clinical' });
+    const department = await asAdmin('hr/departments', { divisionId: division, name: 'Nursing' });
+    const staffId = await asAdmin('hr/staff', {
+      employeeNo: 'N-001',
+      fullName: 'Jane',
+      joiningDate: '2023-03-10',
+      departmentId: department,
+      subDepartmentId: await asAdmin('hr/sub-departments', { departmentId: department, name: 'ICU' }),
+      designationId: await asAdmin('hr/designations', { name: 'Staff Nurse' }),
+      serviceNature: 'Permanent',
+      salaryStatus: 'Regular',
+    });
+    const memberType = await create('sub-ledger-types', { name: 'PF members' });
+    const jane = await create('sub-ledgers', { typeId: memberType, name: 'Jane (N-001)', staffId });
+    const linked = await request(http)
+      .get(`/api/v1/accounts/sub-ledgers?staffId=${staffId}`)
+      .set(bearer(accountant))
+      .expect(200);
+    expect(linked.body.map((entry: { id: string }) => entry.id)).toEqual([jane]);
+    const ghost = await request(http)
+      .post('/api/v1/accounts/sub-ledgers')
+      .set(bearer(accountant))
+      .send({ typeId: memberType, name: 'Ghost', staffId: '00000000-0000-4000-8000-000000000000' })
+      .expect(404);
+    expect(ghost.body.code).toBe('staff_not_found');
+
+    await post(pfJournal, '2025-09-30', [
+      [fundBank, 3_600, 0],
+      [members, 0, 3_600, { subLedgerId: jane }],
+    ]);
+    const mixed = await request(http)
+      .post('/api/v1/accounts/vouchers')
+      .set(bearer(accountant))
+      .send({
+        journalTypeId: pfJournal,
+        voucherDate: '2025-09-30',
+        lines: [
+          { glAccountId: fundBank, debit: 100, credit: 0 },
+          { glAccountId: gl.capital, debit: 0, credit: 100 },
+        ],
+      })
+      .expect(422);
+    expect(mixed.body.detail).toMatch(/3001 belongs to the main book/);
+    const journals = await request(http).get('/api/v1/accounts/journal-types?book=main').set(bearer(accountant));
+    expect(journals.body.map((journal: { shortName: string }) => journal.shortName)).toEqual(['JV']);
+    await request(http)
+      .post('/api/v1/accounts/vouchers')
+      .set(bearer(accountant))
+      .send({
+        journalTypeId: journals.body[0].id,
+        voucherDate: '2025-09-30',
+        lines: [
+          { glAccountId: gl.bank, debit: 100, credit: 0 },
+          { glAccountId: members, debit: 0, credit: 100 },
+        ],
+      })
+      .expect(422);
+
+    const get = (path: string) => request(http).get(`/api/v1/accounts/${path}`).set(bearer(accountant)).expect(200);
+    const pfTrial = await get('statements/trial-balance?from=2025-07-01&to=2025-09-30&book=pf');
+    expect(pfTrial.body).toMatchObject({ balanced: true, totals: { closingDebit: 3_600, closingCredit: 3_600 } });
+    const mainTrial = await get('statements/trial-balance?from=2025-08-01&to=2025-09-30');
+    expect(mainTrial.body.totals).toMatchObject({ closingDebit: 133_000, closingCredit: 133_000 });
+    const pfDayBook = await get('books/day-book?from=2025-07-01&to=2025-09-30&book=pf');
+    expect(pfDayBook.body).toHaveLength(1);
+    const pfBalance = await get('statements/balance-sheet?asOf=2025-09-30&book=pf');
+    expect(pfBalance.body).toMatchObject({ totalDebit: 3_600, totalCredit: 3_600, balanced: true });
+    const owed = await get(`books/ledger?subLedgerId=${jane}&from=2025-07-01&to=2026-06-30`);
+    expect(owed.body).toMatchObject({ title: 'Jane (N-001)', closing: -3_600 });
+
+    // Once used, a nature or journal type stays in its book.
+    for (const path of [`natures/${fundNature}`, `journal-types/${pfJournal}`]) {
+      const moved = await request(http)
+        .patch(`/api/v1/accounts/${path}`)
+        .set(bearer(accountant))
+        .send({ book: 'main' })
+        .expect(409);
+      expect(moved.body.code).toBe('book_in_use');
+    }
+
+    await request(http)
+      .post('/api/v1/reports/accounts.trial-balance/render')
+      .set(bearer(admin))
+      .send({ format: 'pdf', params: { from: '2025-07-01', to: '2025-09-30', book: 'pf' } })
+      .expect(200);
+  });
+
+  it('registers the fund’s deposits, fixed deposits and the TDS rules', async () => {
+    await create('pf-deposits', { year: 2025, month: 9, amount: 3_600, chequeNo: 'CHQ-1', depositedOn: '2025-10-05' });
+    const twice = await request(http)
+      .post('/api/v1/accounts/pf-deposits')
+      .set(bearer(accountant))
+      .send({ year: 2025, month: 9, amount: 1 })
+      .expect(409);
+    expect(twice.body.code).toBe('pf_deposit_exists');
+    const deposits = await request(http).get('/api/v1/accounts/pf-deposits?year=2025').set(bearer(accountant));
+    expect(deposits.body).toMatchObject([{ month: 9, amount: 3_600, chequeNo: 'CHQ-1' }]);
+
+    const fdr = await create('pf-fixed-deposits', {
+      fdrNo: 'fdr-001',
+      bankName: 'Sonali Bank',
+      amount: 500_000,
+      interestRatePercent: 9.5,
+      openedOn: '2025-01-01',
+      maturesOn: '2026-01-01',
+    });
+    const sameNo = await request(http)
+      .post('/api/v1/accounts/pf-fixed-deposits')
+      .set(bearer(accountant))
+      .send({ fdrNo: 'FDR-001', bankName: 'Other', amount: 1, openedOn: '2025-01-01', maturesOn: '2025-06-01' })
+      .expect(409);
+    expect(sameNo.body.code).toBe('pf_fixed_deposit_exists');
+    await request(http)
+      .post('/api/v1/accounts/pf-fixed-deposits')
+      .set(bearer(accountant))
+      .send({ fdrNo: 'FDR-002', bankName: 'Other', amount: 1, openedOn: '2025-06-01', maturesOn: '2025-01-01' })
+      .expect(400);
+    await request(http)
+      .patch(`/api/v1/accounts/pf-fixed-deposits/${fdr}`)
+      .set(bearer(accountant))
+      .send({ withdrawnOn: '2026-01-02' })
+      .expect(422);
+    await request(http)
+      .patch(`/api/v1/accounts/pf-fixed-deposits/${fdr}`)
+      .set(bearer(accountant))
+      .send({ withdrawnOn: '2026-01-02', withdrawnAmount: 547_500 })
+      .expect(200);
+
+    await create('tds-rules', { section: '52', description: 'Supply of goods', category: 'Supplier', ratePercent: 5 });
+    await create('tds-rules', { description: 'Professional fees', category: 'Consultant', ratePercent: 10 });
+    const rules = await request(http).get('/api/v1/accounts/tds-rules?category=Supplier').set(bearer(accountant));
+    expect(rules.body).toMatchObject([{ section: '52', ratePercent: 5, effectiveFrom: null }]);
+    await request(http)
+      .post('/api/v1/accounts/tds-rules')
+      .set(bearer(accountant))
+      .send({ description: 'Too much', category: 'X', ratePercent: 101 })
+      .expect(400);
+    await request(http).get('/api/v1/accounts/tds-rules').set(bearer(plain)).expect(403);
+  });
+});

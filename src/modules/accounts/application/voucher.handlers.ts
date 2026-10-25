@@ -10,7 +10,14 @@ import { TransactionManager } from '../../../shared/application/ports/transactio
 import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { safeFileName, validDocument, type StoredFile } from '../../../shared/domain/uploads.js';
 import { LedgerFacts, VoucherRepository, type StoredAttachment } from '../domain/repositories.js';
-import { Voucher, voucherNumber, voucherTotal, type VoucherLine, type VoucherSource } from '../domain/voucher.js';
+import {
+  Voucher,
+  voucherNumber,
+  voucherTotal,
+  type Chart,
+  type VoucherLine,
+  type VoucherSource,
+} from '../domain/voucher.js';
 import { ACCOUNTS_READ, VOUCHERS_POST, VOUCHERS_WRITE } from './accounts.constants.js';
 import {
   AddVoucherAttachmentCommand,
@@ -40,8 +47,14 @@ export class VoucherBook {
     readonly clock: Clock,
   ) {}
 
-  accountsOf(lines: readonly VoucherLine[]) {
-    return this.facts.accounts([...new Set(lines.map((line) => line.glAccountId))]);
+  /** The voucher's book (its journal type's) with the accounts its lines use. */
+  async chartOf(journalTypeId: string, lines: readonly VoucherLine[]): Promise<Chart> {
+    const [journal, accounts] = await Promise.all([
+      this.facts.journalType(journalTypeId),
+      this.facts.accounts([...new Set(lines.map((line) => line.glAccountId))]),
+    ]);
+    if (!journal) throw new NotFoundError('journal_type');
+    return { book: journal.book, accounts };
   }
 
   async load(id: string, version: number): Promise<Voucher> {
@@ -64,7 +77,13 @@ export class VoucherBook {
     if (!journal) throw new NotFoundError('journal_type');
     const serial = await this.vouchers.nextSerial(journal.id, fiscalYear.id);
     const number = voucherNumber(journal.shortName, fiscalYear.label, serial);
-    voucher.post({ number, fiscalYearId: fiscalYear.id, accounts: await this.accountsOf(voucher.lines), by, now });
+    voucher.post({
+      number,
+      fiscalYearId: fiscalYear.id,
+      chart: await this.chartOf(voucher.journalTypeId, voucher.lines),
+      by,
+      now,
+    });
     return number;
   }
 
@@ -96,7 +115,7 @@ export class CreateVoucherHandler implements ICommandHandler<CreateVoucherComman
         id: randomUUID(),
         header,
         lines,
-        accounts: await this.book.accountsOf(lines),
+        chart: await this.book.chartOf(header.journalTypeId, lines),
         source: null,
         createdBy: actor.userId,
         now,
@@ -122,7 +141,7 @@ export class EditVoucherHandler implements ICommandHandler<EditVoucherCommand> {
       const voucher = await this.book.load(id, version);
       voucher.edit(
         { header, ...(lines ? { lines } : {}) },
-        await this.book.accountsOf(lines ?? voucher.lines),
+        await this.book.chartOf(header.journalTypeId ?? voucher.journalTypeId, lines ?? voucher.lines),
         this.book.clock.now(),
       );
       await this.book.vouchers.update(voucher);
@@ -316,7 +335,7 @@ export class VoucherLedgerPosting extends LedgerPosting {
           serviceUnitId: null,
         },
         lines,
-        accounts: await this.book.accountsOf(lines),
+        chart: await this.book.chartOf(journal.id, lines),
         source,
         createdBy: request.postedBy,
         now,

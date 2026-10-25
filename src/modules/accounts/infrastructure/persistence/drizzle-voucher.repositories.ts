@@ -29,11 +29,17 @@ import {
   LedgerFacts,
   VoucherRepository,
   type FiscalYearInfo,
+  type JournalInfo,
   type StoredAttachment,
   type VoucherAttachmentInfo,
 } from '../../domain/repositories.js';
 import { Voucher, voucherTotal, type PostableAccount, type VoucherProps } from '../../domain/voucher.js';
 import {
+  accountCategories,
+  accountLevel4Heads,
+  accountLevel5Heads,
+  accountNatures,
+  accountSubCategories,
   fiscalYears,
   glAccounts,
   glRoles,
@@ -196,8 +202,14 @@ export class DrizzleLedgerFacts extends LedgerFacts {
         isActive: glAccounts.isActive,
         isControlAccount: glAccounts.isControlAccount,
         requiresCostCenter: glAccounts.requiresCostCenter,
+        book: accountNatures.book,
       })
       .from(glAccounts)
+      .innerJoin(accountLevel5Heads, eq(accountLevel5Heads.id, glAccounts.level5HeadId))
+      .innerJoin(accountLevel4Heads, eq(accountLevel4Heads.id, accountLevel5Heads.level4HeadId))
+      .innerJoin(accountSubCategories, eq(accountSubCategories.id, accountLevel4Heads.subCategoryId))
+      .innerJoin(accountCategories, eq(accountCategories.id, accountSubCategories.categoryId))
+      .innerJoin(accountNatures, eq(accountNatures.id, accountCategories.natureId))
       .where(inArray(glAccounts.id, [...ids]));
     return new Map(rows.map((row) => [row.id, row]));
   }
@@ -236,17 +248,17 @@ export class DrizzleLedgerFacts extends LedgerFacts {
     return row ?? null;
   }
 
-  async journalType(id: string): Promise<{ id: string; shortName: string } | null> {
+  async journalType(id: string): Promise<JournalInfo | null> {
     const [row] = await this.context.db
-      .select({ id: journalTypes.id, shortName: journalTypes.shortName })
+      .select({ id: journalTypes.id, shortName: journalTypes.shortName, book: journalTypes.book })
       .from(journalTypes)
       .where(eq(journalTypes.id, id));
     return row ?? null;
   }
 
-  async journalTypeByShortName(shortName: string): Promise<{ id: string; shortName: string } | null> {
+  async journalTypeByShortName(shortName: string): Promise<JournalInfo | null> {
     const [row] = await this.context.db
-      .select({ id: journalTypes.id, shortName: journalTypes.shortName })
+      .select({ id: journalTypes.id, shortName: journalTypes.shortName, book: journalTypes.book })
       .from(journalTypes)
       .where(eq(sql`upper(${journalTypes.shortName})`, shortName.toUpperCase()));
     return row ?? null;

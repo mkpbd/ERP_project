@@ -1,4 +1,4 @@
-import { and, gte, lte, ne } from 'drizzle-orm';
+import { and, eq, gte, lte, ne, type SQL } from 'drizzle-orm';
 import type { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import type { RecordType } from '../../../../shared/application/records.js';
 import { ConflictError } from '../../../../shared/domain/errors.js';
@@ -33,17 +33,46 @@ import {
   glStatementMappings,
   journalTypes,
   postingSchedules,
+  pfDeposits,
+  pfFixedDeposits,
   posTerminals,
   statementBroadHeads,
   statementSubHeads,
   subLedgers,
   subLedgerTypes,
+  tdsRules,
+  voucherLines,
+  vouchers,
   voucherTypes,
 } from './accounts.schema.js';
 
 /** Drizzle's foreign key name: `<table>_<column>_<referenced table>_id_fk`. */
 const fk = (table: string, column: string, referenced: string) => `${table}_${column}_${referenced}_id_fk`;
 const taken = (code: string, message: string) => ({ code, message });
+
+/**
+ * Whether a voucher (any status) matching the condition mixes books: a line on an account whose nature is in
+ * one book, in a journal of the other. Used to refuse moving a nature or journal type to another book once used.
+ */
+async function booksClash(context: DbContext, where: SQL | undefined): Promise<boolean> {
+  const [row] = await context.db
+    .select({ id: vouchers.id })
+    .from(vouchers)
+    .innerJoin(journalTypes, eq(journalTypes.id, vouchers.journalTypeId))
+    .innerJoin(voucherLines, eq(voucherLines.voucherId, vouchers.id))
+    .innerJoin(glAccounts, eq(glAccounts.id, voucherLines.glAccountId))
+    .innerJoin(accountLevel5Heads, eq(accountLevel5Heads.id, glAccounts.level5HeadId))
+    .innerJoin(accountLevel4Heads, eq(accountLevel4Heads.id, accountLevel5Heads.level4HeadId))
+    .innerJoin(accountSubCategories, eq(accountSubCategories.id, accountLevel4Heads.subCategoryId))
+    .innerJoin(accountCategories, eq(accountCategories.id, accountSubCategories.categoryId))
+    .innerJoin(accountNatures, eq(accountNatures.id, accountCategories.natureId))
+    .where(where)
+    .limit(1);
+  return row !== undefined;
+}
+
+const bookInUse = () =>
+  new ConflictError('book_in_use', 'Vouchers already use it in its current book; it cannot move to the other book');
 
 export function accountRecordTypes(context: DbContext): RecordType[] {
   const record = (name: string, table: RecordTable, options: Omit<RecordStoreOptions, 'name'>): RecordType => ({
@@ -56,6 +85,14 @@ export function accountRecordTypes(context: DbContext): RecordType[] {
   return [
     record(R.nature, accountNatures, {
       orderBy: [accountNatures.code],
+      filters: { book: accountNatures.book },
+      guard: async (row) => {
+        const { id, book } = row;
+        if (typeof id !== 'string' || typeof book !== 'string') return;
+        if (await booksClash(context, and(eq(accountNatures.id, id), ne(journalTypes.book, book as 'main' | 'pf')))) {
+          throw bookInUse();
+        }
+      },
       unique: {
         account_natures_code_uq: taken('account_nature_code_taken', 'Another nature of account has this code'),
         account_natures_name_uq: taken('account_nature_name_taken', 'Another nature of account has this name'),
@@ -193,6 +230,14 @@ export function accountRecordTypes(context: DbContext): RecordType[] {
     }),
     record(R.journalType, journalTypes, {
       orderBy: [journalTypes.shortName],
+      filters: { book: journalTypes.book },
+      guard: async (row) => {
+        const { id, book } = row;
+        if (typeof id !== 'string' || typeof book !== 'string') return;
+        if (await booksClash(context, and(eq(journalTypes.id, id), ne(accountNatures.book, book as 'main' | 'pf')))) {
+          throw bookInUse();
+        }
+      },
       unique: {
         journal_types_short_name_uq: taken('journal_type_short_name_taken', 'Another journal type has this short name'),
       },
@@ -222,8 +267,11 @@ export function accountRecordTypes(context: DbContext): RecordType[] {
     }),
     record(R.subLedger, subLedgers, {
       orderBy: [subLedgers.name],
-      filters: { typeId: subLedgers.typeId },
-      references: { [fk('sub_ledgers', 'type_id', 'sub_ledger_types')]: R.subLedgerType },
+      filters: { typeId: subLedgers.typeId, staffId: subLedgers.staffId },
+      references: {
+        [fk('sub_ledgers', 'type_id', 'sub_ledger_types')]: R.subLedgerType,
+        [fk('sub_ledgers', 'staff_id', 'staff_records')]: 'staff',
+      },
     }),
     record(GL_ROLE, glRoles, {
       orderBy: [glRoles.role],
@@ -233,6 +281,20 @@ export function accountRecordTypes(context: DbContext): RecordType[] {
     record(POSTING_SCHEDULE, postingSchedules, {
       orderBy: [postingSchedules.section],
       unique: { posting_schedules_section_uq: taken('posting_schedule_exists', 'This section already has a schedule') },
+    }),
+    record(R.pfDeposit, pfDeposits, {
+      orderBy: [pfDeposits.year, pfDeposits.month],
+      filters: { year: pfDeposits.year },
+      unique: { pf_deposits_period_uq: taken('pf_deposit_exists', 'That month is already deposited; edit it instead') },
+      references: { [fk('pf_deposits', 'voucher_id', 'vouchers')]: 'voucher' },
+    }),
+    record(R.pfFixedDeposit, pfFixedDeposits, {
+      orderBy: [pfFixedDeposits.maturesOn],
+      unique: { pf_fixed_deposits_no_uq: taken('pf_fixed_deposit_exists', 'An FDR with this number exists') },
+    }),
+    record(R.tdsRule, tdsRules, {
+      orderBy: [tdsRules.category, tdsRules.description],
+      filters: { category: tdsRules.category },
     }),
   ];
 }

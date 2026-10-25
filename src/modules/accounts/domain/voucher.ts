@@ -21,6 +21,16 @@ export interface PostableAccount {
   readonly isActive: boolean;
   readonly isControlAccount: boolean;
   readonly requiresCostCenter: boolean;
+  readonly book: Book;
+}
+
+/** The organization's books, or the provident fund trust's (old PFBook). */
+export type Book = 'main' | 'pf';
+
+/** The book a voucher is kept in (its journal type's) and the accounts its lines use. */
+export interface Chart {
+  readonly book: Book;
+  readonly accounts: ReadonlyMap<string, PostableAccount>;
 }
 
 export interface VoucherHeader {
@@ -66,10 +76,7 @@ const validAmount = (amount: number) =>
  * credit (not both), amounts with at most two decimals, debits equal to credits, active accounts, a cost
  * centre where the account needs one and a sub-ledger on control accounts.
  */
-export function validLines(
-  lines: readonly VoucherLine[],
-  accounts: ReadonlyMap<string, PostableAccount>,
-): VoucherLine[] {
+export function validLines(lines: readonly VoucherLine[], chart: Chart): VoucherLine[] {
   if (lines.length < 2 || lines.length > MAX_VOUCHER_LINES) {
     throw new DomainError('invalid_voucher', `A voucher has 2 to ${MAX_VOUCHER_LINES} lines`);
   }
@@ -83,8 +90,11 @@ export function validLines(
     if (line.debit > 0 === line.credit > 0) {
       throw new DomainError('invalid_voucher', `${at}: enter either a debit or a credit`);
     }
-    const account = accounts.get(line.glAccountId);
+    const account = chart.accounts.get(line.glAccountId);
     if (!account) throw new DomainError('invalid_voucher', `${at}: unknown account`);
+    if (account.book !== chart.book) {
+      throw new DomainError('invalid_voucher', `${at}: account ${account.code} belongs to the ${account.book} book`);
+    }
     if (!account.isActive) throw new DomainError('invalid_voucher', `${at}: account ${account.code} is inactive`);
     if (account.requiresCostCenter && !line.costCenterId) {
       throw new DomainError('invalid_voucher', `${at}: account ${account.code} needs a cost centre`);
@@ -118,7 +128,7 @@ export class Voucher {
     id: string;
     header: VoucherHeader;
     lines: readonly VoucherLine[];
-    accounts: ReadonlyMap<string, PostableAccount>;
+    chart: Chart;
     source: VoucherSource | null;
     createdBy: string | null;
     now: Date;
@@ -131,7 +141,7 @@ export class Voucher {
       status: 'draft',
       source: params.source,
       reversalOfId: null,
-      lines: validLines(params.lines, params.accounts),
+      lines: validLines(params.lines, params.chart),
       createdBy: params.createdBy,
       postedBy: null,
       postedAt: null,
@@ -164,27 +174,17 @@ export class Voucher {
     return this.props.lines;
   }
 
-  edit(
-    changes: { header?: Partial<VoucherHeader>; lines?: readonly VoucherLine[] },
-    accounts: ReadonlyMap<string, PostableAccount>,
-    now: Date,
-  ): void {
+  edit(changes: { header?: Partial<VoucherHeader>; lines?: readonly VoucherLine[] }, chart: Chart, now: Date): void {
     this.assertDraft('edited');
     Object.assign(this.props, changes.header);
-    if (changes.lines) this.props.lines = validLines(changes.lines, accounts);
+    if (changes.lines) this.props.lines = validLines(changes.lines, chart);
     this.touch(now);
   }
 
   /** The accounts are checked again: one may have been deactivated since the draft was saved. */
-  post(params: {
-    number: string;
-    fiscalYearId: string;
-    accounts: ReadonlyMap<string, PostableAccount>;
-    by: string | null;
-    now: Date;
-  }): void {
+  post(params: { number: string; fiscalYearId: string; chart: Chart; by: string | null; now: Date }): void {
     this.assertDraft('posted');
-    validLines(this.props.lines, params.accounts);
+    validLines(this.props.lines, params.chart);
     this.props.status = 'posted';
     this.props.number = params.number;
     this.props.fiscalYearId = params.fiscalYearId;

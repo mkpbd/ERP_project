@@ -9,23 +9,40 @@ const optionalText = (max: number) => z.string().trim().max(max).nullable();
 const optionalCode = code.nullable();
 const ref = z.uuid();
 
-/** Create (nullable fields default to null), update (all optional) and response shapes of a record. */
-function shapes<T extends z.ZodRawShape>(fields: T, nullable: (keyof T)[] = []) {
+/**
+ * Create (nullable fields default to null, others to the given defaults), update (all optional) and response
+ * shapes of a record.
+ */
+function shapes<T extends z.ZodRawShape>(
+  fields: T,
+  nullable: (keyof T)[] = [],
+  defaults: Partial<Record<keyof T, unknown>> = {},
+) {
   const create = Object.fromEntries(
     Object.entries(fields).map(([key, schema]) => [
       key,
-      nullable.includes(key) ? (schema as z.ZodNullable<z.ZodTypeAny>).default(null) : schema,
+      nullable.includes(key)
+        ? (schema as z.ZodNullable<z.ZodTypeAny>).default(null)
+        : key in defaults
+          ? (schema as z.ZodTypeAny).default(defaults[key])
+          : schema,
     ]),
   ) as T;
   return { create: z.strictObject(create), update: updateSchema(fields), response: recordResponseShape(fields) };
 }
 
-const nature = shapes({
-  code,
-  name: name(),
-  statement: z.enum(['balance_sheet', 'profit_and_loss']),
-  normalBalance: z.enum(['debit', 'credit']),
-});
+const book = z.enum(['main', 'pf']);
+const nature = shapes(
+  {
+    code,
+    name: name(),
+    book,
+    statement: z.enum(['balance_sheet', 'profit_and_loss']),
+    normalBalance: z.enum(['debit', 'credit']),
+  },
+  [],
+  { book: 'main' },
+);
 export class CreateNatureDto extends createZodDto(nature.create) {}
 export class UpdateNatureDto extends createZodDto(nature.update) {}
 export class NatureResponseDto extends responseDto(nature.response) {}
@@ -157,8 +174,9 @@ export class FiscalYearResponseDto extends responseDto(
 ) {}
 
 const journalType = shapes(
-  { shortName: z.string().trim().min(1).max(10), name: name(100), description: optionalText(500) },
+  { shortName: z.string().trim().min(1).max(10), name: name(100), book, description: optionalText(500) },
   ['description'],
+  { book: 'main' },
 );
 export class CreateJournalTypeDto extends createZodDto(journalType.create) {}
 export class UpdateJournalTypeDto extends createZodDto(journalType.update) {}
@@ -208,13 +226,89 @@ const subLedger = shapes(
     mobileNo: optionalText(30),
     email: z.email().max(254).nullable(),
     reference: optionalText(100),
+    staffId: ref.nullable(),
   },
-  ['address', 'mobileNo', 'email', 'reference'],
+  ['address', 'mobileNo', 'email', 'reference', 'staffId'],
 );
 export class CreateSubLedgerDto extends createZodDto(subLedger.create) {}
 export class UpdateSubLedgerDto extends createZodDto(subLedger.update) {}
-export class SubLedgerFilterDto extends createZodDto(z.object({ typeId: ref.optional() })) {}
+export class SubLedgerFilterDto extends createZodDto(z.object({ typeId: ref.optional(), staffId: ref.optional() })) {}
 export class SubLedgerResponseDto extends responseDto(subLedger.response) {}
+
+export class BookFilterDto extends createZodDto(z.object({ book: book.optional() })) {}
+
+const amount = z.number().positive().max(999_999_999_999).multipleOf(0.01);
+const percent = z.number().min(0).max(100).multipleOf(0.01);
+
+const pfDepositFields = {
+  year: z.number().int().min(2000).max(2100),
+  month: z.number().int().min(1).max(12),
+  amount,
+  chequeNo: optionalText(50),
+  chequeDate: day.nullable(),
+  depositedOn: day.nullable(),
+  voucherId: ref.nullable(),
+  remarks: optionalText(500),
+};
+const pfDeposit = shapes(pfDepositFields, ['chequeNo', 'chequeDate', 'depositedOn', 'voucherId', 'remarks']);
+export class CreatePfDepositDto extends createZodDto(pfDeposit.create) {}
+export class UpdatePfDepositDto extends createZodDto(pfDeposit.update) {}
+export class PfDepositFilterDto extends createZodDto(z.object({ year: z.coerce.number().int().optional() })) {}
+export class PfDepositResponseDto extends responseDto(
+  recordResponseShape({
+    ...pfDepositFields,
+    chequeDate: z.string().nullable(),
+    depositedOn: z.string().nullable(),
+  }),
+) {}
+
+const fdrFields = {
+  fdrNo: z.string().trim().min(1).max(50),
+  bankName: name(100),
+  amount,
+  interestRatePercent: percent.nullable(),
+  openedOn: day,
+  maturesOn: day,
+  withdrawnOn: day.nullable(),
+  withdrawnAmount: amount.nullable(),
+  remarks: optionalText(500),
+};
+const fdr = shapes(fdrFields, ['interestRatePercent', 'withdrawnOn', 'withdrawnAmount', 'remarks']);
+export class CreatePfFixedDepositDto extends createZodDto(
+  fdr.create
+    .refine((value) => value.maturesOn > value.openedOn, {
+      message: 'The maturity is not after the opening',
+      path: ['maturesOn'],
+    })
+    .refine((value) => (value.withdrawnOn === null) === (value.withdrawnAmount === null), {
+      message: 'Give both the withdrawal date and amount, or neither',
+      path: ['withdrawnAmount'],
+    }),
+) {}
+export class UpdatePfFixedDepositDto extends createZodDto(fdr.update) {}
+export class PfFixedDepositResponseDto extends responseDto(
+  recordResponseShape({
+    ...fdrFields,
+    openedOn: z.string(),
+    maturesOn: z.string(),
+    withdrawnOn: z.string().nullable(),
+  }),
+) {}
+
+const tdsFields = {
+  section: optionalText(50),
+  description: name(500),
+  category: name(100),
+  ratePercent: percent,
+  effectiveFrom: day.nullable(),
+};
+const tds = shapes(tdsFields, ['section', 'effectiveFrom']);
+export class CreateTdsRuleDto extends createZodDto(tds.create) {}
+export class UpdateTdsRuleDto extends createZodDto(tds.update) {}
+export class TdsRuleFilterDto extends createZodDto(z.object({ category: z.string().trim().min(1).optional() })) {}
+export class TdsRuleResponseDto extends responseDto(
+  recordResponseShape({ ...tdsFields, effectiveFrom: z.string().nullable() }),
+) {}
 
 const treeAccount = z.object({
   id: z.uuid(),

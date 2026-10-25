@@ -85,6 +85,18 @@ import {
   UpdateSubLedgerTypeDto,
   UpdateVoucherTypeDto,
   VoucherTypeResponseDto,
+  BookFilterDto,
+  CreatePfDepositDto,
+  UpdatePfDepositDto,
+  PfDepositResponseDto,
+  PfDepositFilterDto,
+  CreatePfFixedDepositDto,
+  UpdatePfFixedDepositDto,
+  PfFixedDepositResponseDto,
+  CreateTdsRuleDto,
+  UpdateTdsRuleDto,
+  TdsRuleResponseDto,
+  TdsRuleFilterDto,
 } from './dto/accounts.dto.js';
 
 const accounts = { tag: 'accounts', readPermission: 'accounts:read', managePermission: 'accounts:manage' } as const;
@@ -98,6 +110,7 @@ export const NaturesController = createRecordController({
   create: CreateNatureDto,
   update: UpdateNatureDto,
   response: NatureResponseDto,
+  filter: BookFilterDto,
 });
 
 export const CategoriesController = createRecordController({
@@ -272,6 +285,7 @@ export const JournalTypesController = createRecordController({
   create: CreateJournalTypeDto,
   update: UpdateJournalTypeDto,
   response: JournalTypeResponseDto,
+  filter: BookFilterDto,
 });
 
 export const VoucherTypesController = createRecordController({
@@ -342,6 +356,41 @@ export const SubLedgersController = createRecordController({
   filter: SubLedgerFilterDto,
 });
 
+export const PfDepositsController = createRecordController({
+  ...accounts,
+  className: 'PfDepositsController',
+  path: 'accounts/pf-deposits',
+  type: R.pfDeposit,
+  label: 'PF deposit',
+  create: CreatePfDepositDto,
+  update: UpdatePfDepositDto,
+  response: PfDepositResponseDto,
+  filter: PfDepositFilterDto,
+});
+
+export const PfFixedDepositsController = createRecordController({
+  ...accounts,
+  className: 'PfFixedDepositsController',
+  path: 'accounts/pf-fixed-deposits',
+  type: R.pfFixedDeposit,
+  label: 'PF fixed deposit',
+  create: CreatePfFixedDepositDto,
+  update: UpdatePfFixedDepositDto,
+  response: PfFixedDepositResponseDto,
+});
+
+export const TdsRulesController = createRecordController({
+  ...accounts,
+  className: 'TdsRulesController',
+  path: 'accounts/tds-rules',
+  type: R.tdsRule,
+  label: 'TDS rule',
+  create: CreateTdsRuleDto,
+  update: UpdateTdsRuleDto,
+  response: TdsRuleResponseDto,
+  filter: TdsRuleFilterDto,
+});
+
 @ApiTags('accounts')
 @ApiBearerAuth()
 @Controller({ path: 'accounts/chart', version: '1' })
@@ -380,4 +429,7 @@ export const ACCOUNTS_RECORD_CONTROLLERS = [
   PosTerminalsController,
   SubLedgerTypesController,
   SubLedgersController,
+  PfDepositsController,
+  PfFixedDepositsController,
+  TdsRulesController,
 ];

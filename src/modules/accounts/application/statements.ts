@@ -18,6 +18,7 @@ import {
   type StatementAccount,
   type TrialBalance,
 } from '../domain/statements.js';
+import type { Book } from '../domain/voucher.js';
 import { ACCOUNTS_READ } from './accounts.constants.js';
 
 /** The earliest date anything can be posted on; "all time before" a date starts here. */
@@ -41,14 +42,14 @@ export interface LedgerScope {
 
 /** Read side of the books: only posted vouchers (and reversed ones, whose reversal is posted too) count. */
 export abstract class BooksReadRepository {
-  abstract accounts(): Promise<(StatementAccount & { kind: 'bank' | 'cash' | 'other' })[]>;
+  abstract accounts(): Promise<(StatementAccount & { kind: 'bank' | 'cash' | 'other'; book: Book })[]>;
   /** Sums per account before `from` and within `from`–`to`. */
   abstract movements(from: string, to: string): Promise<Map<string, AccountMovement>>;
   /** Balance (debit positive) before `from`. */
   abstract opening(scope: LedgerScope, from: string): Promise<number>;
   abstract entries(scope: LedgerScope, from: string, to: string): Promise<LedgerEntry[]>;
   abstract postingLines(from: string, to: string, accountIds: readonly string[]): Promise<PostingLine[]>;
-  abstract dayBook(from: string, to: string): Promise<DayBookVoucher[]>;
+  abstract dayBook(from: string, to: string, book: Book): Promise<DayBookVoucher[]>;
   abstract subLedgerName(id: string): Promise<string | null>;
 }
 
@@ -70,7 +71,7 @@ export class GetLedgerQuery extends Query<AccountLedger> {
     readonly scope:
       | { readonly glAccountId: string }
       | { readonly subLedgerId: string; readonly glAccountId?: string | undefined }
-      | { readonly kind: 'cash' | 'bank' },
+      | { readonly kind: 'cash' | 'bank'; readonly book: Book },
   ) {
     super();
   }
@@ -81,6 +82,7 @@ export class GetDayBookQuery extends Query<DayBookVoucher[]> {
     readonly actor: Actor,
     readonly from: string,
     readonly to: string,
+    readonly book: Book = 'main',
   ) {
     super();
   }
@@ -91,6 +93,7 @@ export class GetTrialBalanceQuery extends Query<TrialBalance> {
     readonly actor: Actor,
     readonly from: string,
     readonly to: string,
+    readonly book: Book = 'main',
   ) {
     super();
   }
@@ -101,6 +104,7 @@ export class GetProfitAndLossQuery extends Query<ProfitAndLoss> {
     readonly actor: Actor,
     readonly from: string,
     readonly to: string,
+    readonly book: Book = 'main',
   ) {
     super();
   }
@@ -110,6 +114,7 @@ export class GetBalanceSheetQuery extends Query<BalanceSheet> {
   constructor(
     readonly actor: Actor,
     readonly asOf: string,
+    readonly book: Book = 'main',
   ) {
     super();
   }
@@ -120,10 +125,14 @@ export class GetReceiptsAndPaymentsQuery extends Query<ReceiptsAndPayments> {
     readonly actor: Actor,
     readonly from: string,
     readonly to: string,
+    readonly book: Book = 'main',
   ) {
     super();
   }
 }
+
+const inBook = <T extends { book: Book }>(accounts: readonly T[], book: Book) =>
+  accounts.filter((account) => account.book === book);
 
 /** Shared by the queries and the reports. */
 export class Books {
@@ -135,8 +144,10 @@ export class Books {
     let title: string;
     let ledgerScope: LedgerScope;
     if ('kind' in scope) {
-      const ids = accounts.filter((account) => account.kind === scope.kind).map((account) => account.id);
-      title = scope.kind === 'cash' ? 'All cash accounts' : 'All bank accounts';
+      const ids = accounts
+        .filter((account) => account.kind === scope.kind && account.book === scope.book)
+        .map((account) => account.id);
+      title = `All ${scope.kind} accounts${scope.book === 'pf' ? ' (PF book)' : ''}`;
       ledgerScope = { accountIds: ids };
     } else if ('subLedgerId' in scope) {
       const name = await this.read.subLedgerName(scope.subLedgerId);
@@ -158,27 +169,29 @@ export class Books {
     return { title, ...ledgerStatement(opening, entries) };
   }
 
-  async trialBalance(from: string, to: string): Promise<TrialBalance> {
+  async trialBalance(from: string, to: string, book: Book = 'main'): Promise<TrialBalance> {
     assertPeriod(from, to);
     const [accounts, movements] = await Promise.all([this.read.accounts(), this.read.movements(from, to)]);
-    return trialBalance(accounts, movements);
+    return trialBalance(inBook(accounts, book), movements);
   }
 
-  async profitAndLoss(from: string, to: string): Promise<ProfitAndLoss> {
+  async profitAndLoss(from: string, to: string, book: Book = 'main'): Promise<ProfitAndLoss> {
     assertPeriod(from, to);
     const [accounts, movements] = await Promise.all([this.read.accounts(), this.read.movements(from, to)]);
-    return profitAndLoss(accounts, movements);
+    return profitAndLoss(inBook(accounts, book), movements);
   }
 
-  async balanceSheet(asOf: string): Promise<BalanceSheet> {
+  async balanceSheet(asOf: string, book: Book = 'main'): Promise<BalanceSheet> {
     const [accounts, movements] = await Promise.all([this.read.accounts(), this.read.movements(BEGINNING, asOf)]);
-    return balanceSheet(accounts, movements);
+    return balanceSheet(inBook(accounts, book), movements);
   }
 
-  async receiptsAndPayments(from: string, to: string): Promise<ReceiptsAndPayments> {
+  async receiptsAndPayments(from: string, to: string, book: Book = 'main'): Promise<ReceiptsAndPayments> {
     assertPeriod(from, to);
     const accounts = await this.read.accounts();
-    const cash = accounts.filter((account) => account.kind !== 'other').map((account) => account.id);
+    const cash = inBook(accounts, book)
+      .filter((account) => account.kind !== 'other')
+      .map((account) => account.id);
     const [opening, lines] = await Promise.all([
       this.read.opening({ accountIds: cash }, from),
       this.read.postingLines(from, to, cash),
@@ -191,9 +204,9 @@ export class Books {
     );
   }
 
-  dayBook(from: string, to: string): Promise<DayBookVoucher[]> {
+  dayBook(from: string, to: string, book: Book = 'main'): Promise<DayBookVoucher[]> {
     assertPeriod(from, to);
-    return this.read.dayBook(from, to);
+    return this.read.dayBook(from, to, book);
   }
 }
 
@@ -230,9 +243,9 @@ export class GetDayBookHandler extends BooksHandler implements IQueryHandler<Get
     super(read, access);
   }
 
-  async execute({ actor, from, to }: GetDayBookQuery): Promise<DayBookVoucher[]> {
+  async execute({ actor, from, to, book }: GetDayBookQuery): Promise<DayBookVoucher[]> {
     await this.authorize(actor);
-    return this.books.dayBook(from, to);
+    return this.books.dayBook(from, to, book);
   }
 }
 
@@ -242,9 +255,9 @@ export class GetTrialBalanceHandler extends BooksHandler implements IQueryHandle
     super(read, access);
   }
 
-  async execute({ actor, from, to }: GetTrialBalanceQuery): Promise<TrialBalance> {
+  async execute({ actor, from, to, book }: GetTrialBalanceQuery): Promise<TrialBalance> {
     await this.authorize(actor);
-    return this.books.trialBalance(from, to);
+    return this.books.trialBalance(from, to, book);
   }
 }
 
@@ -254,9 +267,9 @@ export class GetProfitAndLossHandler extends BooksHandler implements IQueryHandl
     super(read, access);
   }
 
-  async execute({ actor, from, to }: GetProfitAndLossQuery): Promise<ProfitAndLoss> {
+  async execute({ actor, from, to, book }: GetProfitAndLossQuery): Promise<ProfitAndLoss> {
     await this.authorize(actor);
-    return this.books.profitAndLoss(from, to);
+    return this.books.profitAndLoss(from, to, book);
   }
 }
 
@@ -266,9 +279,9 @@ export class GetBalanceSheetHandler extends BooksHandler implements IQueryHandle
     super(read, access);
   }
 
-  async execute({ actor, asOf }: GetBalanceSheetQuery): Promise<BalanceSheet> {
+  async execute({ actor, asOf, book }: GetBalanceSheetQuery): Promise<BalanceSheet> {
     await this.authorize(actor);
-    return this.books.balanceSheet(asOf);
+    return this.books.balanceSheet(asOf, book);
   }
 }
 
@@ -278,9 +291,9 @@ export class GetReceiptsAndPaymentsHandler extends BooksHandler implements IQuer
     super(read, access);
   }
 
-  async execute({ actor, from, to }: GetReceiptsAndPaymentsQuery): Promise<ReceiptsAndPayments> {
+  async execute({ actor, from, to, book }: GetReceiptsAndPaymentsQuery): Promise<ReceiptsAndPayments> {
     await this.authorize(actor);
-    return this.books.receiptsAndPayments(from, to);
+    return this.books.receiptsAndPayments(from, to, book);
   }
 }
 

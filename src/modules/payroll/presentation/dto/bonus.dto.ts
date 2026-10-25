@@ -173,3 +173,70 @@ export class StatementResponseDto extends responseDto({
   ),
   closing: z.number(),
 }) {}
+
+const matchPercent = z.number().min(0).max(200);
+const interestAmount = z.number().positive().max(999_999_999_999).multipleOf(0.01);
+export class PfInterestQueryDto extends createZodDto(
+  z.object({
+    asOf: day,
+    amount: z.coerce.number().pipe(interestAmount),
+    matchPercent: z.coerce.number().pipe(matchPercent).default(100),
+  }),
+) {}
+export class DistributePfInterestDto extends createZodDto(
+  z.strictObject({
+    asOf: day,
+    amount: interestAmount,
+    matchPercent: matchPercent.default(100),
+    remarks: text(200).default(null),
+  }),
+) {}
+export class PfInterestResponseDto extends responseDto({
+  asOf: z.string(),
+  amount: z.number(),
+  matchPercent: z.number(),
+  totalBalance: z.number(),
+  lines: z.array(
+    z.object({
+      staffId: z.uuid(),
+      employeeNo: z.string(),
+      fullName: z.string(),
+      department: z.string(),
+      balance: z.number(),
+      interest: z.number(),
+    }),
+  ),
+}) {}
+export class PfInterestResultResponseDto extends responseDto({ members: z.int(), amount: z.number() }) {}
+
+export class PfSettlementQueryDto extends createZodDto(
+  z.object({
+    asOf: day,
+    staffId: z.uuid().optional(),
+    matchPercent: z.coerce.number().pipe(matchPercent).default(100),
+  }),
+) {}
+export class PfSettlementResponseDto extends responseDto({
+  staff: z.object({
+    id: z.uuid(),
+    employeeNo: z.string(),
+    fullName: z.string(),
+    department: z.string(),
+    designation: z.string(),
+    joiningDate: z.string(),
+    status: z.string(),
+  }),
+  asOf: z.string(),
+  matchPercent: z.number(),
+  opening: z.number(),
+  own: z.number(),
+  employer: z.number(),
+  interest: z.number(),
+  adjustments: z.number(),
+  withdrawn: z.number(),
+  settled: z.number(),
+  balance: z.number(),
+  years: z.array(
+    z.object({ year: z.int(), own: z.number(), employer: z.number(), interest: z.number(), withdrawn: z.number() }),
+  ),
+}) {}

@@ -6,6 +6,7 @@ import type {
   LeaveEncashmentLine,
   SalarySheetLine,
 } from '../domain/repositories.js';
+import type { PfMovements } from '../domain/pf.js';
 import type { SalarySheetStatus } from '../domain/salary-sheet.js';
 import type { IncrementMethod, IncrementStatus, SalaryBreakdown, SalarySnapshot } from '../domain/salary.js';
 
@@ -126,6 +127,8 @@ export abstract class PayrollReadRepository {
   abstract incomeTaxDeductions(payYear: number, payMonth: number): Promise<IncomeTaxDeduction[]>;
   /** PF deducted on committed salary sheets plus PF ledger entries, with a running balance. */
   abstract pfStatement(staffId: string, from: string, to: string): Promise<LedgerStatement>;
+  /** Everyone with anything on their PF account, or one person (empty when nothing). */
+  abstract pfMovements(staffId?: string): Promise<PfMovements[]>;
   /** Dues owed (debit) less paid (credit), optionally for one service unit, with a running balance. */
   abstract duesStatement(staffId: string, from: string, to: string, serviceUnitId?: string): Promise<LedgerStatement>;
 }

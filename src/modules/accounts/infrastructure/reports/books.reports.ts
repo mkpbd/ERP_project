@@ -5,8 +5,9 @@ import { Books, type BooksReadRepository } from '../../application/statements.js
 
 const template = (name: string) => fileURLToPath(new URL(`./${name}.hbs`, import.meta.url));
 const day = z.iso.date();
-const period = z.strictObject({ from: day, to: day });
-const describePeriod = (params: { from: string; to: string }) => `${params.from} to ${params.to}`;
+const book = z.enum(['main', 'pf']).default('main');
+const period = z.strictObject({ from: day, to: day, book });
+const describePeriod = <T extends { from: string; to: string }>(params: T) => `${params.from} to ${params.to}`;
 
 /** A balance shown as an amount with Dr or Cr. */
 const side = (balance: number) => ({ amount: Math.abs(balance), side: balance > 0 ? 'Dr' : balance < 0 ? 'Cr' : '' });
@@ -77,8 +78,8 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       'accounts.cash-book',
       'Cash and bank book',
       'All cash accounts (or all bank accounts) together, with the running balance.',
-      z.strictObject({ from: day, to: day, kind: z.enum(['cash', 'bank']).default('cash') }),
-      (input: { kind: 'cash' | 'bank' }) => ({ kind: input.kind }),
+      z.strictObject({ from: day, to: day, kind: z.enum(['cash', 'bank']).default('cash'), book }),
+      (input: { kind: 'cash' | 'bank'; book: 'main' | 'pf' }) => ({ kind: input.kind, book: input.book }),
       books,
     ),
     defineReport({
@@ -88,7 +89,7 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       description: 'Every posted voucher of the period with its lines.',
       params: period,
       async load(input) {
-        const vouchers = await books.dayBook(input.from, input.to);
+        const vouchers = await books.dayBook(input.from, input.to, input.book);
         return { vouchers, total: vouchers.reduce((sum, voucher) => sum + voucher.total, 0) };
       },
       describe: describePeriod,
@@ -100,7 +101,7 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       group: 'Accounts',
       description: 'Opening balance, period debits and credits, and closing balance of every account.',
       params: period,
-      load: (input) => books.trialBalance(input.from, input.to),
+      load: (input) => books.trialBalance(input.from, input.to, input.book),
       describe: describePeriod,
       pdf: { engine: 'html', template: template('trial-balance'), landscape: true },
       xlsx: (data) => ({
@@ -124,7 +125,7 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       description: 'Income and expenses of the period by nature and statement head, with the net result.',
       params: period,
       async load(input) {
-        const statement = await books.profitAndLoss(input.from, input.to);
+        const statement = await books.profitAndLoss(input.from, input.to, input.book);
         return {
           sides: [
             {
@@ -149,9 +150,9 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       title: 'Balance sheet',
       group: 'Accounts',
       description: 'Assets against liabilities and equity at a date, with income less expenses to date.',
-      params: z.strictObject({ asOf: day }),
+      params: z.strictObject({ asOf: day, book }),
       async load(input) {
-        const sheet = await books.balanceSheet(input.asOf);
+        const sheet = await books.balanceSheet(input.asOf, input.book);
         return {
           sides: [
             {
@@ -180,7 +181,7 @@ export function bookReports(read: BooksReadRepository): ReportDefinition[] {
       group: 'Accounts',
       description: 'Cash and bank opening, what came in and went out by account, and closing.',
       params: period,
-      load: (input) => books.receiptsAndPayments(input.from, input.to),
+      load: (input) => books.receiptsAndPayments(input.from, input.to, input.book),
       describe: describePeriod,
       pdf: { engine: 'html', template: template('receipts-payments') },
     }),

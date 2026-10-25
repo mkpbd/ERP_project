@@ -6,7 +6,7 @@ import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { BONUS_HANDLERS, BonusCalculator } from './application/bonus.handlers.js';
 import { INCOME_TAX_HANDLERS } from './application/income-tax.handlers.js';
-import { LEDGER_HANDLERS } from './application/ledger.handlers.js';
+import { LEDGER_HANDLERS, PfInterestCalculator } from './application/ledger.handlers.js';
 import { PayrollReadRepository } from './application/read-models.js';
 import { SALARY_SHEET_HANDLERS, SalarySheetBuilder } from './application/salary-sheet.handlers.js';
 import { SALARY_HANDLERS, SalaryChanges } from './application/salary.handlers.js';
@@ -15,6 +15,7 @@ import {
   IncomeTaxRepository,
   LeaveEncashmentRepository,
   PayPeriods,
+  PfLedgerRepository,
   SalaryIncrementRepository,
   SalaryPolicyRepository,
   SalarySheetRepository,
@@ -29,6 +30,7 @@ import { bonusRecordTypes } from './infrastructure/persistence/bonus.record-stor
 import { DrizzleIncomeTaxRepository } from './infrastructure/persistence/drizzle-income-tax.repositories.js';
 import { incomeTaxRecordTypes } from './infrastructure/persistence/income-tax.record-stores.js';
 import { taxCertificateReport, taxMonthlyReport } from './infrastructure/reports/income-tax.reports.js';
+import { pfInterestReport, pfSettlementReport } from './infrastructure/reports/pf.reports.js';
 import {
   IncomeTaxController,
   TaxCertificatesController,
@@ -37,6 +39,7 @@ import {
 import {
   DrizzleFestivalBonusRepository,
   DrizzleLeaveEncashmentRepository,
+  DrizzlePfLedgerRepository,
 } from './infrastructure/persistence/drizzle-bonus.repositories.js';
 import {
   duesStatementReport,
@@ -50,6 +53,7 @@ import {
   FestivalBonusSheetController,
   LeaveEncashmentsController,
   LedgerStatementsController,
+  PfFundController,
   PfLedgerController,
   StaffDuesController,
 } from './presentation/bonus.controllers.js';
@@ -109,6 +113,7 @@ import {
     FestivalBonusSheetController,
     LeaveEncashmentsController,
     PfLedgerController,
+    PfFundController,
     StaffDuesController,
     LedgerStatementsController,
     TaxYearsController,
@@ -125,6 +130,8 @@ import {
     BonusCalculator,
     { provide: FestivalBonusRepository, useClass: DrizzleFestivalBonusRepository },
     { provide: LeaveEncashmentRepository, useClass: DrizzleLeaveEncashmentRepository },
+    PfInterestCalculator,
+    { provide: PfLedgerRepository, useClass: DrizzlePfLedgerRepository },
     SalaryChanges,
     SalarySheetBuilder,
     { provide: SalarySheetRepository, useClass: DrizzleSalarySheetRepository },
@@ -146,6 +153,7 @@ export class PayrollModule implements OnModuleInit {
     private readonly access: AccessControl,
     private readonly bonuses: BonusCalculator,
     private readonly taxes: IncomeTaxRepository,
+    private readonly pfInterest: PfInterestCalculator,
   ) {}
 
   onModuleInit(): void {
@@ -171,5 +179,7 @@ export class PayrollModule implements OnModuleInit {
     this.reports.register(duesStatementReport(this.read, this.staff, this.access));
     this.reports.register(taxCertificateReport(this.taxes, this.staff, this.access));
     this.reports.register(taxMonthlyReport(this.read));
+    this.reports.register(pfSettlementReport(this.read, this.staff, this.access));
+    this.reports.register(pfInterestReport(this.pfInterest));
   }
 }

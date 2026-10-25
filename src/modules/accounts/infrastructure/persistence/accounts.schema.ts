@@ -17,6 +17,7 @@ import {
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { serviceUnits } from '../../../administration/infrastructure/persistence/administration.schema.js';
+import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -34,6 +35,8 @@ const codeLength = (table: string, column: SQLWrapper) =>
 export const ACCOUNT_STATEMENTS = ['balance_sheet', 'profit_and_loss'] as const;
 export const NORMAL_BALANCES = ['debit', 'credit'] as const;
 export const GL_KINDS = ['bank', 'cash', 'other'] as const;
+/** The organization's books, and the provident fund trust's own books (old PFBook schema). */
+export const BOOKS = ['main', 'pf'] as const;
 
 // Old Account.NatureOfAccounts (+ MasterStatements): assets, liabilities, equity, income, expenses.
 export const accountNatures = pgTable(
@@ -42,6 +45,7 @@ export const accountNatures = pgTable(
     id: uuid('id').primaryKey(),
     code: text('code').notNull(),
     name: text('name').notNull(),
+    book: text('book', { enum: BOOKS }).notNull().default('main'),
     statement: text('statement', { enum: ACCOUNT_STATEMENTS }).notNull(),
     normalBalance: text('normal_balance', { enum: NORMAL_BALANCES }).notNull(),
     ...timestamps,
@@ -53,6 +57,7 @@ export const accountNatures = pgTable(
     nameLength('account_natures', t.name),
     check('account_natures_statement_ck', sql`${t.statement} in ('balance_sheet', 'profit_and_loss')`),
     check('account_natures_balance_ck', sql`${t.normalBalance} in ('debit', 'credit')`),
+    check('account_natures_book_ck', sql`${t.book} in ('main', 'pf')`),
   ],
 );
 
@@ -284,6 +289,7 @@ export const journalTypes = pgTable(
   'journal_types',
   {
     id: uuid('id').primaryKey(),
+    book: text('book', { enum: BOOKS }).notNull().default('main'),
     shortName: text('short_name').notNull(),
     name: text('name').notNull(),
     description: text('description'),
@@ -292,6 +298,7 @@ export const journalTypes = pgTable(
   (t) => [
     uniqueIndex('journal_types_short_name_uq').on(sql`upper(${t.shortName})`),
     check('journal_types_short_name_len_ck', sql`char_length(${t.shortName}) between 1 and 10`),
+    check('journal_types_book_ck', sql`${t.book} in ('main', 'pf')`),
     nameLength('journal_types', t.name, 100),
   ],
 );
@@ -371,6 +378,8 @@ export const subLedgers = pgTable(
     email: text('email'),
     // Old InvoiceId / InvoiceNo, e.g. the patient bill a sub-ledger was opened for.
     reference: text('reference'),
+    // A provident fund member's account in the PF book (old PfGeneralLedgers.StaffRecordId).
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
     ...timestamps,
   },
   (t) => [index('sub_ledgers_type_idx').on(t.typeId, t.name), nameLength('sub_ledgers', t.name, 200)],
@@ -522,5 +531,73 @@ export const postingSchedules = pgTable(
     uniqueIndex('posting_schedules_section_uq').on(t.section),
     check('posting_schedules_timing_ck', sql`${t.timing} in ('on_sale', 'end_of_day', 'weekly', 'monthly')`),
     check('posting_schedules_section_len_ck', sql`char_length(${t.section}) between 1 and 60`),
+  ],
+);
+
+// Old PFBook.PFDeposits: the monthly PF remittances deposited to the fund's bank account.
+export const pfDeposits = pgTable(
+  'pf_deposits',
+  {
+    id: uuid('id').primaryKey(),
+    year: smallint('year').notNull(),
+    month: smallint('month').notNull(),
+    amount: amount('amount').notNull(),
+    chequeNo: text('cheque_no'),
+    chequeDate: day('cheque_date'),
+    depositedOn: day('deposited_on'),
+    voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pf_deposits_period_uq').on(t.year, t.month),
+    check('pf_deposits_period_ck', sql`${t.year} between 2000 and 2100 and ${t.month} between 1 and 12`),
+    check('pf_deposits_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// Old PFVoucherMasters.FDRNo / MatureDate / FDRWithdrawDate: the fund's fixed deposits.
+export const pfFixedDeposits = pgTable(
+  'pf_fixed_deposits',
+  {
+    id: uuid('id').primaryKey(),
+    fdrNo: text('fdr_no').notNull(),
+    bankName: text('bank_name').notNull(),
+    amount: amount('amount').notNull(),
+    interestRatePercent: numeric('interest_rate_percent', { precision: 5, scale: 2, mode: 'number' }),
+    openedOn: day('opened_on').notNull(),
+    maturesOn: day('matures_on').notNull(),
+    withdrawnOn: day('withdrawn_on'),
+    withdrawnAmount: amount('withdrawn_amount'),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pf_fixed_deposits_no_uq').on(sql`upper(${t.fdrNo})`),
+    check('pf_fixed_deposits_amount_ck', sql`${t.amount} > 0`),
+    check('pf_fixed_deposits_dates_ck', sql`${t.maturesOn} > ${t.openedOn}`),
+    check(
+      'pf_fixed_deposits_withdrawal_ck',
+      sql`(${t.withdrawnOn} is null) = (${t.withdrawnAmount} is null) and (${t.withdrawnOn} is null or ${t.withdrawnOn} >= ${t.openedOn})`,
+    ),
+  ],
+);
+
+// Old IncomeTaxActAndTDSRules (ITAXTDSController): tax to deduct at source from payments, by category.
+export const tdsRules = pgTable(
+  'tds_rules',
+  {
+    id: uuid('id').primaryKey(),
+    section: text('section'),
+    description: text('description').notNull(),
+    category: text('category').notNull(),
+    ratePercent: numeric('rate_percent', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    effectiveFrom: day('effective_from'),
+    ...timestamps,
+  },
+  (t) => [
+    index('tds_rules_category_idx').on(t.category),
+    check('tds_rules_rate_ck', sql`${t.ratePercent} between 0 and 100`),
+    check('tds_rules_description_len_ck', sql`char_length(${t.description}) between 1 and 500`),
   ],
 );

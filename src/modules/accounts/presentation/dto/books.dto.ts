@@ -4,6 +4,7 @@ import { createZodDto } from '../../../../shared/presentation/zod/zod-dto.js';
 
 const day = z.iso.date();
 const period = { from: day, to: day };
+const book = z.enum(['main', 'pf']).default('main');
 
 export class LedgerQueryDto extends createZodDto(
   z
@@ -14,10 +15,10 @@ export class LedgerQueryDto extends createZodDto(
     }),
 ) {}
 export class CashBookQueryDto extends createZodDto(
-  z.object({ ...period, kind: z.enum(['cash', 'bank']).default('cash') }),
+  z.object({ ...period, kind: z.enum(['cash', 'bank']).default('cash'), book }),
 ) {}
-export class PeriodQueryDto extends createZodDto(z.object(period)) {}
-export class AsOfQueryDto extends createZodDto(z.object({ asOf: day })) {}
+export class PeriodQueryDto extends createZodDto(z.object({ ...period, book })) {}
+export class AsOfQueryDto extends createZodDto(z.object({ asOf: day, book })) {}
 
 export class LedgerResponseDto extends responseDto({
   title: z.string(),

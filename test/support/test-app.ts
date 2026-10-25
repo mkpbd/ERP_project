@@ -49,6 +49,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
       pos_terminals, bank_accounts, gl_statement_mappings, statement_sub_heads, statement_broad_heads,
       account_group_members, account_groups, gl_item_descriptions, gl_accounts, account_level5_heads,
       account_level4_heads, account_sub_categories, account_categories, account_natures, coa_descriptions,
+      pf_deposits, pf_fixed_deposits, tds_rules,
       fs_line_items, fiscal_years, journal_types, voucher_types, cost_centers, sub_ledgers, sub_ledger_types,
       income_tax_deductions, income_tax_years,
       festival_bonus_lines, festival_bonuses, leave_encashments, pf_ledger_entries, staff_dues,

@@ -1,0 +1,35 @@
+{{#with data}}
+<p>
+  <b>{{staff.employeeNo}} — {{staff.fullName}}</b>, {{staff.designation}}, {{staff.department}};
+  joined {{date staff.joiningDate}}
+</p>
+<table class="report">
+  <thead>
+    <tr>
+      <th>Year</th><th class="num">Own PF</th><th class="num">Employer's PF</th>
+      <th class="num">Interest</th><th class="num">Withdrawn</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each years}}
+    <tr>
+      <td>{{year}}</td><td class="num">{{money own}}</td><td class="num">{{money employer}}</td>
+      <td class="num">{{money interest}}</td><td class="num">{{money withdrawn}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="report" style="width: 60%; margin-top: 12px">
+  <tbody>
+    <tr><td>Opening balance</td><td class="num">{{money opening}}</td></tr>
+    <tr><td>Own contribution</td><td class="num">{{money own}}</td></tr>
+    <tr><td>Employer's contribution ({{matchPercent}}% of own)</td><td class="num">{{money employer}}</td></tr>
+    <tr><td>Interest</td><td class="num">{{money interest}}</td></tr>
+    <tr><td>Adjustments</td><td class="num">{{money adjustments}}</td></tr>
+    <tr><td>Less withdrawals</td><td class="num">{{money withdrawn}}</td></tr>
+    <tr><td>Less already settled</td><td class="num">{{money settled}}</td></tr>
+    <tr class="group-row"><td>Payable</td><td class="num">{{money balance}}</td></tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords balance}}</p>
+{{/with}}

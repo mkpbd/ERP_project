@@ -16,13 +16,22 @@ import {
   type FestivalBonusAction,
   type LeaveEncashmentView,
 } from '../application/bonus.messages.js';
-import { GetDuesStatementQuery, GetPfStatementQuery } from '../application/ledger.handlers.js';
+import {
+  DistributePfInterestCommand,
+  GetDuesStatementQuery,
+  GetPfSettlementQuery,
+  GetPfStatementQuery,
+  PreviewPfInterestQuery,
+  type PfInterestView,
+  type PfSettlementView,
+} from '../application/ledger.handlers.js';
 import { FESTIVAL_BONUS, PF_LEDGER_ENTRY, STAFF_DUE } from '../application/payroll.constants.js';
 import type { FestivalBonusSheet, LedgerStatement } from '../application/read-models.js';
 import {
   CreateFestivalBonusDto,
   CreatePfEntryDto,
   CreateStaffDueDto,
+  DistributePfInterestDto,
   EncashmentApproveDto,
   EncashmentOptionsDto,
   EncashmentPeriodParamDto,
@@ -32,6 +41,11 @@ import {
   LeaveEncashmentResponseDto,
   LedgerFilterDto,
   PfEntryResponseDto,
+  PfInterestQueryDto,
+  PfInterestResponseDto,
+  PfInterestResultResponseDto,
+  PfSettlementQueryDto,
+  PfSettlementResponseDto,
   RemovedResponseDto,
   SheetResultResponseDto,
   StaffDueFilterDto,
@@ -209,5 +223,42 @@ export class LedgerStatementsController {
     return this.queryBus.execute(
       new GetDuesStatementQuery(actor, query.from, query.to, query.staffId, query.serviceUnitId),
     );
+  }
+}
+
+@ApiTags('payroll-ledgers')
+@ApiBearerAuth()
+@Controller({ path: 'payroll/pf', version: '1' })
+export class PfFundController {
+  constructor(
+    private readonly commandBus: CommandBus,
+    private readonly queryBus: QueryBus,
+  ) {}
+
+  @Get('interest/preview')
+  @ApiOperation({ summary: 'Share interest among PF members in proportion to their balances on a date (not saved)' })
+  @ApiOkResponse({ type: PfInterestResponseDto })
+  previewInterest(@CurrentUser() actor: Actor, @Query() query: PfInterestQueryDto): Promise<PfInterestView> {
+    return this.queryBus.execute(new PreviewPfInterestQuery(actor, query.asOf, query.amount, query.matchPercent));
+  }
+
+  @Post('interest')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('payroll:manage')
+  @ApiOperation({ summary: "Credit each member's share as an interest entry dated asOf; once per date" })
+  @ApiOkResponse({ type: PfInterestResultResponseDto })
+  distributeInterest(@CurrentUser() actor: Actor, @Body() body: DistributePfInterestDto) {
+    return this.commandBus.execute(
+      new DistributePfInterestCommand(actor, body.asOf, body.amount, body.matchPercent, body.remarks),
+    );
+  }
+
+  @Get('settlement')
+  @ApiOperation({
+    summary: 'What the fund owes a person on a date. Your own without staffId; others need payroll:read.',
+  })
+  @ApiOkResponse({ type: PfSettlementResponseDto })
+  settlement(@CurrentUser() actor: Actor, @Query() query: PfSettlementQueryDto): Promise<PfSettlementView> {
+    return this.queryBus.execute(new GetPfSettlementQuery(actor, query.asOf, query.matchPercent, query.staffId));
   }
 }

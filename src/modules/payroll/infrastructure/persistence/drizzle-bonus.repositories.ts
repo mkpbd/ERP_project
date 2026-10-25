@@ -1,14 +1,17 @@
 import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { and, eq } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import {
   FestivalBonusRepository,
   LeaveEncashmentRepository,
+  PfLedgerRepository,
   type FestivalBonusLine,
   type FestivalBonusSchedule,
   type LeaveEncashmentLine,
+  type NewPfEntry,
 } from '../../domain/repositories.js';
-import { festivalBonuses, festivalBonusLines, leaveEncashments } from './payroll.schema.js';
+import { festivalBonuses, festivalBonusLines, leaveEncashments, pfLedgerEntries } from './payroll.schema.js';
 
 @Injectable()
 export class DrizzleFestivalBonusRepository extends FestivalBonusRepository {
@@ -108,5 +111,29 @@ export class DrizzleLeaveEncashmentRepository extends LeaveEncashmentRepository 
       .where(and(eq(leaveEncashments.payYear, payYear), eq(leaveEncashments.payMonth, payMonth)))
       .returning({ staffId: leaveEncashments.staffId });
     return rows.length;
+  }
+}
+
+@Injectable()
+export class DrizzlePfLedgerRepository extends PfLedgerRepository {
+  constructor(private readonly context: DbContext) {
+    super();
+  }
+
+  async hasInterestOn(date: string): Promise<boolean> {
+    const [row] = await this.context.db
+      .select({ id: pfLedgerEntries.id })
+      .from(pfLedgerEntries)
+      .where(and(eq(pfLedgerEntries.type, 'interest'), eq(pfLedgerEntries.entryDate, date)))
+      .limit(1);
+    return row !== undefined;
+  }
+
+  async add(entries: readonly NewPfEntry[]): Promise<void> {
+    for (let start = 0; start < entries.length; start += 500) {
+      await this.context.db
+        .insert(pfLedgerEntries)
+        .values(entries.slice(start, start + 500).map((entry) => ({ id: randomUUID(), ...entry })));
+    }
   }
 }

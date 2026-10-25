@@ -1,7 +1,7 @@
 # Step 6c — Accounts: books and statements
 
-Status: **done** (2026-10-25). Previous: [step 6b](06b-accounts-vouchers.md) · Next: step 6d (party ledgers, due
-collection, PF book, TDS rules).
+Status: **done** (2026-10-25). Previous: [step 6b](06b-accounts-vouchers.md) · Next: [step 6d](06d-accounts-pf-book.md) (PF book,
+TDS rules).
 
 The old books and statements came from `[Account]` stored procedures whose source is not available (see
 [6a](06a-accounts-chart.md#where-the-old-logic-lives)): `SpGetSubLedgerReport`, `SpGetProfitLossDetailsReport`,

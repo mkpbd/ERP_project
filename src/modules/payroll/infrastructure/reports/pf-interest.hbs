@@ -1,0 +1,21 @@
+{{#with data}}
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 30px">#</th><th>Employee no</th><th>Name</th><th>Department</th>
+      <th class="num">PF balance</th><th class="num">Interest</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td>{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{department}}</td>
+      <td class="num">{{money balance}}</td><td class="num">{{money interest}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="4">Total</td><td class="num">{{money totalBalance}}</td><td class="num">{{money amount}}</td>
+    </tr>
+  </tbody>
+</table>
+{{/with}}

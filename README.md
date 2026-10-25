@@ -132,13 +132,13 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /payroll/salary-sheets/:y/:m/payslips/me` | authenticated (own) |
 | monthly inputs (`/payroll/{overtimes,deductions,punishments,arrears,allowance-payments,salary-payments,salary-stops}`) read, salary sheet preview / saved, anyone's payslip | `payroll:read` |
 | monthly inputs (write; frozen once the month is committed), salary sheet approve / commit | `payroll:manage` |
-| `GET /payroll/statements/{pf,dues}` (own) | authenticated |
-| festival bonuses and their sheets, leave encashments, PF ledger, staff dues, anyone's statements (read) | `payroll:read` |
-| the same (write), bonus approve / commit / reverse, encashment save / remove | `payroll:manage` |
+| `GET /payroll/statements/{pf,dues}`, `GET /payroll/pf/settlement` (own) | authenticated |
+| festival bonuses and their sheets, leave encashments, PF ledger, staff dues, anyone's statements and PF settlement, PF interest preview | `payroll:read` |
+| the same (write), bonus approve / commit / reverse, encashment save / remove, `POST /payroll/pf/interest` | `payroll:manage` |
 | `GET /payroll/tax-years`, own `GET /payroll/tax-certificates/:taxYearId` | authenticated |
 | `GET /payroll/income-tax/:y/:m`, anyone's certificate | `payroll:read` |
 | tax years (write), income tax compute / hand entries | `payroll:manage` |
-| `GET /accounts/chart`, accounting masters (read) | `accounts:read` |
+| `GET /accounts/chart`, accounting masters, PF deposits / fixed deposits, TDS rules (read) | `accounts:read` |
 | accounting masters (write) | `accounts:manage` |
 | `GET /accounts/vouchers[/:id]` | `accounts:read` |
 | draft vouchers and attachments | `vouchers:write` |

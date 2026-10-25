@@ -46,7 +46,9 @@ export class BooksController {
   @ApiOperation({ summary: 'Cash book or bank book: all cash (or bank) accounts together' })
   @ApiOkResponse({ type: LedgerResponseDto })
   cash(@CurrentUser() actor: Actor, @Query() query: CashBookQueryDto) {
-    return this.queryBus.execute(new GetLedgerQuery(actor, query.from, query.to, { kind: query.kind }));
+    return this.queryBus.execute(
+      new GetLedgerQuery(actor, query.from, query.to, { kind: query.kind, book: query.book }),
+    );
   }
 
   @Get('books/day-book')
@@ -54,34 +56,34 @@ export class BooksController {
   @ApiOperation({ summary: 'Posted vouchers of a period with their lines' })
   @ApiOkResponse({ type: DayBookResponseDto, isArray: true })
   dayBook(@CurrentUser() actor: Actor, @Query() query: PeriodQueryDto) {
-    return this.queryBus.execute(new GetDayBookQuery(actor, query.from, query.to));
+    return this.queryBus.execute(new GetDayBookQuery(actor, query.from, query.to, query.book));
   }
 
   @Get('statements/trial-balance')
   @RequirePermissions('accounts:read')
   @ApiOkResponse({ type: TrialBalanceResponseDto })
   trialBalance(@CurrentUser() actor: Actor, @Query() query: PeriodQueryDto) {
-    return this.queryBus.execute(new GetTrialBalanceQuery(actor, query.from, query.to));
+    return this.queryBus.execute(new GetTrialBalanceQuery(actor, query.from, query.to, query.book));
   }
 
   @Get('statements/profit-and-loss')
   @RequirePermissions('accounts:read')
   @ApiOkResponse({ type: ProfitAndLossResponseDto })
   profitAndLoss(@CurrentUser() actor: Actor, @Query() query: PeriodQueryDto) {
-    return this.queryBus.execute(new GetProfitAndLossQuery(actor, query.from, query.to));
+    return this.queryBus.execute(new GetProfitAndLossQuery(actor, query.from, query.to, query.book));
   }
 
   @Get('statements/balance-sheet')
   @RequirePermissions('accounts:read')
   @ApiOkResponse({ type: BalanceSheetResponseDto })
   balanceSheet(@CurrentUser() actor: Actor, @Query() query: AsOfQueryDto) {
-    return this.queryBus.execute(new GetBalanceSheetQuery(actor, query.asOf));
+    return this.queryBus.execute(new GetBalanceSheetQuery(actor, query.asOf, query.book));
   }
 
   @Get('statements/receipts-and-payments')
   @RequirePermissions('accounts:read')
   @ApiOkResponse({ type: ReceiptsAndPaymentsResponseDto })
   receiptsAndPayments(@CurrentUser() actor: Actor, @Query() query: PeriodQueryDto) {
-    return this.queryBus.execute(new GetReceiptsAndPaymentsQuery(actor, query.from, query.to));
+    return this.queryBus.execute(new GetReceiptsAndPaymentsQuery(actor, query.from, query.to, query.book));
   }
 }

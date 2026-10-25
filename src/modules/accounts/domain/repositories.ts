@@ -1,4 +1,10 @@
-import type { PostableAccount, Voucher } from './voucher.js';
+import type { Book, PostableAccount, Voucher } from './voucher.js';
+
+export interface JournalInfo {
+  readonly id: string;
+  readonly shortName: string;
+  readonly book: Book;
+}
 
 export interface FiscalYearInfo {
   readonly id: string;
@@ -49,6 +55,6 @@ export abstract class LedgerFacts {
   abstract accountIdsByCode(codes: readonly string[]): Promise<Map<string, string>>;
   abstract accountIdsByRole(roles: readonly string[]): Promise<Map<string, string>>;
   abstract fiscalYearOn(date: string): Promise<FiscalYearInfo | null>;
-  abstract journalType(id: string): Promise<{ id: string; shortName: string } | null>;
-  abstract journalTypeByShortName(shortName: string): Promise<{ id: string; shortName: string } | null>;
+  abstract journalType(id: string): Promise<JournalInfo | null>;
+  abstract journalTypeByShortName(shortName: string): Promise<JournalInfo | null>;
 }

@@ -58,10 +58,10 @@ Order follows dependencies: later modules reference earlier ones.
 | 6a | Accounts: chart of accounts, statement heads, accounting masters | **Done** | [06a-accounts-chart.md](06a-accounts-chart.md) |
 | 6b | Accounts: vouchers (double entry, numbering, attachments, reversal), GL posting, account configuration | **Done** | [06b-accounts-vouchers.md](06b-accounts-vouchers.md) |
 | 6c | Accounts: ledger, sub-ledger, cash/bank book, day book, trial balance, profit and loss, balance sheet, receipts and payments | **Done** | [06c-accounts-books.md](06c-accounts-books.md) |
-| 6d | Accounts: party ledgers (supplier, consultant, IPD patient), due collection, PF book, TDS rules | Next | |
-| 7 | SupplyChain (store, purchase, indents) | Planned | |
+| 6d | Accounts: PF book (book dimension, member sub-ledgers), PF deposits and fixed deposits, PF interest distribution and settlement, TDS rules; party ledgers moved to steps 7 and 9 | **Done** | [06d-accounts-pf-book.md](06d-accounts-pf-book.md) |
+| 7 | SupplyChain (store, purchase, indents), supplier ledger | Next | |
 | 8 | Pharmacy | Planned | |
-| 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords` | Planned | |
+| 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

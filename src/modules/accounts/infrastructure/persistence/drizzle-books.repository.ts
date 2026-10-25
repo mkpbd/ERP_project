@@ -3,6 +3,7 @@ import { and, asc, eq, gte, inArray, lt, lte, sql, sum, type SQL } from 'drizzle
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { BooksReadRepository, type DayBookVoucher, type LedgerScope } from '../../application/statements.js';
 import type { AccountMovement, LedgerEntry, PostingLine, StatementAccount } from '../../domain/statements.js';
+import type { Book } from '../../domain/voucher.js';
 import {
   accountCategories,
   accountLevel4Heads,
@@ -28,13 +29,14 @@ export class DrizzleBooksReadRepository extends BooksReadRepository {
     super();
   }
 
-  async accounts(): Promise<(StatementAccount & { kind: 'bank' | 'cash' | 'other' })[]> {
+  async accounts(): Promise<(StatementAccount & { kind: 'bank' | 'cash' | 'other'; book: Book })[]> {
     const rows = await this.context.db
       .select({
         id: glAccounts.id,
         code: glAccounts.code,
         name: glAccounts.name,
         kind: glAccounts.kind,
+        book: accountNatures.book,
         nature: {
           id: accountNatures.id,
           code: accountNatures.code,
@@ -146,7 +148,7 @@ export class DrizzleBooksReadRepository extends BooksReadRepository {
       );
   }
 
-  async dayBook(from: string, to: string): Promise<DayBookVoucher[]> {
+  async dayBook(from: string, to: string, book: Book): Promise<DayBookVoucher[]> {
     const rows = await this.context.db
       .select({
         id: vouchers.id,
@@ -164,7 +166,7 @@ export class DrizzleBooksReadRepository extends BooksReadRepository {
       .innerJoin(journalTypes, eq(journalTypes.id, vouchers.journalTypeId))
       .innerJoin(voucherLines, eq(voucherLines.voucherId, vouchers.id))
       .innerJoin(glAccounts, eq(glAccounts.id, voucherLines.glAccountId))
-      .where(and(POSTED, gte(vouchers.voucherDate, from), lte(vouchers.voucherDate, to)))
+      .where(and(POSTED, eq(journalTypes.book, book), gte(vouchers.voucherDate, from), lte(vouchers.voucherDate, to)))
       .orderBy(asc(vouchers.voucherDate), asc(vouchers.number), asc(voucherLines.position))
       .limit(20_000);
     const byVoucher = new Map<string, DayBookVoucher>();
