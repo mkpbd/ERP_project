@@ -8,6 +8,8 @@ export interface ChromiumOptions {
 export interface PdfPageOptions {
   readonly landscape: boolean;
   readonly pageSize: 'A4' | 'A5' | 'Letter' | 'Legal';
+  /** A custom paper size; overrides pageSize and landscape. */
+  readonly paper?: { readonly width: string; readonly height: string } | null;
   /** Plain text for the left side of the footer; null prints no footer and uses narrow margins. */
   readonly footerText: string | null;
 }
@@ -59,8 +61,9 @@ export class ChromiumPdfRenderer {
         tab.setDefaultTimeout(RENDER_TIMEOUT_MS);
         await tab.setContent(html, { waitUntil: 'load' });
         return await tab.pdf({
-          format: page.pageSize,
-          landscape: page.landscape,
+          ...(page.paper
+            ? { width: page.paper.width, height: page.paper.height }
+            : { format: page.pageSize, landscape: page.landscape }),
           printBackground: true,
           ...(page.footerText === null
             ? { margin: { top: '5mm', bottom: '5mm', left: '5mm', right: '5mm' } }

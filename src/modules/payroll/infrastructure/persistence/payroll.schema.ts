@@ -1,12 +1,14 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQLWrapper } from 'drizzle-orm';
 import {
   boolean,
+  date,
   check,
   index,
   integer,
   jsonb,
   numeric,
   pgTable,
+  primaryKey,
   smallint,
   text,
   timestamp,
@@ -20,6 +22,7 @@ import type { SalarySnapshot } from '../../domain/salary.js';
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 const money = (name: string) => numeric(name, { precision: 12, scale: 2, mode: 'number' });
 const percent = (name: string) => numeric(name, { precision: 5, scale: 2, mode: 'number' });
+const day = (name: string) => date(name, { mode: 'string' });
 const timestamps = {
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -140,5 +143,253 @@ export const salaryIncrements = pgTable(
     check('salary_increments_period_ck', sql`${t.year} between 2000 and 2100 and ${t.month} between 1 and 12`),
     check('salary_increments_amounts_ck', sql`${t.amount} > 0 and ${t.arrear} >= 0`),
     check('salary_increments_status_ck', sql`${t.status} in ('pending', 'committed')`),
+  ],
+);
+
+const payPeriod = {
+  payYear: smallint('pay_year').notNull(),
+  payMonth: smallint('pay_month').notNull(),
+};
+const payPeriodCheck = (name: string, t: { payYear: SQLWrapper; payMonth: SQLWrapper }) =>
+  check(`${name}_period_ck`, sql`${t.payYear} between 2000 and 2100 and ${t.payMonth} between 1 and 12`);
+const staffRef = () =>
+  uuid('staff_id')
+    .notNull()
+    .references(() => staffRecords.id, { onDelete: 'restrict' });
+
+// Old Payroll.StaffOvertimes: hours (paid at gross ÷ (days × 8)) and/or a fixed amount, in a pay month.
+export const salaryOvertimes = pgTable(
+  'salary_overtimes',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    workYear: smallint('work_year').notNull(),
+    workMonth: smallint('work_month').notNull(),
+    ...payPeriod,
+    days: integer('days').notNull().default(0),
+    hours: integer('hours').notNull().default(0),
+    amount: money('amount').notNull().default(0),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    index('salary_overtimes_period_idx').on(t.payYear, t.payMonth, t.staffId),
+    payPeriodCheck('salary_overtimes', t),
+    check('salary_overtimes_work_ck', sql`${t.workYear} between 2000 and 2100 and ${t.workMonth} between 1 and 12`),
+    check(
+      'salary_overtimes_amounts_ck',
+      sql`${t.days} between 0 and 31 and ${t.hours} between 0 and 744 and ${t.amount} >= 0
+        and (${t.hours} > 0 or ${t.amount} > 0)`,
+    ),
+  ],
+);
+
+// Old Payroll.StaffSalaryDeductions, one per person and pay month. The old salary sheet used only the LWP days
+// and the other deduction; AIT, SM, mobile and food bills, loan and advance are kept as entered.
+export const salaryDeductions = pgTable(
+  'salary_deductions',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    lwpDays: numeric('lwp_days', { precision: 5, scale: 2, mode: 'number' }).notNull().default(0),
+    lwpFrom: day('lwp_from'),
+    lwpTo: day('lwp_to'),
+    otherDeduction: money('other_deduction').notNull().default(0),
+    ait: money('ait').notNull().default(0),
+    sm: money('sm').notNull().default(0),
+    mobileBill: money('mobile_bill').notNull().default(0),
+    foodBill: money('food_bill').notNull().default(0),
+    loan: money('loan').notNull().default(0),
+    advanceSalary: money('advance_salary').notNull().default(0),
+    cause: text('cause').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('salary_deductions_staff_period_uq').on(t.staffId, t.payYear, t.payMonth),
+    payPeriodCheck('salary_deductions', t),
+    check(
+      'salary_deductions_amounts_ck',
+      sql`${t.lwpDays} between 0 and 31 and ${t.otherDeduction} >= 0 and ${t.ait} >= 0 and ${t.sm} >= 0
+        and ${t.mobileBill} >= 0 and ${t.foodBill} >= 0 and ${t.loan} >= 0 and ${t.advanceSalary} >= 0`,
+    ),
+    check(
+      'salary_deductions_lwp_dates_ck',
+      sql`${t.lwpDays} = 0 or (${t.lwpFrom} is not null and ${t.lwpTo} is not null and ${t.lwpTo} >= ${t.lwpFrom})`,
+    ),
+    check('salary_deductions_cause_len_ck', sql`char_length(${t.cause}) between 1 and 500`),
+  ],
+);
+
+// Old Payroll.SalaryPunishments.
+export const salaryPunishments = pgTable(
+  'salary_punishments',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    amount: money('amount').notNull(),
+    description: text('description').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('salary_punishments_period_idx').on(t.payYear, t.payMonth, t.staffId),
+    payPeriodCheck('salary_punishments', t),
+    check('salary_punishments_amount_ck', sql`${t.amount} > 0`),
+    check('salary_punishments_description_len_ck', sql`char_length(${t.description}) between 1 and 500`),
+  ],
+);
+
+// Old Payroll.ArrearRecords: one per person and pay month (the old duplicate check).
+export const salaryArrears = pgTable(
+  'salary_arrears',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    amount: money('amount').notNull(),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('salary_arrears_staff_period_uq').on(t.staffId, t.payYear, t.payMonth),
+    payPeriodCheck('salary_arrears', t),
+    check('salary_arrears_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// Old Payroll.AllowancePayments: extra allowances paid with a month's salary; the refund is kept as entered.
+export const allowancePayments = pgTable(
+  'allowance_payments',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    otherAllowance: money('other_allowance').notNull().default(0),
+    specialAllowance: money('special_allowance').notNull().default(0),
+    salaryRefund: money('salary_refund').notNull().default(0),
+    refundComment: text('refund_comment'),
+    paidOn: day('paid_on'),
+    ...timestamps,
+  },
+  (t) => [
+    index('allowance_payments_period_idx').on(t.payYear, t.payMonth, t.staffId),
+    payPeriodCheck('allowance_payments', t),
+    check(
+      'allowance_payments_amounts_ck',
+      sql`${t.otherAllowance} >= 0 and ${t.specialAllowance} >= 0 and ${t.salaryRefund} >= 0`,
+    ),
+  ],
+);
+
+// Old Payroll.StaffMonthlySalaryRecords: what was actually paid (shown on the sheet, not subtracted).
+export const salaryPayments = pgTable(
+  'salary_payments',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    paidOn: day('paid_on'),
+    advancePaid: money('advance_paid').notNull().default(0),
+    salaryPaid: money('salary_paid').notNull().default(0),
+    paymentMode: text('payment_mode').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('salary_payments_period_idx').on(t.payYear, t.payMonth, t.staffId),
+    payPeriodCheck('salary_payments', t),
+    check('salary_payments_amounts_ck', sql`${t.advancePaid} >= 0 and ${t.salaryPaid} >= 0`),
+    check('salary_payments_mode_len_ck', sql`char_length(${t.paymentMode}) between 1 and 50`),
+  ],
+);
+
+// Old Payroll.SalaryStartStopRecords: a log of salary held back and released (not used by the sheet).
+export const salaryStops = pgTable(
+  'salary_stops',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    stopYear: smallint('stop_year').notNull(),
+    stopMonth: smallint('stop_month').notNull(),
+    startYear: smallint('start_year'),
+    startMonth: smallint('start_month'),
+    stoppedAmount: money('stopped_amount').notNull().default(0),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    index('salary_stops_staff_idx').on(t.staffId),
+    check('salary_stops_stop_ck', sql`${t.stopYear} between 2000 and 2100 and ${t.stopMonth} between 1 and 12`),
+    check(
+      'salary_stops_start_ck',
+      sql`(${t.startYear} is null and ${t.startMonth} is null) or (${t.startMonth} between 1 and 12
+        and ${t.startYear} * 12 + ${t.startMonth} >= ${t.stopYear} * 12 + ${t.stopMonth})`,
+    ),
+    check('salary_stops_amount_ck', sql`${t.stoppedAmount} >= 0`),
+  ],
+);
+
+// Old Payroll.MonthlyHrSalarySheet (scratch) + ApprovedSalarySheets: one approved sheet per pay month.
+export const salarySheets = pgTable(
+  'salary_sheets',
+  {
+    id: uuid('id').primaryKey(),
+    year: smallint('year').notNull(),
+    month: smallint('month').notNull(),
+    status: text('status', { enum: ['approved', 'committed'] }).notNull(),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+    approvedAt: tz('approved_at').notNull(),
+    committedBy: uuid('committed_by').references(() => users.id, { onDelete: 'set null' }),
+    committedAt: tz('committed_at'),
+  },
+  (t) => [
+    uniqueIndex('salary_sheets_period_uq').on(t.year, t.month),
+    check('salary_sheets_period_ck', sql`${t.year} between 2000 and 2100 and ${t.month} between 1 and 12`),
+    check('salary_sheets_status_ck', sql`${t.status} in ('approved', 'committed')`),
+  ],
+);
+
+// One person's approved salary, with their details as they were (old ApprovedSalarySheets rows).
+export const salarySheetLines = pgTable(
+  'salary_sheet_lines',
+  {
+    sheetId: uuid('sheet_id')
+      .notNull()
+      .references(() => salarySheets.id, { onDelete: 'cascade' }),
+    staffId: staffRef(),
+    employeeNo: text('employee_no').notNull(),
+    fullName: text('full_name').notNull(),
+    departmentId: uuid('department_id').notNull(),
+    department: text('department').notNull(),
+    designation: text('designation').notNull(),
+    joiningDate: day('joining_date').notNull(),
+    paymentMode: text('payment_mode'),
+    bankAccountNo: text('bank_account_no'),
+    basic: money('basic').notNull(),
+    houseRent: money('house_rent').notNull(),
+    medical: money('medical').notNull(),
+    conveyance: money('conveyance').notNull(),
+    otherAllowance: money('other_allowance').notNull(),
+    gross: money('gross').notNull(),
+    allowance: money('allowance').notNull(),
+    specialAllowance: money('special_allowance').notNull(),
+    overtime: money('overtime').notNull(),
+    festivalBonus: money('festival_bonus').notNull(),
+    arrear: money('arrear').notNull(),
+    totalPayable: money('total_payable').notNull(),
+    pf: money('pf').notNull(),
+    incomeTax: money('income_tax').notNull(),
+    lwpDays: numeric('lwp_days', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    lwp: money('lwp').notNull(),
+    punishment: money('punishment').notNull(),
+    totalDeduction: money('total_deduction').notNull(),
+    netPayable: money('net_payable').notNull(),
+    advance: money('advance').notNull(),
+    paid: money('paid').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.sheetId, t.staffId] }),
+    index('salary_sheet_lines_staff_idx').on(t.staffId),
+    check('salary_sheet_lines_net_ck', sql`${t.netPayable} >= 0`),
   ],
 );

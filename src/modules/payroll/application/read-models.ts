@@ -1,5 +1,14 @@
 import type { Page, PageRequest } from '../../../shared/application/pagination.js';
+import type { SalarySheetLine } from '../domain/repositories.js';
+import type { SalarySheetStatus } from '../domain/salary-sheet.js';
 import type { IncrementMethod, IncrementStatus, SalaryBreakdown, SalarySnapshot } from '../domain/salary.js';
+
+export interface SavedSalarySheet {
+  readonly status: SalarySheetStatus;
+  readonly approvedAt: Date;
+  readonly committedAt: Date | null;
+  readonly lines: SalarySheetLine[];
+}
 
 export interface StaffSalaryView extends SalaryBreakdown {
   readonly staffId: string;
@@ -80,4 +89,7 @@ export abstract class PayrollReadRepository {
   abstract listIncrements(filter: IncrementFilter): Promise<SalaryIncrementView[]>;
   /** Active staff with a salary whose joining anniversary fell in the month before the pay month. */
   abstract incrementCandidates(year: number, month: number): Promise<IncrementCandidate[]>;
+  /** The saved sheet of a pay month with its lines (by department, then employee number), or null. */
+  abstract savedSheet(year: number, month: number): Promise<SavedSalarySheet | null>;
+  abstract sheetLine(year: number, month: number, staffId: string): Promise<SalarySheetLine | null>;
 }

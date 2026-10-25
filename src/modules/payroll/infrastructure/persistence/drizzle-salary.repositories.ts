@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, asc, eq, inArray } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { StaffDirectory, type StaffSummary } from '../../../../shared/application/contracts/staff-directory.js';
 import { toPage, offsetOf, type Page } from '../../../../shared/application/pagination.js';
@@ -14,9 +14,15 @@ import {
   type IncrementFilter,
   type SalaryIncrementView,
   type SalaryListFilter,
+  type SavedSalarySheet,
   type StaffSalaryView,
 } from '../../application/read-models.js';
-import { SalaryIncrementRepository, SalaryPolicyRepository, StaffSalaryRepository } from '../../domain/repositories.js';
+import {
+  SalaryIncrementRepository,
+  SalaryPolicyRepository,
+  StaffSalaryRepository,
+  type SalarySheetLine,
+} from '../../domain/repositories.js';
 import {
   incrementArrear,
   isIncrementDue,
@@ -24,7 +30,14 @@ import {
   type SalaryIncrementProps,
   type SalaryPolicyTerms,
 } from '../../domain/salary.js';
-import { salaryIncrements, salaryPolicies, salaryReviewCycles, staffSalaries } from './payroll.schema.js';
+import {
+  salaryIncrements,
+  salaryPolicies,
+  salaryReviewCycles,
+  salarySheetLines,
+  salarySheets,
+  staffSalaries,
+} from './payroll.schema.js';
 
 const REFERENCES: Record<string, string> = {
   staff_salaries_staff_id_staff_records_id_fk: 'staff',
@@ -290,5 +303,35 @@ export class DrizzlePayrollReadRepository extends PayrollReadRepository {
           applied: done.has(person.id),
         };
       });
+  }
+
+  async savedSheet(year: number, month: number): Promise<SavedSalarySheet | null> {
+    const [sheet] = await this.context.db
+      .select()
+      .from(salarySheets)
+      .where(and(eq(salarySheets.year, year), eq(salarySheets.month, month)));
+    if (!sheet) return null;
+    const lines = await this.context.db
+      .select()
+      .from(salarySheetLines)
+      .where(eq(salarySheetLines.sheetId, sheet.id))
+      .orderBy(asc(salarySheetLines.department), asc(salarySheetLines.employeeNo));
+    return {
+      status: sheet.status,
+      approvedAt: sheet.approvedAt,
+      committedAt: sheet.committedAt,
+      lines: lines.map(({ sheetId: _sheet, ...line }) => line),
+    };
+  }
+
+  async sheetLine(year: number, month: number, staffId: string): Promise<SalarySheetLine | null> {
+    const [row] = await this.context.db
+      .select({ line: salarySheetLines })
+      .from(salarySheetLines)
+      .innerJoin(salarySheets, eq(salarySheets.id, salarySheetLines.sheetId))
+      .where(and(eq(salarySheets.year, year), eq(salarySheets.month, month), eq(salarySheetLines.staffId, staffId)));
+    if (!row) return null;
+    const { sheetId: _sheet, ...line } = row.line;
+    return line;
   }
 }

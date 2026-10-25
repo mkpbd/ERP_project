@@ -9,7 +9,12 @@ import { AuditTrail } from '../../../shared/application/ports/audit-trail.js';
 import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
-import { SalaryIncrementRepository, SalaryPolicyRepository, StaffSalaryRepository } from '../domain/repositories.js';
+import {
+  PayPeriods,
+  SalaryIncrementRepository,
+  SalaryPolicyRepository,
+  StaffSalaryRepository,
+} from '../domain/repositories.js';
 import {
   assertPayPeriod,
   incrementArrear,
@@ -46,6 +51,7 @@ export class SalaryChanges {
     readonly increments: SalaryIncrementRepository,
     private readonly staff: StaffDirectory,
     private readonly policies: SalaryPolicyRepository,
+    private readonly periods: PayPeriods,
     private readonly access: AccessControl,
     private readonly tx: TransactionManager,
     private readonly audit: AuditTrail,
@@ -82,8 +88,12 @@ export class SalaryChanges {
     return terms;
   }
 
-  lockPeriod(year: number, month: number): Promise<void> {
-    return this.tx.lock(`payroll:increments:${year}-${month}`);
+  /** Serialises increment changes of a pay month and refuses them once its salary sheet is committed. */
+  async lockPeriod(year: number, month: number, refuseClosed = true): Promise<void> {
+    await this.tx.lock(`payroll:increments:${year}-${month}`);
+    if (refuseClosed && (await this.periods.isClosed(year, month))) {
+      throw new ConflictError('pay_period_closed', 'The salary sheet of this month is committed');
+    }
   }
 }
 
@@ -200,7 +210,8 @@ export class CommitIncrementsHandler implements ICommandHandler<CommitIncrements
     assertPayPeriod(year, month);
     const period = `${year}-${String(month).padStart(2, '0')}`;
     return this.changes.run(actor, 'increments_committed', period, async (now) => {
-      await this.changes.lockPeriod(year, month);
+      // Committing what was applied before the sheet was committed is still allowed.
+      await this.changes.lockPeriod(year, month, false);
       const committed = await this.changes.increments.commit(year, month, actor.userId, now);
       return { result: { committed }, metadata: { year, month, committed } };
     });

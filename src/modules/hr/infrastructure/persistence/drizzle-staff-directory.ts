@@ -27,6 +27,8 @@ export class DrizzleStaffDirectory extends StaffDirectory {
         joiningDate: staffRecords.joiningDate,
         status: staffRecords.status,
         userId: staffRecords.userId,
+        paymentMode: staffRecords.paymentMode,
+        bankAccountNo: staffRecords.bankAccountNo,
       })
       .from(staffRecords)
       .innerJoin(hrDepartments, eq(hrDepartments.id, staffRecords.departmentId))

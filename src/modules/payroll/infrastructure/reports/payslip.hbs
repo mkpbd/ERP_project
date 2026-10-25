@@ -1,0 +1,49 @@
+<style>
+  .who { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 16px; margin: 6px 0 10px; }
+  .who b { display: inline-block; width: 90px; font-weight: 600; color: #444; }
+  .columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  table.slip { width: 100%; border-collapse: collapse; }
+  table.slip th, table.slip td { border: 1px solid #999; padding: 3px 6px; }
+  table.slip th { background: #eee; text-align: left; }
+  table.slip td.n { text-align: right; }
+  table.slip tr.total td { font-weight: 700; background: #f6f6f6; }
+  .net { margin-top: 10px; font-size: 13px; font-weight: 700; border: 1px solid #222; padding: 6px; }
+  .signs { display: flex; justify-content: space-between; margin-top: 50px; }
+  .signs div { border-top: 1px solid #222; width: 160px; text-align: center; padding-top: 2px; }
+</style>
+{{#with data}}
+<div class="who">
+  <div><b>Employee no</b>{{employeeNo}}</div>
+  <div><b>Name</b>{{fullName}}</div>
+  <div><b>Designation</b>{{designation}}</div>
+  <div><b>Department</b>{{department}}</div>
+  <div><b>Joined</b>{{date joiningDate}}</div>
+  <div><b>Payment</b>{{paymentMode}}{{#if bankAccountNo}} · {{bankAccountNo}}{{/if}}</div>
+</div>
+<div class="columns">
+  <table class="slip">
+    <tr><th colspan="2">Earnings</th></tr>
+    <tr><td>Basic</td><td class="n">{{money basic}}</td></tr>
+    <tr><td>House rent</td><td class="n">{{money houseRent}}</td></tr>
+    <tr><td>Medical</td><td class="n">{{money medical}}</td></tr>
+    <tr><td>Conveyance</td><td class="n">{{money conveyance}}</td></tr>
+    <tr><td>Other allowance</td><td class="n">{{money otherAllowance}}</td></tr>
+    <tr><td>Allowance paid this month</td><td class="n">{{money allowance}}</td></tr>
+    <tr><td>Special allowance</td><td class="n">{{money specialAllowance}}</td></tr>
+    <tr><td>Overtime</td><td class="n">{{money overtime}}</td></tr>
+    <tr><td>Festival bonus</td><td class="n">{{money festivalBonus}}</td></tr>
+    <tr><td>Arrear</td><td class="n">{{money arrear}}</td></tr>
+    <tr class="total"><td>Total earnings</td><td class="n">{{money totalPayable}}</td></tr>
+  </table>
+  <table class="slip">
+    <tr><th colspan="2">Deductions</th></tr>
+    <tr><td>Provident fund</td><td class="n">{{money pf}}</td></tr>
+    <tr><td>Income tax</td><td class="n">{{money incomeTax}}</td></tr>
+    <tr><td>Leave without pay ({{lwpDays}} days)</td><td class="n">{{money lwp}}</td></tr>
+    <tr><td>Punishment and other</td><td class="n">{{money punishment}}</td></tr>
+    <tr class="total"><td>Total deductions</td><td class="n">{{money totalDeduction}}</td></tr>
+  </table>
+</div>
+<div class="net">Net payable: {{money netPayable}} ({{amountInWords netPayable}})</div>
+<div class="signs"><div>Prepared by</div><div>Accounts</div><div>Received by</div></div>
+{{/with}}

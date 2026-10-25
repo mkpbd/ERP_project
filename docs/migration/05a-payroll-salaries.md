@@ -1,6 +1,6 @@
 # Step 5a — Payroll: salary structure and increments
 
-Status: **done** (2026-10-25). Previous: [step 4e](04e-hr-recruitment.md) · Next: step 5b (monthly salary).
+Status: **done** (2026-10-25). Previous: [step 4e](04e-hr-recruitment.md) · Next: [step 5b](05b-payroll-salary-sheet.md) (monthly salary).
 
 Payroll is large in the old system (23 tables, 114 feature files and about 60 stored procedures), so it is
 split like HR:

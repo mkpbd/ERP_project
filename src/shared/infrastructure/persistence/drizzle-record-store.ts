@@ -22,6 +22,11 @@ export interface RecordStoreOptions {
   readonly unique?: Readonly<Record<string, { readonly code: string; readonly message: string }>>;
   /** Foreign key constraint name → referenced record, reported as `<record>_not_found`. */
   readonly references?: Readonly<Record<string, string>>;
+  /**
+   * Business check run inside the transaction before every write, with each affected row: the new row on
+   * insert, the old and the changed row on update, the old row on delete. Throw to refuse the write.
+   */
+  readonly guard?: (row: Readonly<Record<string, unknown>>) => Promise<void>;
 }
 
 /**
@@ -58,6 +63,7 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
   }
 
   async insert(id: string, input: TInput, now: Date): Promise<void> {
+    await this.options.guard?.(input as Record<string, unknown>);
     try {
       // The DTO for this record type defines `input`; the table checks it.
       await this.context.db.insert(this.table).values({ ...input, id, createdAt: now, updatedAt: now } as never);
@@ -67,6 +73,12 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
   }
 
   async update(id: string, changes: Partial<TInput>, now: Date): Promise<boolean> {
+    if (this.options.guard) {
+      const before = await this.lockedRow(id);
+      if (!before) return false;
+      await this.options.guard(before);
+      await this.options.guard({ ...before, ...changes });
+    }
     try {
       const rows = await this.context.db
         .update(this.table)
@@ -80,6 +92,11 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
   }
 
   async delete(id: string): Promise<boolean> {
+    if (this.options.guard) {
+      const before = await this.lockedRow(id);
+      if (!before) return false;
+      await this.options.guard(before);
+    }
     try {
       const rows = await this.context.db
         .delete(this.table)
@@ -89,6 +106,11 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
     } catch (error) {
       this.translate(error, 'delete');
     }
+  }
+
+  private async lockedRow(id: string): Promise<Record<string, unknown> | null> {
+    const rows: unknown[] = await this.context.db.select().from(this.table).where(eq(this.table.id, id)).for('update');
+    return (rows[0] as Record<string, unknown> | undefined) ?? null;
   }
 
   private translate(error: unknown, operation: 'write' | 'delete'): never {

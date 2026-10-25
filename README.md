@@ -129,6 +129,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /payroll/salaries/me` | authenticated (own) |
 | `GET /payroll/salaries`, anyone's salary, `GET /payroll/increments[/candidates]` | `payroll:read` |
 | salary policies / review cycles (write), `PUT/PATCH /payroll/salaries/:staffId`, increments apply / commit / reverse | `payroll:manage` |
+| `GET /payroll/salary-sheets/:y/:m/payslips/me` | authenticated (own) |
+| monthly inputs (`/payroll/{overtimes,deductions,punishments,arrears,allowance-payments,salary-payments,salary-stops}`) read, salary sheet preview / saved, anyone's payslip | `payroll:read` |
+| monthly inputs (write; frozen once the month is committed), salary sheet approve / commit | `payroll:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

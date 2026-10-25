@@ -1,0 +1,30 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Department</th><th class="num">Staff</th><th class="num">Gross</th><th class="num">Overtime</th>
+      <th class="num">Arrear</th><th class="num">Payable</th><th class="num">PF</th><th class="num">Income tax</th>
+      <th class="num">LWP</th><th class="num">Punishment</th><th class="num">Net payable</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td>{{department}}</td><td class="num">{{count}}</td><td class="num">{{money gross}}</td><td class="num">{{money overtime}}</td>
+      <td class="num">{{money arrear}}</td><td class="num">{{money totalPayable}}</td><td class="num">{{money pf}}</td>
+      <td class="num">{{money incomeTax}}</td><td class="num">{{money lwp}}</td><td class="num">{{money punishment}}</td>
+      <td class="num">{{money netPayable}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td>Total</td><td class="num">{{data.total.count}}</td><td class="num">{{money data.total.gross}}</td>
+      <td class="num">{{money data.total.overtime}}</td><td class="num">{{money data.total.arrear}}</td>
+      <td class="num">{{money data.total.totalPayable}}</td><td class="num">{{money data.total.pf}}</td>
+      <td class="num">{{money data.total.incomeTax}}</td><td class="num">{{money data.total.lwp}}</td>
+      <td class="num">{{money data.total.punishment}}</td><td class="num">{{money data.total.netPayable}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p class="empty">The salary sheet of this month is empty.</p>
+{{/if}}

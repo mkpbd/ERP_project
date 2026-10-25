@@ -1,0 +1,29 @@
+{{#if data.lines.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th><th>Name</th><th>Designation</th><th>Department</th><th>Joined</th>
+      {{#if data.bank}}<th>Bank account</th>{{/if}}
+      <th class="num">Amount</th><th style="width: 90px">Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{designation}}</td>
+      <td>{{department}}</td><td>{{date joiningDate}}</td>
+      {{#if @root.data.bank}}<td>{{bankAccountNo}}</td>{{/if}}
+      <td class="num">{{money netPayable}}</td><td></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="{{#if data.bank}}7{{else}}6{{/if}}">Total ({{data.lines.length}})</td>
+      <td class="num">{{money data.total}}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords data.total}}</p>
+{{else}}
+<p class="empty">Nobody is paid this way in this month.</p>
+{{/if}}

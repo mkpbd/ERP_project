@@ -53,6 +53,7 @@ export class ReportRenderingService extends ReportRenderer implements OnModuleDe
       data: await this.chromium.render(html, {
         landscape: layout.landscape ?? false,
         pageSize: layout.pageSize ?? 'A4',
+        paper: layout.paper ?? null,
         footerText: bare ? null : footerText,
       }),
     };

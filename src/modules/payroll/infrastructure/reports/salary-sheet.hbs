@@ -1,0 +1,65 @@
+<style>
+  table.sheet { width: 100%; border-collapse: collapse; font-size: 7.5px; }
+  table.sheet th, table.sheet td { border: 1px solid #999; padding: 2px 3px; }
+  table.sheet th { background: #eee; }
+  table.sheet thead { display: table-header-group; }
+  table.sheet tr { page-break-inside: avoid; }
+  table.sheet td.n { text-align: right; white-space: nowrap; }
+  table.sheet td.net { font-weight: 700; }
+  table.sheet td.sign { width: 60px; }
+  .draft { text-align: center; color: #b00020; font-weight: 700; margin-bottom: 4px; }
+</style>
+{{#unless data.status}}<div class="draft">DRAFT — not approved</div>{{/unless}}
+{{#if data.groups.length}}
+<table class="sheet">
+  <thead>
+    <tr>
+      <th>#</th><th>Emp no</th><th>Name</th><th>Designation</th><th>Joined</th>
+      <th>Basic</th><th>House rent</th><th>Medical</th><th>Conv.</th><th>Other</th><th>Gross</th>
+      <th>Allow.</th><th>Special</th><th>Overtime</th><th>Bonus</th><th>Arrear</th><th>Payable</th>
+      <th>PF</th><th>Tax</th><th>LWP days</th><th>LWP</th><th>Punish.</th><th>Deduction</th><th>Net payable</th>
+      <th>Advance</th><th>Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.groups}}
+    <tr class="group-row"><td colspan="26">{{department}} ({{lines.length}})</td></tr>
+    {{#each lines}}
+    <tr>
+      <td class="n">{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{designation}}</td><td>{{date joiningDate}}</td>
+      <td class="n">{{integer basic}}</td><td class="n">{{integer houseRent}}</td><td class="n">{{integer medical}}</td>
+      <td class="n">{{integer conveyance}}</td><td class="n">{{integer otherAllowance}}</td><td class="n">{{integer gross}}</td>
+      <td class="n">{{integer allowance}}</td><td class="n">{{integer specialAllowance}}</td><td class="n">{{integer overtime}}</td>
+      <td class="n">{{integer festivalBonus}}</td><td class="n">{{integer arrear}}</td><td class="n">{{integer totalPayable}}</td>
+      <td class="n">{{integer pf}}</td><td class="n">{{integer incomeTax}}</td><td class="n">{{lwpDays}}</td><td class="n">{{integer lwp}}</td>
+      <td class="n">{{integer punishment}}</td><td class="n">{{integer totalDeduction}}</td><td class="n net">{{integer netPayable}}</td>
+      <td class="n">{{integer advance}}</td><td class="sign"></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">{{department}} total</td>
+      <td class="n">{{integer totals.basic}}</td><td class="n">{{integer totals.houseRent}}</td><td class="n">{{integer totals.medical}}</td>
+      <td class="n">{{integer totals.conveyance}}</td><td class="n">{{integer totals.otherAllowance}}</td><td class="n">{{integer totals.gross}}</td>
+      <td class="n">{{integer totals.allowance}}</td><td class="n">{{integer totals.specialAllowance}}</td><td class="n">{{integer totals.overtime}}</td>
+      <td class="n">{{integer totals.festivalBonus}}</td><td class="n">{{integer totals.arrear}}</td><td class="n">{{integer totals.totalPayable}}</td>
+      <td class="n">{{integer totals.pf}}</td><td class="n">{{integer totals.incomeTax}}</td><td></td><td class="n">{{integer totals.lwp}}</td>
+      <td class="n">{{integer totals.punishment}}</td><td class="n">{{integer totals.totalDeduction}}</td><td class="n net">{{integer totals.netPayable}}</td>
+      <td class="n">{{integer totals.advance}}</td><td></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">Grand total ({{data.count}})</td>
+      <td class="n">{{integer data.totals.basic}}</td><td class="n">{{integer data.totals.houseRent}}</td><td class="n">{{integer data.totals.medical}}</td>
+      <td class="n">{{integer data.totals.conveyance}}</td><td class="n">{{integer data.totals.otherAllowance}}</td><td class="n">{{integer data.totals.gross}}</td>
+      <td class="n">{{integer data.totals.allowance}}</td><td class="n">{{integer data.totals.specialAllowance}}</td><td class="n">{{integer data.totals.overtime}}</td>
+      <td class="n">{{integer data.totals.festivalBonus}}</td><td class="n">{{integer data.totals.arrear}}</td><td class="n">{{integer data.totals.totalPayable}}</td>
+      <td class="n">{{integer data.totals.pf}}</td><td class="n">{{integer data.totals.incomeTax}}</td><td></td><td class="n">{{integer data.totals.lwp}}</td>
+      <td class="n">{{integer data.totals.punishment}}</td><td class="n">{{integer data.totals.totalDeduction}}</td><td class="n net">{{integer data.totals.netPayable}}</td>
+      <td class="n">{{integer data.totals.advance}}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+<p>Net payable in words: {{amountInWords data.totals.netPayable}}</p>
+{{else}}
+<p class="empty">Nobody is on this month's sheet.</p>
+{{/if}}

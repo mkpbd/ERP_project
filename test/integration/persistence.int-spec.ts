@@ -42,12 +42,13 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 10 });
+    expect(applied.rows[0]).toEqual({ n: 11 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
     expect(tables.rows.map((row) => row.table_name)).toEqual([
       'admin_departments',
+      'allowance_payments',
       'attendance_punches',
       'audit_logs',
       'countries',
@@ -92,9 +93,17 @@ describe('migrations', () => {
       'role_reports',
       'roles',
       'roster_duties',
+      'salary_arrears',
+      'salary_deductions',
       'salary_increments',
+      'salary_overtimes',
+      'salary_payments',
       'salary_policies',
+      'salary_punishments',
       'salary_review_cycles',
+      'salary_sheet_lines',
+      'salary_sheets',
+      'salary_stops',
       'serve_types',
       'service_units',
       'settings',

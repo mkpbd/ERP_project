@@ -5,3 +5,11 @@ export const SALARY_REVIEW_CYCLE = 'salary_review_cycle';
 export const PAYROLL_READ = 'payroll:read';
 /** Salary policies, salary structures and increments. */
 export const PAYROLL_MANAGE = 'payroll:manage';
+
+export const SALARY_OVERTIME = 'salary_overtime';
+export const SALARY_DEDUCTION = 'salary_deduction';
+export const SALARY_PUNISHMENT = 'salary_punishment';
+export const SALARY_ARREAR = 'salary_arrear';
+export const ALLOWANCE_PAYMENT = 'allowance_payment';
+export const SALARY_PAYMENT = 'salary_payment';
+export const SALARY_STOP = 'salary_stop';

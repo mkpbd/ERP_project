@@ -1,0 +1,19 @@
+<style>
+  /* One envelope (9 × 4 in, as the old KhamDocument) per page, printed straight onto it. */
+  .envelope { height: 3.6in; padding: 0.35in 0.5in; font-family: 'Times New Roman', 'Noto Serif Bengali', serif; font-size: 14px; font-weight: 600; page-break-after: always; }
+  .envelope:last-child { page-break-after: auto; }
+  .envelope div { margin-bottom: 3px; }
+  .empty { padding: 1in; text-align: center; }
+</style>
+{{#each data.lines}}
+<div class="envelope">
+  <div>{{employeeNo}}</div>
+  <div>{{fullName}}</div>
+  <div>{{department}}</div>
+  <div>{{designation}}</div>
+  <div>Salary amount: {{money netPayable}}</div>
+  <div>Salary for the month: {{@root.data.monthName}}, {{@root.data.year}}</div>
+</div>
+{{else}}
+<p class="empty">No approved salary for this selection.</p>
+{{/each}}
