@@ -64,6 +64,13 @@
       "when": 1792939528535,
       "tag": "0008_hr_recruitment",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1792940775749,
+      "tag": "0009_payroll_salaries",
+      "breakpoints": true
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Step 4e — HR: recruitment and ID cards
 
-Status: **done** (2026-10-25). Previous: [step 4d](04d-hr-attendance.md) · Next: step 5 (payroll).
+Status: **done** (2026-10-25). Previous: [step 4d](04d-hr-attendance.md) · Next: [step 5a](05a-payroll-salaries.md) (payroll).
 
 This step finishes HR. The old recruitment feature was small (a circular number and title, and CV rows with
 the file bytes inline), so it is ported as simple records plus a file store. The step also ports the last

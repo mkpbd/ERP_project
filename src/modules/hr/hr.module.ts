@@ -1,4 +1,6 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
+import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
+import { DrizzleStaffDirectory } from './infrastructure/persistence/drizzle-staff-directory.js';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
@@ -105,7 +107,9 @@ import {
  * shift types, the monthly duty roster, days off, duty exchanges, extra duties (step 4c);
  * attendance: device punches, manual entries with approval, daily status (step 4d);
  * recruitment: job circulars, applicants and their CVs; staff ID cards (step 4e).
+ * Publishes StaffDirectory for other modules (payroll).
  */
+@Global()
 @Module({
   controllers: [
     HrDivisionsController,
@@ -133,6 +137,7 @@ import {
     JobApplicationFilesController,
   ],
   providers: [
+    { provide: StaffDirectory, useClass: DrizzleStaffDirectory },
     ...STAFF_HANDLERS,
     ...LEAVE_HANDLERS,
     ...ROSTER_HANDLERS,
@@ -158,6 +163,7 @@ import {
     { provide: AttendanceReadRepository, useClass: DrizzleAttendanceReadRepository },
     { provide: JobApplicationFileRepository, useClass: DrizzleJobApplicationFileRepository },
   ],
+  exports: [StaffDirectory],
 })
 export class HrModule implements OnModuleInit {
   constructor(

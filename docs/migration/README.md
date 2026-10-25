@@ -51,7 +51,10 @@ Order follows dependencies: later modules reference earlier ones.
 | 4c | HR: shift types, monthly duty roster with days off, duty exchanges, extra duties, roster report | **Done** | [04c-hr-roster.md](04c-hr-roster.md) |
 | 4d | HR: attendance — device punch ingestion, manual attendance with approval, daily status, attendance reports | **Done** | [04d-hr-attendance.md](04d-hr-attendance.md) |
 | 4e | HR: recruitment (job circulars, applicants, CV files), staff ID cards | **Done** | [04e-hr-recruitment.md](04e-hr-recruitment.md) |
-| 5 | Payroll, PFBook, TDS/VAT/TAX (incl. the salary envelope print `Kham`) | Next | |
+| 5a | Payroll: salary policies, salary structure, yearly increments | **Done** | [05a-payroll-salaries.md](05a-payroll-salaries.md) |
+| 5b | Payroll: monthly salary (overtime, deductions, arrears, allowances, stop/start), salary sheet, approval, payment, payslip, bank/cash statements, salary envelope `Kham` | Next | |
+| 5c | Payroll: festival bonus, leave encashment, PF ledger, staff global ledger | Planned | |
+| 5d | Payroll: income tax (slabs, certificates, TDS/VAT/TAX), PF book | Planned | |
 | 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |

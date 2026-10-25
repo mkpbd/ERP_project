@@ -1,0 +1,61 @@
+{{#if data.groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th>
+      <th>Name</th>
+      <th>Designation</th>
+      <th>Joined</th>
+      <th>Policy</th>
+      <th class="num">Gross</th>
+      <th class="num">Basic</th>
+      <th class="num">House rent</th>
+      <th class="num">Medical</th>
+      <th class="num">Conveyance</th>
+      <th class="num">Other</th>
+      <th class="num">Special</th>
+      <th class="num">PF</th>
+      <th class="num">CPF</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.groups}}
+    <tr class="group-row"><td colspan="15">{{department}} ({{rows.length}})</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{employeeNo}}</td>
+      <td>{{fullName}}</td>
+      <td>{{designation}}</td>
+      <td>{{date joiningDate}}</td>
+      <td>{{policyName}}</td>
+      <td class="num">{{money gross}}</td>
+      <td class="num">{{money basic}}</td>
+      <td class="num">{{money houseRent}}</td>
+      <td class="num">{{money medical}}</td>
+      <td class="num">{{money conveyance}}</td>
+      <td class="num">{{money otherAllowance}}</td>
+      <td class="num">{{money specialAllowance}}</td>
+      <td class="num">{{money pf}}</td>
+      <td class="num">{{money cpf}}</td>
+    </tr>
+    {{/each}}
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="6">Total ({{data.count}})</td>
+      <td class="num">{{money data.totals.gross}}</td>
+      <td class="num">{{money data.totals.basic}}</td>
+      <td class="num">{{money data.totals.houseRent}}</td>
+      <td class="num">{{money data.totals.medical}}</td>
+      <td class="num">{{money data.totals.conveyance}}</td>
+      <td class="num">{{money data.totals.otherAllowance}}</td>
+      <td class="num">{{money data.totals.specialAllowance}}</td>
+      <td class="num">{{money data.totals.pf}}</td>
+      <td class="num">{{money data.totals.cpf}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No salaries match these filters.</p>
+{{/if}}

@@ -126,6 +126,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `POST /hr/attendance/punches` (device integration) | `attendance:ingest` |
 | `GET /hr/recruitment/{circulars,applications}[/:id]`, CV downloads | `recruitment:read` |
 | writes to circulars / applications, CV upload and removal | `recruitment:manage` |
+| `GET /payroll/salaries/me` | authenticated (own) |
+| `GET /payroll/salaries`, anyone's salary, `GET /payroll/increments[/candidates]` | `payroll:read` |
+| salary policies / review cycles (write), `PUT/PATCH /payroll/salaries/:staffId`, increments apply / commit / reverse | `payroll:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

@@ -1,0 +1,48 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th>
+      <th>Name</th>
+      <th>Designation</th>
+      <th>Department</th>
+      <th>Joined</th>
+      <th>Method</th>
+      <th class="num">Previous gross</th>
+      <th class="num">Previous basic</th>
+      <th class="num">Increment</th>
+      <th class="num">Arrear</th>
+      <th class="num">Present gross</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{employeeNo}}</td>
+      <td>{{fullName}}</td>
+      <td>{{designation}}</td>
+      <td>{{department}}</td>
+      <td>{{date joiningDate}}</td>
+      <td>{{methodLabel}}</td>
+      <td class="num">{{money previousGross}}</td>
+      <td class="num">{{money previousBasic}}</td>
+      <td class="num">{{money amount}}</td>
+      <td class="num">{{money arrear}}</td>
+      <td class="num">{{money presentGross}}</td>
+      <td>{{statusLabel}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="9">Total ({{data.rows.length}})</td>
+      <td class="num">{{money data.totals.amount}}</td>
+      <td class="num">{{money data.totals.arrear}}</td>
+      <td colspan="2"></td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No increments in this month.</p>
+{{/if}}

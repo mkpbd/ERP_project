@@ -41,6 +41,8 @@ export const PERMISSION_CATALOG = [
   { key: 'attendance:ingest', description: 'Send device punches (for the attendance device integration)' },
   { key: 'recruitment:read', description: 'See job circulars, applicants and their CVs' },
   { key: 'recruitment:manage', description: 'Publish job circulars and record applicants, their status and CVs' },
+  { key: 'payroll:read', description: "See everyone's salary structure and increments" },
+  { key: 'payroll:manage', description: 'Set up salary policies and salaries; apply, commit and reverse increments' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 
