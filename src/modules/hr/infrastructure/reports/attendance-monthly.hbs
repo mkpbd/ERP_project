@@ -1,0 +1,41 @@
+<style>
+  table.month { width: 100%; border-collapse: collapse; font-size: 8px; }
+  table.month th, table.month td { border: 1px solid #999; padding: 2px 1px; text-align: center; }
+  table.month th.name, table.month td.name { text-align: left; white-space: nowrap; padding: 2px 4px; }
+  table.month thead { display: table-header-group; }
+  table.month tr { page-break-inside: avoid; }
+  table.month td.absent { background: #fdecea; color: #b00020; font-weight: 700; }
+  table.month td.late { background: #fff4e5; color: #b45309; }
+  table.month td.leave { background: #e8f0fe; }
+  table.month td.day-off, table.month td.holiday { background: #f1f1f1; color: #666; }
+  table.month td.total { font-weight: 700; }
+  .legend { margin-top: 6px; font-size: 9px; }
+</style>
+{{#if data.staff.length}}
+<table class="month">
+  <thead>
+    <tr>
+      <th class="name">Employee</th>
+      {{#each data.days}}<th>{{this}}</th>{{/each}}
+      <th>P</th><th>L</th><th>A</th><th>LV</th><th>Off</th><th>Late</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.staff}}
+    <tr>
+      <td class="name">{{employeeNo}} {{fullName}}</td>
+      {{#each cells}}<td class="{{status}}">{{letter}}</td>{{/each}}
+      <td class="total">{{present}}</td>
+      <td class="total">{{late}}</td>
+      <td class="total">{{absent}}</td>
+      <td class="total">{{leave}}</td>
+      <td class="total">{{dayOff}}</td>
+      <td class="total">{{duration lateMinutes}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<div class="legend">P present · L late (late days also count in the P total) · A absent · LV leave · O day off · H government holiday.</div>
+{{else}}
+<p class="empty">No active employees match these filters.</p>
+{{/if}}

@@ -1,3 +1,4 @@
+import type { ManualAttendance, ManualStatus } from './attendance.js';
 import type { ApprovalLevel, LeaveApplication, LeavePolicyTerms } from './leave.js';
 import type { Duty, ShiftType, StaffPlacement } from './roster.js';
 import type { EducationEntry, EmergencyContactEntry, StaffMember, StaffStatus } from './staff-member.js';
@@ -73,6 +74,35 @@ export abstract class RosterRepository {
   abstract duties(staffIds: readonly string[], from: string, to: string): Promise<Duty[]>;
   abstract daysOff(staffIds: readonly string[], from: string, to: string): Promise<DayOff[]>;
   abstract apply(writes: RosterWrites, actorUserId: string, now: Date): Promise<void>;
+}
+
+export interface PunchRow {
+  readonly id: string;
+  readonly biometricNo: number;
+  readonly staffId: string | null;
+  readonly machineNo: number;
+  readonly punchedAt: Date;
+}
+
+export abstract class AttendanceRepository {
+  abstract staffByBiometric(biometricNos: readonly number[]): Promise<Map<number, string>>;
+  /** Inserts new punches and skips ones already received; returns how many were new. */
+  abstract insertPunches(rows: readonly PunchRow[], receivedBy: string, now: Date): Promise<number>;
+  /** Throws ConflictError (manual_attendance_exists) when a live entry exists for the person and day. */
+  abstract insertManual(entry: ManualAttendance): Promise<void>;
+  abstract findManualForUpdate(id: string): Promise<ManualAttendance | null>;
+  abstract updateManual(entry: ManualAttendance): Promise<void>;
+  /** Facts that decide whether a manual entry may be made for a person and day. */
+  abstract manualContext(
+    staffId: string,
+    date: string,
+    excludeId: string | null,
+  ): Promise<{
+    staffActive: boolean;
+    leave: string | null;
+    otherEntryStatus: ManualStatus | null;
+    isDayOff: boolean;
+  } | null>;
 }
 
 export abstract class OrgStructureRepository {

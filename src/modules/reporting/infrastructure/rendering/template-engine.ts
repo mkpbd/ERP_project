@@ -1,7 +1,15 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import Handlebars from 'handlebars';
-import { amountInWords, formatDate, formatDateTime, formatInteger, formatMoney } from './formatting.js';
+import {
+  amountInWords,
+  formatDate,
+  formatDateTime,
+  formatDuration,
+  formatInteger,
+  formatMoney,
+  formatTime,
+} from './formatting.js';
 
 const LAYOUT = fileURLToPath(new URL('./templates/layout.hbs', import.meta.url));
 
@@ -18,6 +26,8 @@ export class TemplateEngine {
     const h = this.handlebars;
     h.registerHelper('date', (value: unknown) => formatDate(value, timeZone));
     h.registerHelper('datetime', (value: unknown) => formatDateTime(value, timeZone));
+    h.registerHelper('time', (value: unknown) => formatTime(value, timeZone));
+    h.registerHelper('duration', (minutes: unknown) => formatDuration(minutes));
     h.registerHelper('money', (value: unknown) => formatMoney(value));
     h.registerHelper('integer', (value: unknown) => formatInteger(value));
     h.registerHelper('amountInWords', (value: unknown) => (typeof value === 'number' ? amountInWords(value) : ''));

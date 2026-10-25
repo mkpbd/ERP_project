@@ -119,6 +119,11 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `/hr/leave/{policies,approval-levels,delegates,records}`, `GET /hr/leave/applications` | `leave:read` / `leave:manage` |
 | `GET /hr/roster/month`, `/hr/roster/me`, `/hr/roster/{shift-types,duty-exchanges,extra-duties}` | authenticated |
 | `PUT /hr/roster/entries`, writes to shift types / duty exchanges / extra duties | `roster:manage` |
+| `GET /hr/attendance/me`, own `GET /hr/attendance/staff/:id[/punches]` | authenticated |
+| `GET /hr/attendance/daily`, anyone's `GET /hr/attendance/staff/:id[/punches]` | `attendance:read` |
+| `POST/PATCH /hr/attendance/manual`, submit / cancel | `attendance:enter` |
+| `POST /hr/attendance/manual/:id/{approve,reject}`, cancelling an approved entry | `attendance:approve` |
+| `POST /hr/attendance/punches` (device integration) | `attendance:ingest` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

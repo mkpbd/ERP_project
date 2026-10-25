@@ -50,6 +50,13 @@
       "when": 1792937232343,
       "tag": "0006_hr_roster",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792938071911,
+      "tag": "0007_hr_attendance",
+      "breakpoints": true
     }
   ]
 }

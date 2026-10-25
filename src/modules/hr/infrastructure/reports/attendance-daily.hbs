@@ -1,0 +1,44 @@
+<style>
+  .counts { margin: 0 0 8px; font-size: 10px; }
+  .counts span { display: inline-block; margin-right: 14px; }
+  td.absent { color: #b00020; font-weight: 700; }
+  td.late { color: #b45309; font-weight: 700; }
+</style>
+<div class="counts">
+  <span>Present: <b>{{data.counts.present}}</b></span>
+  <span>Late: <b>{{data.counts.late}}</b></span>
+  <span>Absent: <b>{{data.counts.absent}}</b></span>
+  <span>Leave: <b>{{data.counts.leave}}</b></span>
+  <span>Day off: <b>{{data.counts.[day-off]}}</b></span>
+  <span>Holiday: <b>{{data.counts.holiday}}</b></span>
+</div>
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 28px">#</th><th>Employee no</th><th>Name</th><th>Department</th><th>Shift</th>
+      <th>In</th><th>Out</th><th>Status</th><th class="num">Late</th><th class="num">Early out</th><th class="num">Worked</th><th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{employeeNo}}</td>
+      <td>{{fullName}}</td>
+      <td>{{departmentName}}</td>
+      <td>{{shift}}</td>
+      <td>{{time inAt}}{{#if (eq source "manual")}} <span class="muted">(manual)</span>{{/if}}</td>
+      <td>{{time outAt}}</td>
+      <td class="{{status}}">{{lookup @root.data.labels status}}</td>
+      <td class="num">{{duration lateMinutes}}</td>
+      <td class="num">{{duration earlyOutMinutes}}</td>
+      <td class="num">{{duration workMinutes}}</td>
+      <td>{{note}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No active employees match these filters.</p>
+{{/if}}

@@ -35,6 +35,10 @@ export const PERMISSION_CATALOG = [
     description: 'Set leave policies, approval chains and delegates; record leave; cancel approved leave',
   },
   { key: 'roster:manage', description: 'Set up shift types and edit duty rosters, duty exchanges and extra duties' },
+  { key: 'attendance:read', description: "See everyone's attendance, punches and manual entries" },
+  { key: 'attendance:enter', description: 'Enter, edit, submit and cancel manual attendance' },
+  { key: 'attendance:approve', description: 'Approve, reject and revoke manual attendance (not your own)' },
+  { key: 'attendance:ingest', description: 'Send device punches (for the attendance device integration)' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

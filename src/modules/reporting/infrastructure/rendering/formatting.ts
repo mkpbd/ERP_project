@@ -83,6 +83,22 @@ export function formatDateTime(value: unknown, timeZone: string): string {
   }).format(date);
 }
 
+/** `06:30 pm` in the report time zone. */
+export function formatTime(value: unknown, timeZone: string): string {
+  const date = toDate(value);
+  if (!date) return '';
+  return new Intl.DateTimeFormat('en-GB', { timeZone, hour: '2-digit', minute: '2-digit', hour12: true }).format(date);
+}
+
+/** `75` → `1h 15m`; `0` or missing → empty. */
+export function formatDuration(minutes: unknown): string {
+  const total = toNumber(minutes);
+  if (total === null || total <= 0) return '';
+  const hours = Math.floor(total / 60);
+  const rest = Math.round(total % 60);
+  return hours > 0 ? `${hours}h${rest > 0 ? ` ${rest}m` : ''}` : `${rest}m`;
+}
+
 /** The same instant as wall-clock time in `timeZone`, expressed as a UTC date (spreadsheets have no zones). */
 export function wallClock(value: unknown, timeZone: string): Date | null {
   const date = toDate(value);

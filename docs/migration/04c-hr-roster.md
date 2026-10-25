@@ -1,6 +1,6 @@
 # Step 4c — HR: duty roster
 
-Status: **done** (2026-10-25). Previous: [step 4b](04b-hr-leave.md) · Next: step 4d (attendance).
+Status: **done** (2026-10-25). Previous: [step 4b](04b-hr-leave.md) · Next: [step 4d](04d-hr-attendance.md) (attendance).
 
 Roster and attendance were planned as one step; attendance (device punches, the manual-attendance approval
 workflow, daily status and attendance reports) is its own step **4d**, and recruitment moves to **4e**.
