@@ -132,6 +132,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /payroll/salary-sheets/:y/:m/payslips/me` | authenticated (own) |
 | monthly inputs (`/payroll/{overtimes,deductions,punishments,arrears,allowance-payments,salary-payments,salary-stops}`) read, salary sheet preview / saved, anyone's payslip | `payroll:read` |
 | monthly inputs (write; frozen once the month is committed), salary sheet approve / commit | `payroll:manage` |
+| `GET /payroll/statements/{pf,dues}` (own) | authenticated |
+| festival bonuses and their sheets, leave encashments, PF ledger, staff dues, anyone's statements (read) | `payroll:read` |
+| the same (write), bonus approve / commit / reverse, encashment save / remove | `payroll:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

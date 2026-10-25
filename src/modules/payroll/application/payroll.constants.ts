@@ -13,3 +13,6 @@ export const SALARY_ARREAR = 'salary_arrear';
 export const ALLOWANCE_PAYMENT = 'allowance_payment';
 export const SALARY_PAYMENT = 'salary_payment';
 export const SALARY_STOP = 'salary_stop';
+export const FESTIVAL_BONUS = 'festival_bonus';
+export const PF_LEDGER_ENTRY = 'pf_ledger_entry';
+export const STAFF_DUE = 'staff_due';

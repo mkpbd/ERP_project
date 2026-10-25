@@ -53,8 +53,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 4e | HR: recruitment (job circulars, applicants, CV files), staff ID cards | **Done** | [04e-hr-recruitment.md](04e-hr-recruitment.md) |
 | 5a | Payroll: salary policies, salary structure, yearly increments | **Done** | [05a-payroll-salaries.md](05a-payroll-salaries.md) |
 | 5b | Payroll: monthly salary (overtime, deductions, arrears, allowances, stop/start), salary sheet, approval, payment, payslip, bank/cash statements, salary envelope `Kham` | **Done** | [05b-payroll-salary-sheet.md](05b-payroll-salary-sheet.md) |
-| 5c | Payroll: festival bonus, leave encashment, PF ledger, staff global ledger | Next | |
-| 5d | Payroll: income tax (slabs, certificates, TDS/VAT/TAX), PF book | Planned | |
+| 5c | Payroll: festival bonus, leave encashment, PF ledger, staff dues | **Done** | [05c-payroll-bonus-ledgers.md](05c-payroll-bonus-ledgers.md) |
+| 5d | Payroll: income tax (slabs, certificates, TDS/VAT/TAX), PF book | Next | |
 | 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |

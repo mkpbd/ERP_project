@@ -1,0 +1,29 @@
+{{#unless data.status}}<div style="text-align: center; color: #b00020; font-weight: 700; margin-bottom: 4px">DRAFT — not approved</div>{{/unless}}
+{{#if data.lines.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th><th>Name</th><th>Designation</th><th>Department</th><th>Joined</th>
+      <th>Payment</th><th class="num">Gross</th><th class="num">Basic</th><th class="num">Bonus</th>
+      <th style="width: 80px">Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{designation}}</td>
+      <td>{{department}}</td><td>{{date joiningDate}}</td>
+      <td>{{paymentMode}}{{#if bankAccountNo}} · {{bankAccountNo}}{{/if}}</td>
+      <td class="num">{{money gross}}</td><td class="num">{{money basic}}</td><td class="num">{{money amount}}</td><td></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="9">Total ({{data.lines.length}})</td><td class="num">{{money data.total}}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords data.total}}</p>
+{{else}}
+<p class="empty">Nobody is due this bonus.</p>
+{{/if}}

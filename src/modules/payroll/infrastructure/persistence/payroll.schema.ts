@@ -15,7 +15,8 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
+import { serviceUnits } from '../../../administration/infrastructure/persistence/administration.schema.js';
+import { festivals, staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import type { SalarySnapshot } from '../../domain/salary.js';
 
@@ -391,5 +392,146 @@ export const salarySheetLines = pgTable(
     primaryKey({ columns: [t.sheetId, t.staffId] }),
     index('salary_sheet_lines_staff_idx').on(t.staffId),
     check('salary_sheet_lines_net_ck', sql`${t.netPayable} >= 0`),
+  ],
+);
+
+// Old Payroll.FestivalBonuses: a festival's bonus in a pay month, as a percentage of basic. The joining
+// cut-off was a screen parameter (BeforeJoiningDate); paying with salary chooses between the old salary
+// sheet's bonus column and the separate bonus sheet.
+export const festivalBonuses = pgTable(
+  'festival_bonuses',
+  {
+    id: uuid('id').primaryKey(),
+    festivalId: uuid('festival_id')
+      .notNull()
+      .references(() => festivals.id, { onDelete: 'restrict' }),
+    ...payPeriod,
+    percentOfBasic: percent('percent_of_basic').notNull(),
+    joinedBy: day('joined_by').notNull(),
+    payWithSalary: boolean('pay_with_salary').notNull().default(false),
+    dateFrom: day('date_from'),
+    dateTo: day('date_to'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('festival_bonuses_festival_period_uq').on(t.festivalId, t.payYear, t.payMonth),
+    payPeriodCheck('festival_bonuses', t),
+    check('festival_bonuses_percent_ck', sql`${t.percentOfBasic} > 0 and ${t.percentOfBasic} <= 100`),
+    check(
+      'festival_bonuses_dates_ck',
+      sql`${t.dateTo} is null or ${t.dateFrom} is null or ${t.dateTo} >= ${t.dateFrom}`,
+    ),
+  ],
+);
+
+// Old Payroll.AprovedFestivalBonuses: the approved bonus sheet of one festival bonus.
+export const festivalBonusLines = pgTable(
+  'festival_bonus_lines',
+  {
+    bonusId: uuid('bonus_id')
+      .notNull()
+      .references(() => festivalBonuses.id, { onDelete: 'restrict' }),
+    staffId: staffRef(),
+    employeeNo: text('employee_no').notNull(),
+    fullName: text('full_name').notNull(),
+    departmentId: uuid('department_id').notNull(),
+    department: text('department').notNull(),
+    designation: text('designation').notNull(),
+    joiningDate: day('joining_date').notNull(),
+    paymentMode: text('payment_mode'),
+    bankAccountNo: text('bank_account_no'),
+    gross: money('gross').notNull(),
+    basic: money('basic').notNull(),
+    amount: money('amount').notNull(),
+    status: text('status', { enum: ['approved', 'committed'] }).notNull(),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+    approvedAt: tz('approved_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.bonusId, t.staffId] }),
+    index('festival_bonus_lines_staff_idx').on(t.staffId),
+    check('festival_bonus_lines_amount_ck', sql`${t.amount} >= 0`),
+    check('festival_bonus_lines_status_ck', sql`${t.status} in ('approved', 'committed')`),
+  ],
+);
+
+// Old Payroll.LeaveEncashments (+ procedure LeaveIncashment): unused leave paid out, saved per pay month.
+export const leaveEncashments = pgTable(
+  'leave_encashments',
+  {
+    staffId: staffRef(),
+    ...payPeriod,
+    leaveYear: smallint('leave_year').notNull(),
+    employeeNo: text('employee_no').notNull(),
+    fullName: text('full_name').notNull(),
+    departmentId: uuid('department_id').notNull(),
+    department: text('department').notNull(),
+    designation: text('designation').notNull(),
+    joiningDate: day('joining_date').notNull(),
+    paymentMode: text('payment_mode'),
+    gross: money('gross').notNull(),
+    entitledDays: numeric('entitled_days', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    takenDays: integer('taken_days').notNull(),
+    remainingDays: numeric('remaining_days', { precision: 5, scale: 2, mode: 'number' }).notNull(),
+    perDay: money('per_day').notNull(),
+    amount: money('amount').notNull(),
+    approvedBy: uuid('approved_by').references(() => users.id, { onDelete: 'set null' }),
+    approvedAt: tz('approved_at').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.staffId, t.payYear, t.payMonth] }),
+    payPeriodCheck('leave_encashments', t),
+    check('leave_encashments_amount_ck', sql`${t.amount} > 0 and ${t.remainingDays} > 0`),
+  ],
+);
+
+// Old Payroll.PFLedgers: entries outside the salary sheet (opening balance, interest, withdrawal, settlement).
+// The running balance is worked out, not stored.
+export const pfLedgerEntries = pgTable(
+  'pf_ledger_entries',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    entryDate: day('entry_date').notNull(),
+    type: text('type', {
+      enum: ['opening', 'contribution', 'interest', 'withdrawal', 'settlement', 'adjustment'],
+    }).notNull(),
+    credit: money('credit').notNull().default(0),
+    debit: money('debit').notNull().default(0),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    index('pf_ledger_entries_staff_idx').on(t.staffId, t.entryDate),
+    check(
+      'pf_ledger_entries_type_ck',
+      sql`${t.type} in ('opening', 'contribution', 'interest', 'withdrawal', 'settlement', 'adjustment')`,
+    ),
+    check(
+      'pf_ledger_entries_amount_ck',
+      sql`${t.credit} >= 0 and ${t.debit} >= 0 and (${t.credit} > 0) <> (${t.debit} > 0)`,
+    ),
+  ],
+);
+
+// Old Payroll.StaffGlobalLedgers: what staff owe a service unit (e.g. canteen or pharmacy on credit) and
+// what they paid back. The running balance is worked out, not stored.
+export const staffDues = pgTable(
+  'staff_dues',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    serviceUnitId: uuid('service_unit_id').references(() => serviceUnits.id, { onDelete: 'restrict' }),
+    entryDate: day('entry_date').notNull(),
+    particulars: text('particulars').notNull(),
+    debit: money('debit').notNull().default(0),
+    credit: money('credit').notNull().default(0),
+    reference: text('reference'),
+    ...timestamps,
+  },
+  (t) => [
+    index('staff_dues_staff_idx').on(t.staffId, t.entryDate),
+    check('staff_dues_particulars_len_ck', sql`char_length(${t.particulars}) between 1 and 300`),
+    check('staff_dues_amount_ck', sql`${t.debit} >= 0 and ${t.credit} >= 0 and (${t.debit} > 0) <> (${t.credit} > 0)`),
   ],
 );

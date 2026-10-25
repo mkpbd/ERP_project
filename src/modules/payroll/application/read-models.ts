@@ -1,5 +1,10 @@
 import type { Page, PageRequest } from '../../../shared/application/pagination.js';
-import type { SalarySheetLine } from '../domain/repositories.js';
+import type {
+  FestivalBonusLine,
+  FestivalBonusSchedule,
+  LeaveEncashmentLine,
+  SalarySheetLine,
+} from '../domain/repositories.js';
 import type { SalarySheetStatus } from '../domain/salary-sheet.js';
 import type { IncrementMethod, IncrementStatus, SalaryBreakdown, SalarySnapshot } from '../domain/salary.js';
 
@@ -8,6 +13,28 @@ export interface SavedSalarySheet {
   readonly approvedAt: Date;
   readonly committedAt: Date | null;
   readonly lines: SalarySheetLine[];
+}
+
+export interface FestivalBonusSheet {
+  readonly schedule: FestivalBonusSchedule & { readonly festivalName: string };
+  /** null: no approved sheet yet. */
+  readonly status: 'approved' | 'committed' | null;
+  readonly lines: FestivalBonusLine[];
+}
+
+/** A movement on a PF or dues account; balance is after it. */
+export interface LedgerRow {
+  readonly date: string;
+  readonly description: string;
+  readonly credit: number;
+  readonly debit: number;
+  readonly balance: number;
+}
+
+export interface LedgerStatement {
+  readonly opening: number;
+  readonly rows: LedgerRow[];
+  readonly closing: number;
 }
 
 export interface StaffSalaryView extends SalaryBreakdown {
@@ -92,4 +119,11 @@ export abstract class PayrollReadRepository {
   /** The saved sheet of a pay month with its lines (by department, then employee number), or null. */
   abstract savedSheet(year: number, month: number): Promise<SavedSalarySheet | null>;
   abstract sheetLine(year: number, month: number, staffId: string): Promise<SalarySheetLine | null>;
+  /** The bonus schedule with its saved sheet (lines empty when none), or null for an unknown bonus. */
+  abstract festivalBonusSheet(bonusId: string): Promise<FestivalBonusSheet | null>;
+  abstract leaveEncashments(payYear: number, payMonth: number): Promise<LeaveEncashmentLine[]>;
+  /** PF deducted on committed salary sheets plus PF ledger entries, with a running balance. */
+  abstract pfStatement(staffId: string, from: string, to: string): Promise<LedgerStatement>;
+  /** Dues owed (debit) less paid (credit), optionally for one service unit, with a running balance. */
+  abstract duesStatement(staffId: string, from: string, to: string, serviceUnitId?: string): Promise<LedgerStatement>;
 }

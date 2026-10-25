@@ -11,6 +11,8 @@ import {
 } from '../../domain/repositories.js';
 import {
   allowancePayments,
+  festivalBonuses,
+  festivalBonusLines,
   salaryArrears,
   salaryDeductions,
   salaryIncrements,
@@ -86,6 +88,20 @@ export class DrizzleSalarySheetRepository extends SalarySheetRepository {
           pay(salaryPayments),
         ),
       ]);
+    // Approved festival bonuses paid with this month's salary.
+    const bonusRows = await this.context.db
+      .select({ staffId: festivalBonusLines.staffId, amount: sum(festivalBonusLines.amount).mapWith(Number) })
+      .from(festivalBonusLines)
+      .innerJoin(festivalBonuses, eq(festivalBonuses.id, festivalBonusLines.bonusId))
+      .where(
+        and(
+          eq(festivalBonuses.payWithSalary, true),
+          eq(festivalBonuses.payYear, year),
+          eq(festivalBonuses.payMonth, month),
+        ),
+      )
+      .groupBy(festivalBonusLines.staffId);
+    const bonuses = new Map(bonusRows.map((row) => [row.staffId, row.amount ?? 0]));
     const of = (totals: Totals, staffId: string, key: string) => totals.get(staffId)?.[key] ?? 0;
     return salaries.map((salary) => ({
       staffId: salary.staffId,
@@ -100,6 +116,7 @@ export class DrizzleSalarySheetRepository extends SalarySheetRepository {
       specialAllowance: of(allowances, salary.staffId, 'special'),
       advance: of(payments, salary.staffId, 'advance'),
       paid: of(payments, salary.staffId, 'paid'),
+      festivalBonus: bonuses.get(salary.staffId) ?? 0,
     }));
   }
 

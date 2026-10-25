@@ -41,11 +41,7 @@ export class SalarySheetBuilder {
       .flatMap((fact) => {
         const person = people.get(fact.staffId);
         if (!person || person.status !== 'active' || !joinedBy(person.joiningDate, year, month)) return [];
-        const amounts = salaryLine(
-          { ...fact, joiningDate: person.joiningDate, festivalBonus: 0, incomeTax: 0 },
-          year,
-          month,
-        );
+        const amounts = salaryLine({ ...fact, joiningDate: person.joiningDate, incomeTax: 0 }, year, month);
         return [
           {
             staffId: person.id,

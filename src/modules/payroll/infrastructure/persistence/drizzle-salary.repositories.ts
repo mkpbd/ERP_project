@@ -13,6 +13,8 @@ import {
   type IncrementCandidate,
   type IncrementFilter,
   type SalaryIncrementView,
+  type FestivalBonusSheet,
+  type LedgerStatement,
   type SalaryListFilter,
   type SavedSalarySheet,
   type StaffSalaryView,
@@ -21,6 +23,7 @@ import {
   SalaryIncrementRepository,
   SalaryPolicyRepository,
   StaffSalaryRepository,
+  type LeaveEncashmentLine,
   type SalarySheetLine,
 } from '../../domain/repositories.js';
 import {
@@ -31,11 +34,16 @@ import {
   type SalaryPolicyTerms,
 } from '../../domain/salary.js';
 import {
+  festivalBonuses,
+  festivalBonusLines,
+  leaveEncashments,
+  pfLedgerEntries,
   salaryIncrements,
   salaryPolicies,
   salaryReviewCycles,
   salarySheetLines,
   salarySheets,
+  staffDues,
   staffSalaries,
 } from './payroll.schema.js';
 
@@ -334,4 +342,140 @@ export class DrizzlePayrollReadRepository extends PayrollReadRepository {
     const { sheetId: _sheet, ...line } = row.line;
     return line;
   }
+
+  async festivalBonusSheet(bonusId: string): Promise<FestivalBonusSheet | null> {
+    const [schedule] = await this.context.db
+      .select({
+        id: festivalBonuses.id,
+        festivalId: festivalBonuses.festivalId,
+        payYear: festivalBonuses.payYear,
+        payMonth: festivalBonuses.payMonth,
+        percentOfBasic: festivalBonuses.percentOfBasic,
+        joinedBy: festivalBonuses.joinedBy,
+        payWithSalary: festivalBonuses.payWithSalary,
+      })
+      .from(festivalBonuses)
+      .where(eq(festivalBonuses.id, bonusId));
+    if (!schedule) return null;
+    const [rows, festivalName] = await Promise.all([
+      this.context.db
+        .select()
+        .from(festivalBonusLines)
+        .where(eq(festivalBonusLines.bonusId, bonusId))
+        .orderBy(asc(festivalBonusLines.department), asc(festivalBonusLines.employeeNo)),
+      this.staff.festivalName(schedule.festivalId),
+    ]);
+    return {
+      schedule: { ...schedule, festivalName: festivalName ?? '' },
+      status: rows[0]?.status ?? null,
+      lines: rows.map(({ bonusId: _bonus, status: _status, approvedBy: _by, approvedAt: _at, ...line }) => line),
+    };
+  }
+
+  async leaveEncashments(payYear: number, payMonth: number): Promise<LeaveEncashmentLine[]> {
+    const rows = await this.context.db
+      .select()
+      .from(leaveEncashments)
+      .where(and(eq(leaveEncashments.payYear, payYear), eq(leaveEncashments.payMonth, payMonth)))
+      .orderBy(asc(leaveEncashments.department), asc(leaveEncashments.employeeNo));
+    return rows.map(
+      ({ payYear: _year, payMonth: _month, leaveYear: _leave, approvedBy: _by, approvedAt: _at, ...line }) => line,
+    );
+  }
+
+  async pfStatement(staffId: string, from: string, to: string): Promise<LedgerStatement> {
+    const [deductions, entries] = await Promise.all([
+      this.context.db
+        .select({ year: salarySheets.year, month: salarySheets.month, pf: salarySheetLines.pf })
+        .from(salarySheetLines)
+        .innerJoin(salarySheets, eq(salarySheets.id, salarySheetLines.sheetId))
+        .where(and(eq(salarySheetLines.staffId, staffId), eq(salarySheets.status, 'committed'))),
+      this.context.db.select().from(pfLedgerEntries).where(eq(pfLedgerEntries.staffId, staffId)),
+    ]);
+    const movements = [
+      ...entries.map((entry) => ({
+        date: entry.entryDate,
+        description: [PF_ENTRY_LABELS[entry.type], entry.remarks].filter(Boolean).join(' — '),
+        credit: entry.credit,
+        debit: entry.debit,
+      })),
+      ...deductions
+        .filter((row) => row.pf > 0)
+        .map((row) => ({
+          date: monthEnd(row.year, row.month),
+          description: `PF deduction, ${MONTH_NAMES[row.month - 1]} ${row.year}`,
+          credit: row.pf,
+          debit: 0,
+        })),
+    ];
+    return statement(movements, from, to, (credit, debit) => credit - debit);
+  }
+
+  async duesStatement(staffId: string, from: string, to: string, serviceUnitId?: string): Promise<LedgerStatement> {
+    const rows = await this.context.db
+      .select()
+      .from(staffDues)
+      .where(
+        and(eq(staffDues.staffId, staffId), serviceUnitId ? eq(staffDues.serviceUnitId, serviceUnitId) : undefined),
+      );
+    return statement(
+      rows.map((row) => ({
+        date: row.entryDate,
+        description: [row.particulars, row.reference].filter(Boolean).join(' — '),
+        credit: row.credit,
+        debit: row.debit,
+      })),
+      from,
+      to,
+      (credit, debit) => debit - credit,
+    );
+  }
+}
+
+const MONTH_NAMES = [
+  'January',
+  'February',
+  'March',
+  'April',
+  'May',
+  'June',
+  'July',
+  'August',
+  'September',
+  'October',
+  'November',
+  'December',
+];
+const PF_ENTRY_LABELS = {
+  opening: 'Opening balance',
+  contribution: 'Contribution',
+  interest: 'Interest',
+  withdrawal: 'Withdrawal',
+  settlement: 'Settlement',
+  adjustment: 'Adjustment',
+} as const;
+
+const monthEnd = (year: number, month: number) =>
+  `${year}-${String(month).padStart(2, '0')}-${String(new Date(Date.UTC(year, month, 0)).getUTCDate()).padStart(2, '0')}`;
+const cents = (amount: number) => Math.round(amount * 100) / 100;
+
+/** Opening balance before `from`, then each movement up to `to` with the running balance. */
+function statement(
+  movements: { date: string; description: string; credit: number; debit: number }[],
+  from: string,
+  to: string,
+  effect: (credit: number, debit: number) => number,
+): LedgerStatement {
+  const sorted = [...movements].sort((a, b) => a.date.localeCompare(b.date));
+  let balance = cents(
+    sorted.filter((movement) => movement.date < from).reduce((sum, m) => sum + effect(m.credit, m.debit), 0),
+  );
+  const opening = balance;
+  const rows = sorted
+    .filter((movement) => movement.date >= from && movement.date <= to)
+    .map((movement) => {
+      balance = cents(balance + effect(movement.credit, movement.debit));
+      return { ...movement, balance };
+    });
+  return { opening, rows, closing: balance };
 }

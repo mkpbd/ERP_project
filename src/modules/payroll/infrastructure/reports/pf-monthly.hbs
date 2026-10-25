@@ -1,0 +1,21 @@
+{{#if data.lines.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th><th>Name</th><th>Designation</th><th>Department</th><th>Joined</th><th class="num">PF</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{designation}}</td>
+      <td>{{department}}</td><td>{{date joiningDate}}</td><td class="num">{{money pf}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Total ({{data.lines.length}})</td><td class="num">{{money data.total}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p class="empty">No PF was deducted in this month.</p>
+{{/if}}

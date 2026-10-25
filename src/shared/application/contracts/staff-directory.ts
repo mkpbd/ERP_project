@@ -28,4 +28,13 @@ export abstract class StaffDirectory {
   abstract findSummaries(staffIds: readonly string[]): Promise<StaffSummary[]>;
   abstract search(search: StaffSearch): Promise<StaffSummary[]>;
   abstract staffIdForUser(userId: string): Promise<string | null>;
+  /** A festival's name, or null when unknown. */
+  abstract festivalName(festivalId: string): Promise<string | null>;
+  /** Staff who observe a festival (for festival bonuses). */
+  abstract festivalObservers(festivalId: string): Promise<string[]>;
+  /**
+   * Leave days taken in a calendar year (approved applications plus recorded leave, by start date), per person.
+   * People with none are left out.
+   */
+  abstract leaveDaysTaken(year: number, staffIds: readonly string[]): Promise<Map<string, number>>;
 }

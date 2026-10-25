@@ -36,6 +36,8 @@ export interface SalaryLineFacts {
   readonly specialAllowance: number;
   readonly advance: number;
   readonly paid: number;
+  /** Approved festival bonuses paid with this month's salary. */
+  readonly festivalBonus: number;
 }
 
 /** A person's line on an approved sheet, with their details as they were. */
@@ -73,4 +75,74 @@ export abstract class SalarySheetRepository {
 /** Whether a pay month's salary sheet is committed; its inputs can no longer change. */
 export abstract class PayPeriods {
   abstract isClosed(year: number, month: number): Promise<boolean>;
+}
+
+export interface FestivalBonusSchedule {
+  readonly id: string;
+  readonly festivalId: string;
+  readonly payYear: number;
+  readonly payMonth: number;
+  readonly percentOfBasic: number;
+  readonly joinedBy: string;
+  readonly payWithSalary: boolean;
+}
+
+/** One person's bonus on an approved bonus sheet, with their details as they were. */
+export interface FestivalBonusLine {
+  readonly staffId: string;
+  readonly employeeNo: string;
+  readonly fullName: string;
+  readonly departmentId: string;
+  readonly department: string;
+  readonly designation: string;
+  readonly joiningDate: string;
+  readonly paymentMode: string | null;
+  readonly bankAccountNo: string | null;
+  readonly gross: number;
+  readonly basic: number;
+  readonly amount: number;
+}
+
+export abstract class FestivalBonusRepository {
+  /** Locks the schedule row until the transaction ends. */
+  abstract lock(bonusId: string): Promise<FestivalBonusSchedule | null>;
+  /** 'none' when the bonus has no approved sheet. */
+  abstract sheetStatus(bonusId: string): Promise<'none' | 'approved' | 'committed'>;
+  abstract replaceLines(
+    bonusId: string,
+    lines: readonly FestivalBonusLine[],
+    approvedBy: string,
+    approvedAt: Date,
+  ): Promise<void>;
+  abstract commit(bonusId: string): Promise<void>;
+  abstract removeLines(bonusId: string): Promise<number>;
+}
+
+export interface LeaveEncashmentLine {
+  readonly staffId: string;
+  readonly employeeNo: string;
+  readonly fullName: string;
+  readonly departmentId: string;
+  readonly department: string;
+  readonly designation: string;
+  readonly joiningDate: string;
+  readonly paymentMode: string | null;
+  readonly gross: number;
+  readonly entitledDays: number;
+  readonly takenDays: number;
+  readonly remainingDays: number;
+  readonly perDay: number;
+  readonly amount: number;
+}
+
+export abstract class LeaveEncashmentRepository {
+  abstract replace(
+    payYear: number,
+    payMonth: number,
+    leaveYear: number,
+    lines: readonly LeaveEncashmentLine[],
+    approvedBy: string,
+    approvedAt: Date,
+  ): Promise<void>;
+  abstract remove(payYear: number, payMonth: number): Promise<number>;
 }

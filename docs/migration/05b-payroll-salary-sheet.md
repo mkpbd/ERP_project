@@ -1,6 +1,6 @@
 # Step 5b — Payroll: monthly salary
 
-Status: **done** (2026-10-25). Previous: [step 5a](05a-payroll-salaries.md) · Next: step 5c (bonus, encashment, PF
+Status: **done** (2026-10-25). Previous: [step 5a](05a-payroll-salaries.md) · Next: [step 5c](05c-payroll-bonus-ledgers.md) (bonus, encashment, PF
 ledger).
 
 The reference is FAK's live logic, the Bellevue procedures `Payroll.spGetHrSalarySheet` and
@@ -25,7 +25,7 @@ The reference is FAK's live logic, the Bellevue procedures `Payroll.spGetHrSalar
 | `spGetDeptWiseHrSalarySummary` | Report `payroll.department-summary` |
 | `Reports/Kham` (`KhamDocument`) | Report `payroll.salary-envelope` |
 | `spGetInActiveHrSalarySheet`, gross/LWP/overtime/punishment/deduction statements, `…Dynamic` variants | Data available through the sheet and the input lists (filters by person and month); printable variants can follow |
-| Festival bonus inside the sheet (`FestivalBonuses`, basic ÷ 2) | Step 5c; the column is 0 until then |
+| Festival bonus inside the sheet (`FestivalBonuses`, basic ÷ 2) | Step 5c: approved bonuses paid with salary |
 | Income tax (`IndividualSalariesIncomeTax.NetTaxPayablePerMonth`) | Step 5d; the column is 0 until then |
 | `EmployeeSalaryStops` / `spGetSalaryStopEmployee` | Not ported: a Bellevue table FAK does not have |
 
@@ -40,7 +40,7 @@ procedure also listed people who had not joined yet; they are left out).
 | Gross | Their sum (= the structure's gross) |
 | Allowance, special allowance | Sums of the month's allowance payments (the structure's special allowance is **not** paid, as in the old sheet) |
 | Overtime | gross ÷ (days of the **previous** month × 8) × hours + fixed overtime amounts |
-| Festival bonus | 0 until step 5c |
+| Festival bonus | Approved festival bonuses marked "pay with salary" for this month ([step 5c](05c-payroll-bonus-ledgers.md)) |
 | Arrear | Arrear records + increment arrears of the month; someone who joined during the month has gross ÷ days × (joining day − 1) taken off here |
 | Total payable | gross + allowance + special + arrear + overtime + bonus |
 | PF | From the structure (0 when PF is off) |

@@ -1,0 +1,28 @@
+{{#if data.lines.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Employee no</th><th>Name</th><th>Designation</th><th>Department</th><th>Joined</th>
+      <th class="num">Gross</th><th class="num">Entitled</th><th class="num">Taken</th><th class="num">Remaining</th>
+      <th class="num">Per day</th><th class="num">Amount</th><th style="width: 80px">Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{employeeNo}}</td><td>{{fullName}}</td><td>{{designation}}</td>
+      <td>{{department}}</td><td>{{date joiningDate}}</td><td class="num">{{money gross}}</td>
+      <td class="num">{{entitledDays}}</td><td class="num">{{takenDays}}</td><td class="num">{{remainingDays}}</td>
+      <td class="num">{{money perDay}}</td><td class="num">{{money amount}}</td><td></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="11">Total ({{data.lines.length}})</td><td class="num">{{money data.total}}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords data.total}}</p>
+{{else}}
+<p class="empty">No leave encashment is saved for this month.</p>
+{{/if}}

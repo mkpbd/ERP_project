@@ -45,6 +45,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
     truncate table audit_logs, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,
       email_verification_tokens, role_reports, role_menus, menus,
+      festival_bonus_lines, festival_bonuses, leave_encashments, pf_ledger_entries, staff_dues,
       salary_sheet_lines, salary_sheets, salary_overtimes, salary_deductions, salary_punishments, salary_arrears,
       allowance_payments, salary_payments, salary_stops,
       salary_increments, staff_salaries, salary_review_cycles, salary_policies,

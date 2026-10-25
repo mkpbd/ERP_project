@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 11 });
+    expect(applied.rows[0]).toEqual({ n: 12 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -61,6 +61,8 @@ describe('migrations', () => {
       'editor_shortcuts',
       'email_verification_tokens',
       'extra_duties',
+      'festival_bonus_lines',
+      'festival_bonuses',
       'festivals',
       'govt_holidays',
       'hr_departments',
@@ -75,6 +77,7 @@ describe('migrations', () => {
       'leave_applications',
       'leave_approval_levels',
       'leave_delegates',
+      'leave_encashments',
       'leave_policies',
       'leave_policy_entitlements',
       'leave_records',
@@ -86,6 +89,7 @@ describe('migrations', () => {
       'payment_channels',
       'payment_modes',
       'permissions',
+      'pf_ledger_entries',
       'printers',
       'refresh_tokens',
       'role_menus',
@@ -110,6 +114,7 @@ describe('migrations', () => {
       'shift_types',
       'staff_days_off',
       'staff_documents',
+      'staff_dues',
       'staff_education',
       'staff_emergency_contacts',
       'staff_festivals',
