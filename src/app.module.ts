@@ -13,6 +13,7 @@ import { AdministrationModule } from './modules/administration/administration.mo
 import { AuditModule } from './modules/audit/audit.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
+import { HrModule } from './modules/hr/hr.module.js';
 import { AuthenticationGuard } from './modules/identity/presentation/authentication.guard.js';
 import { LocationModule } from './modules/location/location.module.js';
 import { NavigationModule } from './modules/navigation/navigation.module.js';
@@ -85,6 +86,7 @@ export class AppModule {
         LocationModule,
         AdministrationModule,
         ReportingModule,
+        HrModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

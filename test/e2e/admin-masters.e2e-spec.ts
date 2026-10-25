@@ -175,11 +175,20 @@ describe('tenants', () => {
       .set('Content-Type', 'application/json')
       .send({ not: 'an image' })
       .expect(400);
-    await request(http)
+    // Over the logo limit (1 MiB) but under the upload limit (5 MiB): refused by the domain rule.
+    const tooBig = await request(http)
       .put(`/api/v1/admin/tenants/${tenant}/logos/primary`)
       .set(bearer(admin))
       .set('Content-Type', 'image/png')
       .send(Buffer.concat([PNG, Buffer.alloc(1024 * 1024)]))
+      .expect(422);
+    expect(tooBig.body.code).toBe('invalid_logo');
+    // Over the upload limit: refused by the body parser.
+    await request(http)
+      .put(`/api/v1/admin/tenants/${tenant}/logos/primary`)
+      .set(bearer(admin))
+      .set('Content-Type', 'image/png')
+      .send(Buffer.concat([PNG, Buffer.alloc(5 * 1024 * 1024)]))
       .expect(413);
     await request(http).get(`/api/v1/admin/tenants/${tenant}/logos/secondary`).set(bearer(admin)).expect(404);
 

@@ -46,7 +46,10 @@ Order follows dependencies: later modules reference earlier ones.
 | 1 | Menus, page access; identity/role mapping | **Done** | [01-menus-and-page-access.md](01-menus-and-page-access.md) |
 | 2 | Admin masters (departments, service units, serve types, printers, discount categories, payment modes/channels, editor shortcuts, page controls), tenants + logos, locations, settings (AppSettings, EditorMargins); shared simple-record toolkit | **Done** | [02-admin-masters-locations-settings.md](02-admin-masters-locations-settings.md) |
 | 3 | Reporting foundation: Chromium HTML→PDF + pdfmake + exceljs, report catalog in code, role grants, audited runs (replaces `Web/Report`, `ReportAndSps`, `ReportPermissions`, dynamic SP reports) | **Done** | [03-reporting-foundation.md](03-reporting-foundation.md) |
-| 4 | HR (staff records, departments, designations), Attendance | Planned | |
+| 4a | HR: organization structure, staff records (education, contacts, festivals, photo, documents), department incharges, holidays, festivals, employee reports | **Done** | [04a-hr-staff-records.md](04a-hr-staff-records.md) |
+| 4b | HR: leave types, policies, applications, multi-level approval, leave records, leave reports | Next | |
+| 4c | HR: duty roster, doctors' days off, attendance (manual + device logs), attendance reports | Planned | |
+| 4d | HR: recruitment (job circulars, CVs), remaining HR reports | Planned | |
 | 5 | Payroll, PFBook, TDS/VAT/TAX | Planned | |
 | 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |

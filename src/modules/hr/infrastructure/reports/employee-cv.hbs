@@ -1,0 +1,63 @@
+<style>
+  .cv-head { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 10px; }
+  .cv-head img { width: 96px; height: 112px; object-fit: cover; border: 1px solid #999; }
+  .cv-head .who { flex: 1; }
+  .cv-head .who .name { font-size: 15px; font-weight: 700; }
+  h2 { font-size: 12px; margin: 12px 0 4px; border-bottom: 1px solid #999; padding-bottom: 2px; }
+  table.kv { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  table.kv td { padding: 2px 4px; vertical-align: top; }
+  table.kv td.k { width: 22%; color: #444; }
+</style>
+{{#with data}}
+<div class="cv-head">
+  {{#if photoDataUri}}<img src="{{photoDataUri}}" alt="">{{/if}}
+  <div class="who">
+    <div class="name">{{fullName}}</div>
+    <div>{{designation}} — {{department}} / {{subDepartment}}</div>
+    <div>Employee no: {{employeeNo}} · Status: {{statusLabel}}{{#if separationDate}} (separated {{date separationDate}}){{/if}}</div>
+  </div>
+</div>
+
+<h2>Personal</h2>
+<table class="kv">
+  <tr><td class="k">Father's name</td><td>{{fatherName}}</td><td class="k">Mother's name</td><td>{{motherName}}</td></tr>
+  <tr><td class="k">Date of birth</td><td>{{date dateOfBirth}}</td><td class="k">Sex</td><td>{{sex}}</td></tr>
+  <tr><td class="k">Marital status</td><td>{{maritalStatus}}</td><td class="k">Religion</td><td>{{religion}}</td></tr>
+  <tr><td class="k">Blood group</td><td>{{bloodGroup}}</td><td class="k">Nationality</td><td>{{nationality}}</td></tr>
+  <tr><td class="k">NID / passport</td><td>{{nationalIdOrPassport}}</td><td class="k">TIN</td><td>{{tinNo}}</td></tr>
+  <tr><td class="k">Mobile</td><td>{{mobileNo}}</td><td class="k">Email</td><td>{{email}}</td></tr>
+  <tr><td class="k">Present address</td><td colspan="3">{{presentAddress}}</td></tr>
+  <tr><td class="k">Permanent address</td><td colspan="3">{{permanentAddress}}</td></tr>
+</table>
+
+<h2>Employment</h2>
+<table class="kv">
+  <tr><td class="k">Joining date</td><td>{{date joiningDate}}</td><td class="k">Confirmation date</td><td>{{date confirmationDate}}</td></tr>
+  <tr><td class="k">Service nature</td><td>{{serviceNature}}</td><td class="k">Salary status</td><td>{{salaryStatus}}</td></tr>
+  <tr><td class="k">Job location</td><td>{{jobLocation}}</td><td class="k">Working time</td><td>{{workingTime}}</td></tr>
+  {{#if medicalCouncilNo}}<tr><td class="k">BMDC no</td><td colspan="3">{{medicalCouncilNo}}</td></tr>{{/if}}
+  {{#if nursingCouncilNo}}<tr><td class="k">BNMC no</td><td colspan="3">{{nursingCouncilNo}}</td></tr>{{/if}}
+</table>
+
+<h2>Education</h2>
+{{#if education.length}}
+<table class="report">
+  <thead><tr><th>Exam</th><th>Subject</th><th>Board / institute</th><th>Year</th><th>Result</th></tr></thead>
+  <tbody>
+    {{#each education}}
+    <tr><td>{{examName}}</td><td>{{subject}}</td><td>{{board}}</td><td>{{passingYear}}</td><td>{{result}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Not recorded.</p>{{/if}}
+
+<h2>Emergency contacts</h2>
+{{#if contacts.length}}
+<table class="report">
+  <thead><tr><th>Name</th><th>Relation</th><th>Contact</th></tr></thead>
+  <tbody>
+    {{#each contacts}}<tr><td>{{name}}</td><td>{{relation}}</td><td>{{contact}}</td></tr>{{/each}}
+  </tbody>
+</table>
+{{else}}<p class="muted">Not recorded.</p>{{/if}}
+{{/with}}

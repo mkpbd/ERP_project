@@ -110,6 +110,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `/admin/settings/{general,editor-margins}` | `GET`: authenticated; `PATCH`: `settings:manage` |
 | `GET /reports`, `GET /reports/:key`, `POST /reports/:key/render` | authenticated; the report must be granted to one of your roles (or `reports:access-all`) |
 | `GET /reports/catalog`, `GET /roles/:id/reports` / `PUT /roles/:id/reports` | `reports:read` / `reports:assign` + may only grant reports you can run |
+| `/hr/{divisions,departments,sub-departments,designations,festivals,govt-holidays}` | read: authenticated; write: `hr-masters:manage` |
+| `/hr/department-incharges` | read: authenticated; write: `hr:manage` |
+| `GET /hr/staff`, `GET /hr/staff/:id[/photo,/documents/:documentId]` | `hr:read`, or your own linked record (`GET /hr/staff/me`) |
+| `POST/PATCH /hr/staff…` (status, lists, photo, documents) | `hr:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

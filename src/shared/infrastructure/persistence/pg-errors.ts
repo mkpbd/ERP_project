@@ -27,6 +27,11 @@ export function foreignKeyViolationConstraint(error: unknown): string | null {
   return violatedConstraint(error, '23503', '23001');
 }
 
+/** Returns the violated constraint name when `error` (or its cause) is a CHECK violation. */
+export function checkViolationConstraint(error: unknown): string | null {
+  return violatedConstraint(error, '23514');
+}
+
 /** Escapes LIKE wildcards so user input is matched literally. */
 export function escapeLike(value: string): string {
   return value.replace(/[\\%_]/g, (char) => `\\${char}`);

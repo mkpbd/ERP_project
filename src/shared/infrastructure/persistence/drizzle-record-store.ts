@@ -1,9 +1,9 @@
-import { and, asc, eq } from 'drizzle-orm';
+import { and, asc, eq, gte, lte } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { DbContext } from '../../../database/drizzle-transaction-manager.js';
 import { RecordStore, type RecordFilter } from '../../application/records.js';
-import { ConflictError, NotFoundError } from '../../domain/errors.js';
-import { foreignKeyViolationConstraint, uniqueViolationConstraint } from './pg-errors.js';
+import { ConflictError, DomainError, NotFoundError } from '../../domain/errors.js';
+import { checkViolationConstraint, foreignKeyViolationConstraint, uniqueViolationConstraint } from './pg-errors.js';
 
 /** A record table: uuid `id`, `created_at`, `updated_at`, plus its own columns. */
 export type RecordTable = PgTable & {
@@ -16,8 +16,8 @@ export interface RecordStoreOptions {
   /** snake_case record name, for `<name>_in_use` and default conflict codes. */
   readonly name: string;
   readonly orderBy: readonly PgColumn[];
-  /** Allowed list filters: query key → column (equality). */
-  readonly filters?: Readonly<Record<string, PgColumn>>;
+  /** Allowed list filters: query key → column (equality), or `{ column, op }` for a range bound. */
+  readonly filters?: Readonly<Record<string, PgColumn | { readonly column: PgColumn; readonly op: 'gte' | 'lte' }>>;
   /** Unique constraint name → reported conflict. */
   readonly unique?: Readonly<Record<string, { readonly code: string; readonly message: string }>>;
   /** Foreign key constraint name → referenced record, reported as `<record>_not_found`. */
@@ -39,8 +39,10 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
 
   async list(filter: RecordFilter): Promise<TView[]> {
     const conditions = Object.entries(filter).flatMap(([key, value]) => {
-      const column = this.options.filters?.[key];
-      return column && value !== undefined ? [eq(column, value)] : [];
+      const spec = this.options.filters?.[key];
+      if (!spec || value === undefined) return [];
+      if (!('op' in spec)) return [eq(spec, value)];
+      return [spec.op === 'gte' ? gte(spec.column, value) : lte(spec.column, value)];
     });
     const rows: unknown[] = await this.context.db
       .select()
@@ -104,6 +106,10 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
         throw new ConflictError(`${this.options.name}_in_use`, 'Other records still refer to this one');
       }
       throw new NotFoundError(this.options.references?.[foreignKey] ?? 'referenced_record');
+    }
+    const check = checkViolationConstraint(error);
+    if (check !== null) {
+      throw new DomainError(`invalid_${this.options.name}`, `The values break the rule ${check}`);
     }
     throw error;
   }

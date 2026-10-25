@@ -27,6 +27,7 @@ src/
     ├── location/        countries, divisions, districts (simple records)
     ├── administration/  admin masters, tenants + logos, settings documents, OrganizationProfile
     ├── reporting/       report catalog, role grants, PDF (Chromium / pdfmake) and Excel rendering
+    ├── hr/              HR org structure, staff records (+ photo, documents), holidays, festivals
     └── health/          liveness/readiness
 ```
 
@@ -54,6 +55,8 @@ Modules never import each other. Cross-module needs go through abstract contract
 
 * `AccessControl` (access-control) — profile lookup, `authorize()`, last-super-admin guard, admin bootstrap.
 * `UserDirectory` (identity) — read-only user summaries for other modules.
+* `OrganizationProfile` (administration) — the report letterhead.
+* `LocationDirectory` (location) — nationality lookups.
 
 The one sanctioned exception: a module's Drizzle schema (`*.schema.ts`) may reference another module's
 tables for foreign keys (`access-control` → `users`, `navigation` → `roles`, `users`). All modules live in

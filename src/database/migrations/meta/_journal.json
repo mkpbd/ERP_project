@@ -29,6 +29,13 @@
       "when": 1792933553151,
       "tag": "0003_reporting",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792934871487,
+      "tag": "0004_hr_core",
+      "breakpoints": true
     }
   ]
 }
