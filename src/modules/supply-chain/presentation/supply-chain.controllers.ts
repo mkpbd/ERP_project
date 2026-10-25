@@ -56,6 +56,13 @@ import {
   UpdateSubStoreDto,
   UpdateSupplierDto,
   UpdateSupplierTypeDto,
+  CreatePurchaseApprovalLevelDto,
+  UpdatePurchaseApprovalLevelDto,
+  PurchaseApprovalLevelFilterDto,
+  PurchaseApprovalLevelResponseDto,
+  CreateCsApprovalLevelDto,
+  UpdateCsApprovalLevelDto,
+  CsApprovalLevelResponseDto,
 } from './dto/supply-chain.dto.js';
 
 const scm = { tag: 'supply-chain', readPermission: 'scm:read', managePermission: 'scm:manage' } as const;
@@ -235,6 +242,29 @@ export const SuppliersController = createRecordController({
   filter: SupplierFilterDto,
 });
 
+export const PurchaseApprovalLevelsController = createRecordController({
+  ...scm,
+  className: 'PurchaseApprovalLevelsController',
+  path: 'scm/purchase-approval-levels',
+  type: R.purchaseApprovalLevel,
+  label: 'requisition approval level',
+  create: CreatePurchaseApprovalLevelDto,
+  update: UpdatePurchaseApprovalLevelDto,
+  response: PurchaseApprovalLevelResponseDto,
+  filter: PurchaseApprovalLevelFilterDto,
+});
+
+export const CsApprovalLevelsController = createRecordController({
+  ...scm,
+  className: 'CsApprovalLevelsController',
+  path: 'scm/cs-approval-levels',
+  type: R.csApprovalLevel,
+  label: 'comparative study approval level',
+  create: CreateCsApprovalLevelDto,
+  update: UpdateCsApprovalLevelDto,
+  response: CsApprovalLevelResponseDto,
+});
+
 export const SCM_RECORD_CONTROLLERS = [
   MainStoresController,
   SubStoresController,
@@ -251,4 +281,6 @@ export const SCM_RECORD_CONTROLLERS = [
   RoleGroupRestrictionsController,
   SupplierTypesController,
   SuppliersController,
+  PurchaseApprovalLevelsController,
+  CsApprovalLevelsController,
 ];

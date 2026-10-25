@@ -7,6 +7,7 @@ import {
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
 import { SCM_MANAGE, SCM_READ, SCM_RECORDS as R } from '../../application/supply-chain.constants.js';
 import {
+  csApprovalLevels,
   departmentStoreAccess,
   departmentUsers,
   issueStoreUsers,
@@ -17,6 +18,7 @@ import {
   itemSubGroups,
   itemVariants,
   mainStores,
+  purchaseApprovalLevels,
   roleGroupRestrictions,
   storeDepartments,
   subStores,
@@ -162,6 +164,25 @@ export function supplyChainRecordTypes(context: DbContext): RecordType[] {
         [fk('suppliers', 'gl_account_id', 'gl_accounts')]: 'gl_account',
         [fk('suppliers', 'sub_ledger_id', 'sub_ledgers')]: 'sub_ledger',
       },
+    }),
+    record(R.purchaseApprovalLevel, purchaseApprovalLevels, {
+      orderBy: [purchaseApprovalLevels.mainStoreId, purchaseApprovalLevels.levelOrder],
+      filters: { mainStoreId: purchaseApprovalLevels.mainStoreId },
+      unique: {
+        purchase_approval_levels_order_uq: taken(
+          'purchase_approval_level_exists',
+          'The main store already has this level',
+        ),
+      },
+      references: {
+        [fk('purchase_approval_levels', 'main_store_id', 'main_stores')]: R.mainStore,
+        [fk('purchase_approval_levels', 'role_id', 'roles')]: 'role',
+      },
+    }),
+    record(R.csApprovalLevel, csApprovalLevels, {
+      orderBy: [csApprovalLevels.levelOrder],
+      unique: { cs_approval_levels_order_uq: taken('cs_approval_level_exists', 'This level exists') },
+      references: { [fk('cs_approval_levels', 'approver_staff_id', 'staff_records')]: 'staff' },
     }),
   ];
 }

@@ -44,6 +44,9 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
 export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
     truncate table audit_logs,
+      purchase_order_lines, purchase_orders, comparative_study_approvals, comparative_study_quotes,
+      comparative_studies, cs_approval_levels, purchase_requisition_approvals, purchase_requisition_lines,
+      purchase_requisitions, purchase_approval_levels, scm_sequences,
       department_store_access, issue_store_users, store_department_users, role_group_restrictions, item_variants,
       items, item_sub_groups, item_groups, item_sub_categories, item_categories, suppliers, supplier_types,
       sub_stores, main_stores, store_departments, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,

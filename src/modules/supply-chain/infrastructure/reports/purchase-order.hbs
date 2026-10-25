@@ -1,0 +1,52 @@
+{{#with data.order}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 15%">Order no</td><td><b>{{number}}</b></td><td style="width: 15%">Date</td><td>{{date orderDate}}</td></tr>
+    <tr>
+      <td>To</td>
+      <td><b>{{supplierName}}</b>{{#if supplierAddress}}<br />{{supplierAddress}}{{/if}}{{#if supplierContactNo}}<br />{{supplierContactNo}}{{/if}}</td>
+      <td>Deliver to</td>
+      <td>{{mainStoreName}}{{#if expectedOn}}<br />by {{date expectedOn}}{{/if}}</td>
+    </tr>
+    <tr>
+      <td>Reference</td>
+      <td colspan="3">
+        {{#if requisitionNumber}}Requisition {{requisitionNumber}}{{/if}}
+        {{#if comparativeStudyNumber}} · Comparative study {{comparativeStudyNumber}}{{/if}}
+        · {{../data.status}}{{#if cancelReason}} ({{cancelReason}}){{/if}}
+      </td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Unit</th>
+      <th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th><th class="num">VAT %</th>
+      <th class="num">VAT</th><th class="num">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}{{#if code}} ({{code}}){{/if}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{money rate}}</td>
+      <td class="num">{{money amount}}</td>
+      <td class="num">{{money vatPercent}}</td>
+      <td class="num">{{money vat}}</td>
+      <td class="num">{{money total}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">Total</td><td class="num">{{money amount}}</td><td></td>
+      <td class="num">{{money vat}}</td><td class="num">{{money total}}</td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords total}}</p>
+{{#if terms}}<p><b>Terms and conditions:</b> {{terms}}</p>{{/if}}
+{{#if note}}<p><b>Note:</b> {{note}}</p>{{/if}}
+{{/with}}

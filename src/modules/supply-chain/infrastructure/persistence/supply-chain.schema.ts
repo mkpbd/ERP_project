@@ -3,16 +3,20 @@ import {
   boolean,
   check,
   date,
+  foreignKey,
   index,
   integer,
   numeric,
   pgTable,
+  primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
 import { glAccounts, subLedgers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
+import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { roles } from '../../../access-control/infrastructure/persistence/access-control.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 
@@ -306,6 +310,289 @@ export const suppliers = pgTable(
     check(
       'suppliers_enlistment_ck',
       sql`${t.enlistmentExpiresOn} is null or ${t.enlistedOn} is null or ${t.enlistmentExpiresOn} >= ${t.enlistedOn}`,
+    ),
+  ],
+);
+
+const quantity = (name: string) => numeric(name, { precision: 14, scale: 3, mode: 'number' });
+
+// Document serials per kind and year (old Admin.spGetNextIndentNo; purchase orders used max + 1).
+export const scmSequences = pgTable(
+  'scm_sequences',
+  {
+    kind: text('kind').notNull(),
+    year: smallint('year').notNull(),
+    last: integer('last').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.year] })],
+);
+
+// Old SCMPurchaseApprovalSettings (main store, role, "Level1".."Final"): who approves requisitions, in order.
+export const purchaseApprovalLevels = pgTable(
+  'purchase_approval_levels',
+  {
+    id: uuid('id').primaryKey(),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'cascade' }),
+    levelOrder: smallint('level_order').notNull(),
+    name: text('name').notNull(),
+    roleId: uuid('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'restrict' }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('purchase_approval_levels_order_uq').on(t.mainStoreId, t.levelOrder),
+    check('purchase_approval_levels_order_ck', sql`${t.levelOrder} between 1 and 20`),
+    nameLength('purchase_approval_levels', t.name, 50),
+  ],
+);
+
+// Old PurchaseRequisiontions.
+export const purchaseRequisitions = pgTable(
+  'purchase_requisitions',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'restrict' }),
+    subStoreId: uuid('sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    departmentId: uuid('department_id').references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
+    requisitionDate: day('requisition_date').notNull(),
+    paymentTerm: text('payment_term', { enum: ['cash', 'credit'] }),
+    note: text('note'),
+    terms: text('terms'),
+    status: text('status', { enum: ['draft', 'pending', 'approved', 'rejected', 'cancelled'] }).notNull(),
+    currentLevel: smallint('current_level'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('purchase_requisitions_number_uq').on(t.number),
+    index('purchase_requisitions_status_idx').on(t.status, t.requisitionDate),
+    index('purchase_requisitions_main_store_idx').on(t.mainStoreId),
+    check(
+      'purchase_requisitions_status_ck',
+      sql`${t.status} in ('draft', 'pending', 'approved', 'rejected', 'cancelled')`,
+    ),
+    check(
+      'purchase_requisitions_payment_term_ck',
+      sql`${t.paymentTerm} is null or ${t.paymentTerm} in ('cash', 'credit')`,
+    ),
+    check('purchase_requisitions_level_ck', sql`(${t.status} = 'pending') = (${t.currentLevel} is not null)`),
+  ],
+);
+
+export const purchaseRequisitionLines = pgTable(
+  'purchase_requisition_lines',
+  {
+    requisitionId: uuid('requisition_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    requestedQty: quantity('requested_qty').notNull(),
+    approvedQty: quantity('approved_qty'),
+    description: text('description'),
+  },
+  (t) => [
+    foreignKey({
+      name: 'purchase_requisition_lines_requisition_fk',
+      columns: [t.requisitionId],
+      foreignColumns: [purchaseRequisitions.id],
+    }).onDelete('cascade'),
+    primaryKey({ columns: [t.requisitionId, t.position] }),
+    uniqueIndex('purchase_requisition_lines_variant_uq').on(t.requisitionId, t.variantId),
+    check(
+      'purchase_requisition_lines_qty_ck',
+      sql`${t.requestedQty} > 0 and (${t.approvedQty} is null or ${t.approvedQty} between 0 and ${t.requestedQty})`,
+    ),
+  ],
+);
+
+// Old RequisitionApprovals (one row per level, with the next level's setting id).
+export const purchaseRequisitionApprovals = pgTable(
+  'purchase_requisition_approvals',
+  {
+    requisitionId: uuid('requisition_id').notNull(),
+    levelOrder: smallint('level_order').notNull(),
+    levelName: text('level_name').notNull(),
+    decision: text('decision', { enum: ['approved', 'rejected'] }).notNull(),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at').notNull(),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    foreignKey({
+      name: 'purchase_requisition_approvals_requisition_fk',
+      columns: [t.requisitionId],
+      foreignColumns: [purchaseRequisitions.id],
+    }).onDelete('cascade'),
+    primaryKey({ columns: [t.requisitionId, t.levelOrder] }),
+    check('purchase_requisition_approvals_decision_ck', sql`${t.decision} in ('approved', 'rejected')`),
+  ],
+);
+
+// Old CSApprovalSettings: named staff approve comparative studies in order; a final level ends the approval.
+export const csApprovalLevels = pgTable(
+  'cs_approval_levels',
+  {
+    id: uuid('id').primaryKey(),
+    levelOrder: smallint('level_order').notNull(),
+    name: text('name').notNull(),
+    approverStaffId: uuid('approver_staff_id')
+      .notNull()
+      .references(() => staffRecords.id, { onDelete: 'restrict' }),
+    isFinal: boolean('is_final').notNull().default(false),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('cs_approval_levels_order_uq').on(t.levelOrder),
+    check('cs_approval_levels_order_ck', sql`${t.levelOrder} between 1 and 20`),
+    nameLength('cs_approval_levels', t.name, 50),
+  ],
+);
+
+// Old ComparativeStudies.
+export const comparativeStudies = pgTable(
+  'comparative_studies',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    studyDate: day('study_date').notNull(),
+    requisitionId: uuid('requisition_id').references(() => purchaseRequisitions.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['draft', 'pending', 'approved', 'rejected'] }).notNull(),
+    currentLevel: smallint('current_level'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('comparative_studies_number_uq').on(t.number),
+    index('comparative_studies_status_idx').on(t.status, t.studyDate),
+    check('comparative_studies_status_ck', sql`${t.status} in ('draft', 'pending', 'approved', 'rejected')`),
+    check('comparative_studies_level_ck', sql`(${t.status} = 'pending') = (${t.currentLevel} is not null)`),
+  ],
+);
+
+// Old ComparativeStudyDetails: one supplier's quote for one item.
+export const comparativeStudyQuotes = pgTable(
+  'comparative_study_quotes',
+  {
+    id: uuid('id').primaryKey(),
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => comparativeStudies.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    variantId: uuid('variant_id').references(() => itemVariants.id, { onDelete: 'restrict' }),
+    manualName: text('manual_name'),
+    qty: quantity('qty').notNull(),
+    unitPrice: money('unit_price').notNull(),
+    vatPercent: percent('vat_percent').notNull(),
+    aitPercent: percent('ait_percent').notNull(),
+    vat: money('vat').notNull(),
+    ait: money('ait').notNull(),
+    total: money('total').notNull(),
+    selected: boolean('selected').notNull(),
+  },
+  (t) => [
+    index('comparative_study_quotes_study_idx').on(t.studyId, t.position),
+    check('comparative_study_quotes_item_ck', sql`(${t.variantId} is null) <> (${t.manualName} is null)`),
+    check('comparative_study_quotes_amounts_ck', sql`${t.qty} > 0 and ${t.unitPrice} >= 0 and ${t.total} >= 0`),
+  ],
+);
+
+export const comparativeStudyApprovals = pgTable(
+  'comparative_study_approvals',
+  {
+    studyId: uuid('study_id')
+      .notNull()
+      .references(() => comparativeStudies.id, { onDelete: 'cascade' }),
+    levelOrder: smallint('level_order').notNull(),
+    levelName: text('level_name').notNull(),
+    decision: text('decision', { enum: ['approved', 'rejected'] }).notNull(),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at').notNull(),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.studyId, t.levelOrder] }),
+    check('comparative_study_approvals_decision_ck', sql`${t.decision} in ('approved', 'rejected')`),
+  ],
+);
+
+// Old PurchaseOrders / PurchaseOrderDetails.
+export const purchaseOrders = pgTable(
+  'purchase_orders',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'restrict' }),
+    requisitionId: uuid('requisition_id').references(() => purchaseRequisitions.id, { onDelete: 'restrict' }),
+    comparativeStudyId: uuid('comparative_study_id').references(() => comparativeStudies.id, {
+      onDelete: 'restrict',
+    }),
+    orderDate: day('order_date').notNull(),
+    expectedOn: day('expected_on'),
+    terms: text('terms'),
+    note: text('note'),
+    status: text('status', {
+      enum: ['open', 'partially_received', 'received', 'closed', 'cancelled'],
+    }).notNull(),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('purchase_orders_number_uq').on(t.number),
+    index('purchase_orders_supplier_idx').on(t.supplierId, t.orderDate),
+    index('purchase_orders_requisition_idx').on(t.requisitionId),
+    index('purchase_orders_status_idx').on(t.status, t.orderDate),
+    check(
+      'purchase_orders_status_ck',
+      sql`${t.status} in ('open', 'partially_received', 'received', 'closed', 'cancelled')`,
+    ),
+    check('purchase_orders_expected_ck', sql`${t.expectedOn} is null or ${t.expectedOn} >= ${t.orderDate}`),
+  ],
+);
+
+export const purchaseOrderLines = pgTable(
+  'purchase_order_lines',
+  {
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => purchaseOrders.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    rate: money('rate').notNull(),
+    vatPercent: percent('vat_percent').notNull(),
+    receivedQty: quantity('received_qty').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orderId, t.position] }),
+    uniqueIndex('purchase_order_lines_variant_uq').on(t.orderId, t.variantId),
+    index('purchase_order_lines_variant_idx').on(t.variantId),
+    check(
+      'purchase_order_lines_amounts_ck',
+      sql`${t.qty} > 0 and ${t.rate} >= 0 and ${t.vatPercent} between 0 and 100 and ${t.receivedQty} >= 0`,
     ),
   ],
 );

@@ -1,6 +1,6 @@
 # Step 7a — Supply chain: stores, item catalogue, suppliers
 
-Status: **done** (2026-10-25). Previous: [step 6d](06d-accounts-pf-book.md) · Next: step 7b (purchase cycle).
+Status: **done** (2026-10-25). Previous: [step 6d](06d-accounts-pf-book.md) · Next: [step 7b](07b-scm-purchase.md) (requisitions, comparative studies, purchase orders; step 7 was re-planned there).
 
 ## Where the old logic lives
 

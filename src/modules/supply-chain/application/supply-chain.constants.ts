@@ -15,9 +15,13 @@ export const SCM_RECORDS = {
   roleGroupRestriction: 'role_group_restriction',
   supplierType: 'supplier_type',
   supplier: 'supplier',
+  purchaseApprovalLevel: 'purchase_approval_level',
+  csApprovalLevel: 'cs_approval_level',
 } as const;
 
 /** Stores, the item catalogue and suppliers. */
 export const SCM_READ = 'scm:read';
 /** Setting up stores, store access, the item catalogue and suppliers. */
 export const SCM_MANAGE = 'scm:manage';
+/** Raising and editing requisitions, comparative studies and purchase orders. */
+export const SCM_PURCHASE = 'scm:purchase';

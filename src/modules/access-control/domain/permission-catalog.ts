@@ -48,7 +48,8 @@ export const PERMISSION_CATALOG = [
   { key: 'vouchers:write', description: 'Enter and edit draft vouchers and their attachments' },
   { key: 'vouchers:post', description: 'Post and reverse vouchers' },
   { key: 'scm:read', description: 'See stores, store access, the item catalogue and suppliers' },
-  { key: 'scm:manage', description: 'Set up stores, store access, the item catalogue and suppliers' },
+  { key: 'scm:manage', description: 'Set up stores, store access, the item catalogue, suppliers and approval levels' },
+  { key: 'scm:purchase', description: 'Raise and edit purchase requisitions, comparative studies and purchase orders' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

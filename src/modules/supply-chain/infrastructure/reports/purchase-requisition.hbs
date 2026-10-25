@@ -1,0 +1,43 @@
+{{#with data.requisition}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 18%">Requisition no</td><td><b>{{number}}</b></td><td style="width: 18%">Date</td><td>{{date requisitionDate}}</td></tr>
+    <tr><td>Main store</td><td>{{mainStoreName}}{{#if subStoreName}} · {{subStoreName}}{{/if}}</td><td>Department</td><td>{{departmentName}}</td></tr>
+    <tr><td>Suggested supplier</td><td>{{supplierName}}</td><td>Payment</td><td>{{paymentTerm}}</td></tr>
+    <tr><td>Status</td><td colspan="3">{{../data.status}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Unit</th>
+      <th class="num">Requested</th><th class="num">Approved</th><th class="num">Ordered</th><th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}{{#if code}} ({{code}}){{/if}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{requestedQty}}</td>
+      <td class="num">{{approvedQty}}</td>
+      <td class="num">{{orderedQty}}</td>
+      <td>{{description}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if note}}<p><b>Note:</b> {{note}}</p>{{/if}}
+{{#if terms}}<p><b>Terms:</b> {{terms}}</p>{{/if}}
+{{#if decisions.length}}
+<table class="report" style="margin-top: 10px">
+  <thead><tr><th>Level</th><th>Decision</th><th>When</th><th>Remarks</th></tr></thead>
+  <tbody>
+    {{#each decisions}}
+    <tr><td>{{levelName}}</td><td>{{decision}}</td><td>{{date decidedAt}}</td><td>{{remarks}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

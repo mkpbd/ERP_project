@@ -145,7 +145,12 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | post / reverse vouchers | `vouchers:post` |
 | `GET /accounts/books/*`, `GET /accounts/statements/*` | `accounts:read` |
 | `GET /scm/*` (stores, store access, item catalogue, suppliers) | `scm:read` |
-| the same (write) | `scm:manage` |
+| the same (write), purchase and comparative study approval levels | `scm:manage` |
+| `GET /scm/{purchase-requisitions,comparative-studies,purchase-orders}[/:id]` | `scm:read` |
+| raise, edit, submit, cancel requisitions, studies and orders | `scm:purchase` |
+| `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
+| `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
+| `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

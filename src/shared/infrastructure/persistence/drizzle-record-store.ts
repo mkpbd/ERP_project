@@ -3,7 +3,12 @@ import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { DbContext } from '../../../database/drizzle-transaction-manager.js';
 import { RecordStore, type RecordFilter } from '../../application/records.js';
 import { ConflictError, DomainError, NotFoundError } from '../../domain/errors.js';
-import { checkViolationConstraint, foreignKeyViolationConstraint, uniqueViolationConstraint } from './pg-errors.js';
+import {
+  checkViolationConstraint,
+  escapeLike,
+  foreignKeyViolationConstraint,
+  uniqueViolationConstraint,
+} from './pg-errors.js';
 
 /** A record table: uuid `id`, `created_at`, `updated_at`, plus its own columns. */
 export type RecordTable = PgTable & {
@@ -31,6 +36,12 @@ export interface RecordStoreOptions {
   readonly guard?: (row: Readonly<Record<string, unknown>>) => Promise<void>;
 }
 
+/** PostgreSQL cuts identifiers to 63 bytes, so a long generated constraint name comes back shortened. */
+function byConstraint<T>(entries: Readonly<Record<string, T>> | undefined, constraint: string): T | undefined {
+  if (!entries) return undefined;
+  return entries[constraint] ?? Object.entries(entries).find(([name]) => name.slice(0, 63) === constraint)?.[1];
+}
+
 /**
  * RecordStore over one table. Database constraints are the integrity rules;
  * their violations become ConflictError / NotFoundError.
@@ -53,7 +64,7 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
     });
     const text = filter['q']?.trim();
     if (text && this.options.search?.length) {
-      const pattern = `%${text.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+      const pattern = `%${escapeLike(text)}%`;
       const anyColumn = or(...this.options.search.map((column) => ilike(column, pattern)));
       if (anyColumn) conditions.push(anyColumn);
     }
@@ -124,7 +135,7 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
   private translate(error: unknown, operation: 'write' | 'delete'): never {
     const unique = uniqueViolationConstraint(error);
     if (unique !== null) {
-      const conflict = this.options.unique?.[unique];
+      const conflict = byConstraint(this.options.unique, unique);
       throw new ConflictError(
         conflict?.code ?? `${this.options.name}_duplicate`,
         conflict?.message ?? 'A record with these values already exists',
@@ -135,7 +146,7 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
       if (operation === 'delete') {
         throw new ConflictError(`${this.options.name}_in_use`, 'Other records still refer to this one');
       }
-      throw new NotFoundError(this.options.references?.[foreignKey] ?? 'referenced_record');
+      throw new NotFoundError(byConstraint(this.options.references, foreignKey) ?? 'referenced_record');
     }
     const check = checkViolationConstraint(error);
     if (check !== null) {

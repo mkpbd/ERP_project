@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 17 });
+    expect(applied.rows[0]).toEqual({ n: 18 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -60,8 +60,12 @@ describe('migrations', () => {
       'audit_logs',
       'bank_accounts',
       'coa_descriptions',
+      'comparative_studies',
+      'comparative_study_approvals',
+      'comparative_study_quotes',
       'cost_centers',
       'countries',
+      'cs_approval_levels',
       'department_incharges',
       'department_store_access',
       'designations',
@@ -123,6 +127,12 @@ describe('migrations', () => {
       'pos_terminals',
       'posting_schedules',
       'printers',
+      'purchase_approval_levels',
+      'purchase_order_lines',
+      'purchase_orders',
+      'purchase_requisition_approvals',
+      'purchase_requisition_lines',
+      'purchase_requisitions',
       'refresh_tokens',
       'role_group_restrictions',
       'role_menus',
@@ -141,6 +151,7 @@ describe('migrations', () => {
       'salary_sheet_lines',
       'salary_sheets',
       'salary_stops',
+      'scm_sequences',
       'serve_types',
       'service_units',
       'settings',

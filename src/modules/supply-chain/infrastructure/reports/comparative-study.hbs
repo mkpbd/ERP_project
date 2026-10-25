@@ -1,0 +1,45 @@
+{{#with data}}
+<p>Date {{date study.studyDate}}{{#if study.requisitionNumber}} · for requisition {{study.requisitionNumber}}{{/if}}</p>
+<table class="report">
+  <thead>
+    <tr>
+      <th rowspan="2" class="center" style="width: 24px">#</th>
+      <th rowspan="2">Item</th>
+      {{#each suppliers}}<th colspan="3" class="center">{{name}}</th>{{/each}}
+    </tr>
+    <tr>
+      {{#each suppliers}}<th class="num">Qty</th><th class="num">Rate</th><th class="num">Total</th>{{/each}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}}{{#if unit}} ({{unit}}){{/if}}</td>
+      {{#each cells}}
+      {{#if quoted}}
+      <td class="num">{{qty}}</td>
+      <td class="num">{{money unitPrice}}</td>
+      <td class="num" style="{{#if chosen}}font-weight: bold; background: #e6f4ea{{/if}}">
+        {{money total}}{{#if lowest}} *{{/if}}{{#if chosen}} ✓{{/if}}
+      </td>
+      {{else}}
+      <td colspan="3" class="center">—</td>
+      {{/if}}
+      {{/each}}
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p><small>Totals include VAT and AIT. * lowest quote for the item · ✓ chosen</small></p>
+{{#if study.decisions.length}}
+<table class="report" style="margin-top: 10px">
+  <thead><tr><th>Level</th><th>Decision</th><th>When</th><th>Remarks</th></tr></thead>
+  <tbody>
+    {{#each study.decisions}}
+    <tr><td>{{levelName}}</td><td>{{decision}}</td><td>{{date decidedAt}}</td><td>{{remarks}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

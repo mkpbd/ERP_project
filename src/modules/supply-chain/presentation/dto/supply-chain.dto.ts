@@ -188,3 +188,17 @@ export class SupplierResponseDto extends responseDto(
     enlistmentExpiresOn: z.string().nullable(),
   }),
 ) {}
+
+const levelOrder = z.int().min(1).max(20);
+const purchaseLevel = shapes({ mainStoreId: ref, levelOrder, name: name(50), roleId: ref });
+export class CreatePurchaseApprovalLevelDto extends createZodDto(purchaseLevel.create) {}
+export class UpdatePurchaseApprovalLevelDto extends createZodDto(purchaseLevel.update) {}
+export class PurchaseApprovalLevelFilterDto extends createZodDto(z.object({ mainStoreId: ref.optional() })) {}
+export class PurchaseApprovalLevelResponseDto extends responseDto(purchaseLevel.response) {}
+
+const csLevel = shapes({ levelOrder, name: name(50), approverStaffId: ref, isFinal: z.boolean() }, [], {
+  isFinal: false,
+});
+export class CreateCsApprovalLevelDto extends createZodDto(csLevel.create) {}
+export class UpdateCsApprovalLevelDto extends createZodDto(csLevel.update) {}
+export class CsApprovalLevelResponseDto extends responseDto(csLevel.response) {}
