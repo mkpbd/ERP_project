@@ -144,6 +144,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | draft vouchers and attachments | `vouchers:write` |
 | post / reverse vouchers | `vouchers:post` |
 | `GET /accounts/books/*`, `GET /accounts/statements/*` | `accounts:read` |
+| `GET /scm/*` (stores, store access, item catalogue, suppliers) | `scm:read` |
+| the same (write) | `scm:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

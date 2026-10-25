@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 16 });
+    expect(applied.rows[0]).toEqual({ n: 17 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -63,6 +63,7 @@ describe('migrations', () => {
       'cost_centers',
       'countries',
       'department_incharges',
+      'department_store_access',
       'designations',
       'discount_categories',
       'districts',
@@ -88,6 +89,13 @@ describe('migrations', () => {
       'income_tax_years',
       'investigation_entry_page_controls',
       'ipd_admission_page_controls',
+      'issue_store_users',
+      'item_categories',
+      'item_groups',
+      'item_sub_categories',
+      'item_sub_groups',
+      'item_variants',
+      'items',
       'job_application_files',
       'job_applications',
       'job_circulars',
@@ -101,6 +109,7 @@ describe('migrations', () => {
       'leave_policy_entitlements',
       'leave_records',
       'leave_types',
+      'main_stores',
       'manual_attendances',
       'menus',
       'outbox_messages',
@@ -115,6 +124,7 @@ describe('migrations', () => {
       'posting_schedules',
       'printers',
       'refresh_tokens',
+      'role_group_restrictions',
       'role_menus',
       'role_permissions',
       'role_reports',
@@ -148,8 +158,13 @@ describe('migrations', () => {
       'staff_salaries',
       'statement_broad_heads',
       'statement_sub_heads',
+      'store_department_users',
+      'store_departments',
       'sub_ledger_types',
       'sub_ledgers',
+      'sub_stores',
+      'supplier_types',
+      'suppliers',
       'tds_rules',
       'tenant_logos',
       'tenants',

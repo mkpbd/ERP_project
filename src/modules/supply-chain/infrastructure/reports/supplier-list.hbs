@@ -1,0 +1,34 @@
+{{#if data.rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Type</th>
+      <th>Supplier</th>
+      <th>Contact</th>
+      <th>Address</th>
+      <th>Enlisted</th>
+      <th>Expires</th>
+      <th class="num">VAT %</th>
+      <th class="num">Tax %</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{type}}</td>
+      <td>{{name}}</td>
+      <td>{{contactNo}}</td>
+      <td>{{address}}</td>
+      <td>{{#if enlistedOn}}{{date enlistedOn}}{{/if}}</td>
+      <td>{{#if enlistmentExpiresOn}}{{date enlistmentExpiresOn}}{{/if}}</td>
+      <td class="num">{{money vatPercent}}</td>
+      <td class="num">{{money taxPercent}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No suppliers.</p>
+{{/if}}

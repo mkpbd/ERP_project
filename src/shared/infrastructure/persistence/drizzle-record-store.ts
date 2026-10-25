@@ -1,4 +1,4 @@
-import { and, asc, eq, gte, lte } from 'drizzle-orm';
+import { and, asc, eq, gte, ilike, lte, or } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import type { DbContext } from '../../../database/drizzle-transaction-manager.js';
 import { RecordStore, type RecordFilter } from '../../application/records.js';
@@ -18,6 +18,8 @@ export interface RecordStoreOptions {
   readonly orderBy: readonly PgColumn[];
   /** Allowed list filters: query key → column (equality), or `{ column, op }` for a range bound. */
   readonly filters?: Readonly<Record<string, PgColumn | { readonly column: PgColumn; readonly op: 'gte' | 'lte' }>>;
+  /** Columns the `q` filter searches (case-insensitive, anywhere in the text). */
+  readonly search?: readonly PgColumn[];
   /** Unique constraint name → reported conflict. */
   readonly unique?: Readonly<Record<string, { readonly code: string; readonly message: string }>>;
   /** Foreign key constraint name → referenced record, reported as `<record>_not_found`. */
@@ -49,6 +51,12 @@ export class DrizzleRecordStore<TView, TInput extends object> extends RecordStor
       if (!('op' in spec)) return [eq(spec, value)];
       return [spec.op === 'gte' ? gte(spec.column, value) : lte(spec.column, value)];
     });
+    const text = filter['q']?.trim();
+    if (text && this.options.search?.length) {
+      const pattern = `%${text.replace(/[\\%_]/g, (character) => `\\${character}`)}%`;
+      const anyColumn = or(...this.options.search.map((column) => ilike(column, pattern)));
+      if (anyColumn) conditions.push(anyColumn);
+    }
     const rows: unknown[] = await this.context.db
       .select()
       .from(this.table)

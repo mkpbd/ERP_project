@@ -1,0 +1,35 @@
+{{#if data.groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>
+      <th>Item</th>
+      <th>Variant</th>
+      <th>Code</th>
+      <th>Unit</th>
+      <th class="num">Purchase price</th>
+      <th class="num">Sale price</th>
+      <th class="num">Reorder level</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.groups}}
+    <tr class="group-row"><td colspan="8">{{title}} ({{rows.length}})</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{item}}</td>
+      <td>{{variant}}{{#if expiryRequired}} <small>(expiry)</small>{{/if}}</td>
+      <td>{{code}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{money purchasePrice}}</td>
+      <td class="num">{{money salePrice}}</td>
+      <td class="num">{{integer reorderLevel}}</td>
+    </tr>
+    {{/each}}
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No items.</p>
+{{/if}}

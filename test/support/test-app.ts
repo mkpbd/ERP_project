@@ -43,7 +43,10 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
 /** Empties every table except the permission catalog, then re-syncs the catalog and super-admin role. */
 export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
-    truncate table audit_logs, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,
+    truncate table audit_logs,
+      department_store_access, issue_store_users, store_department_users, role_group_restrictions, item_variants,
+      items, item_sub_groups, item_groups, item_sub_categories, item_categories, suppliers, supplier_types,
+      sub_stores, main_stores, store_departments, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,
       email_verification_tokens, role_reports, role_menus, menus,
       voucher_attachments, voucher_lines, voucher_sequences, vouchers, gl_roles, posting_schedules,
       pos_terminals, bank_accounts, gl_statement_mappings, statement_sub_heads, statement_broad_heads,

@@ -1,6 +1,6 @@
 # Step 6d — Accounts: PF book, fund registers, TDS rules
 
-Status: **done** (2026-10-25). Previous: [step 6c](06c-accounts-books.md) · Next: step 7 (SupplyChain).
+Status: **done** (2026-10-25). Previous: [step 6c](06c-accounts-books.md) · Next: [step 7a](07a-scm-masters.md) (supply chain masters).
 
 The old API kept the provident fund trust's accounts in a separate `PFBook` schema with its own chart
 (`PFNoAcategory`, `PFSubCategory`, `PFLevel4Head`, `PFNoA`), voucher master (`PFVoucherMaster`), general ledger
