@@ -15,6 +15,8 @@ export function configureApp(app: NestExpressApplication, config: AppConfig): vo
   app.set('trust proxy', config.trustProxy ? 1 : false);
   app.disable('x-powered-by');
   app.useBodyParser('json', { limit: '100kb' });
+  // Image uploads (tenant logos) are sent as raw bytes; the handler checks the bytes match the type.
+  app.useBodyParser('raw', { type: ['image/png', 'image/jpeg', 'image/webp'], limit: '1mb' });
 
   app.use(requestContextMiddleware);
   app.use(helmet());

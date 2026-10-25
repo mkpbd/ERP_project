@@ -19,6 +19,10 @@ export const PERMISSION_CATALOG = [
   { key: 'menus:manage', description: 'Create, edit, activate and delete menus' },
   { key: 'menus:assign', description: 'Grant menus to roles (only menus you can use yourself)' },
   { key: 'menus:access-all', description: 'Use every active menu without a role grant' },
+  { key: 'locations:manage', description: 'Create, edit and delete countries, divisions and districts' },
+  { key: 'masters:manage', description: 'Create, edit and delete admin master data (departments, service units, …)' },
+  { key: 'tenants:manage', description: 'Create, edit and delete tenants and their logos' },
+  { key: 'settings:manage', description: 'Change application settings' },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]['key'];

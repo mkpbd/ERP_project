@@ -24,6 +24,8 @@ src/
     ├── audit/           audit trail writer + query API
     ├── notifications/   transactional outbox + mail transports
     ├── navigation/      menu tree, role menu grants, page-level access (@MenuAccess)
+    ├── location/        countries, divisions, districts (simple records)
+    ├── administration/  admin masters, tenants + logos, settings documents
     └── health/          liveness/readiness
 ```
 
@@ -81,6 +83,19 @@ Commands extend `Command<TResult>` and queries `Query<TResult>`, so results are 
 * **Durable side effects** (emails) use the transactional outbox: rows are written in the business
   transaction; `OutboxDispatcher` polls with `FOR UPDATE SKIP LOCKED`, delivers at-least-once with
   exponential backoff, and scrubs the payload (which may contain a single-use link) after delivery.
+
+### Simple records (master data)
+
+Lookup tables with no behaviour beyond validation and constraints (departments, districts, payment
+modes, …) do not get an aggregate, commands and handlers each. A module declares a `RecordType`
+(name, read permission or `null` for any signed-in user, manage permission, store) and registers it in
+the shared `RecordTypeRegistry` on module init. Generic handlers in `shared/application/record.handlers.ts`
+authorize, run the write in a transaction and audit `<name>.created|updated|deleted`.
+`DrizzleRecordStore` maps unique violations to 409, missing references to 404 and deleting a referenced
+row (`23503`/`23001`) to 409 `<name>_in_use`. `createRecordController()` builds the
+`GET / GET :id / POST / PATCH :id / DELETE :id` controller from Zod DTOs; it applies the same parameter
+metadata a hand-written controller would, so validation and OpenAPI work unchanged. As soon as a table
+needs rules of its own, it gets a regular aggregate and handlers.
 
 ### Transactions
 

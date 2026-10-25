@@ -82,7 +82,7 @@ class FakeNavigationRead extends NavigationReadRepository {
 /** StubAccessControl plus per-user role ids. */
 class RoleAwareAccessControl extends StubAccessControl {
   readonly roleIds = new Map<string, string[]>();
-  async getProfile(userId: string): Promise<AuthorizationProfile> {
+  override async getProfile(userId: string): Promise<AuthorizationProfile> {
     return { ...(await super.getProfile(userId)), roleIds: this.roleIds.get(userId) ?? [] };
   }
 }

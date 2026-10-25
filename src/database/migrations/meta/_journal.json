@@ -15,6 +15,13 @@
       "when": 1792929802817,
       "tag": "0001_navigation",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792931090602,
+      "tag": "0002_admin_masters_locations",
+      "breakpoints": true
     }
   ]
 }

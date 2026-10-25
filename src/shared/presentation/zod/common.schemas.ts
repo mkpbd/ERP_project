@@ -17,6 +17,22 @@ export const pageMetaShape = {
 
 export const isoDate = z.iso.datetime();
 
+/**
+ * PATCH body for a record: every field optional, at least one present.
+ * Pass fields without defaults so absent fields stay absent.
+ */
+export function updateSchema<TShape extends z.ZodRawShape>(fields: TShape) {
+  return z
+    .strictObject(fields)
+    .partial()
+    .refine((value) => Object.keys(value).length > 0, 'Provide at least one field');
+}
+
+/** Response shape of a record: id, its fields, timestamps. */
+export function recordResponseShape<TShape extends z.ZodRawShape>(fields: TShape) {
+  return { id: z.uuid(), ...fields, createdAt: isoDate, updatedAt: isoDate };
+}
+
 /** Response DTO helper: documents a JSON object returned by an endpoint. */
 export function responseDto<TShape extends z.ZodRawShape>(shape: TShape) {
   return createZodDto(z.object(shape), { io: 'output' });

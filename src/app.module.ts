@@ -9,10 +9,12 @@ import type { AppConfig } from './config/configuration.js';
 import { DatabaseModule } from './database/database.module.js';
 import { AccessControlModule } from './modules/access-control/access-control.module.js';
 import { AuthorizationGuard } from './modules/access-control/presentation/authorization.guard.js';
+import { AdministrationModule } from './modules/administration/administration.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { AuthenticationGuard } from './modules/identity/presentation/authentication.guard.js';
+import { LocationModule } from './modules/location/location.module.js';
 import { NavigationModule } from './modules/navigation/navigation.module.js';
 import { MenuAccessGuard } from './modules/navigation/presentation/menu-access.guard.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
@@ -79,6 +81,8 @@ export class AppModule {
         AccessControlModule,
         IdentityModule,
         NavigationModule,
+        LocationModule,
+        AdministrationModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

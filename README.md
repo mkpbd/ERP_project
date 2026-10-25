@@ -103,6 +103,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `POST /menus`, `PATCH/DELETE /menus/:id` | `menus:manage` |
 | `GET /menus/me`, `/menus/resolve?path=` | authenticated, own navigation only |
 | `GET /roles/:id/menus` / `PUT /roles/:id/menus` | `menus:read` / `menus:assign` + may only grant menus you can use |
+| `/locations/{countries,divisions,districts}` | read: authenticated; write: `locations:manage` |
+| `/admin/{departments,service-units,serve-types,discount-categories,printers,payment-modes,payment-channels,editor-shortcuts}`, `/admin/page-controls/{ipd-admission,investigation-entry}` | read: authenticated; write: `masters:manage` |
+| `/admin/tenants`, `/admin/tenants/:id/logos/:slot` | read: authenticated; write: `tenants:manage` |
+| `/admin/settings/{general,editor-margins}` | `GET`: authenticated; `PATCH`: `settings:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

@@ -30,6 +30,9 @@ one module at a time. Each step has its own document in this folder.
 | `[Authorize(Policy = "ApiKeyPolicy")]` (any signed-in user) | Default-deny authentication + a module permission (`pharmacy:read`, `pharmacy:manage`, …) via `@RequirePermissions` and `AccessControl.authorize()` in the handler. |
 | `[MenuAccess("/page")]` | `@MenuAccess('/page')` (step 1). Use it where the old API did, on top of the permission. |
 | `Result.FailAsync("message")` with HTTP 200 | Throw `DomainError` (422), `NotFoundError` (404), `ConflictError` (409), `ForbiddenError` (403) |
+| `api/v1/[controller]` routes | Business modules are prefixed: `/api/v1/admin/...`, `/api/v1/locations/...`, `/api/v1/hr/...`, `/api/v1/pharmacy/...` (old names collide, e.g. Admin vs. HR `Departments`). Platform routes (`/auth`, `/users`, `/roles`, `/menus`) stay unprefixed. |
+| One "AddEdit" `POST` (create when `Id` is empty) | `POST` creates, `PATCH /:id` edits the fields sent |
+| Plain master tables (command + query + response + profile + controller each) | A `RecordType` + `createRecordController()` (step 2). Only tables with behaviour get aggregates and handlers. |
 
 Each step must finish with: typecheck, lint, format, unit + architecture tests, integration and e2e tests green,
 a reviewed migration in `src/database/migrations`, and its document in this folder.
@@ -41,14 +44,14 @@ Order follows dependencies: later modules reference earlier ones.
 | Step | Scope (old feature folders) | Status | Document |
 |---|---|---|---|
 | 1 | Menus, page access; identity/role mapping | **Done** | [01-menus-and-page-access.md](01-menus-and-page-access.md) |
-| 2 | Admin masters (Country, ServiceUnit, ServeType, Printer, DiscountCategory, PaymentMode/Channel, Editor*, page controls), Tenants, Location, SuperAdmin settings (AppSetting, AccountConfiguration) | Next | |
-| 3 | Reporting foundation: replacement for RDLC (`Web/Report`, `ReportAndSp`, `ReportPermission`, `DynamicReportQuery`) | Planned | |
+| 2 | Admin masters (departments, service units, serve types, printers, discount categories, payment modes/channels, editor shortcuts, page controls), tenants + logos, locations, settings (AppSettings, EditorMargins); shared simple-record toolkit | **Done** | [02-admin-masters-locations-settings.md](02-admin-masters-locations-settings.md) |
+| 3 | Reporting foundation: replacement for RDLC (`Web/Report`, `ReportAndSp`, `ReportPermission`, `DynamicReportQuery`) | Next — needs a decision on the rendering approach | |
 | 4 | HR (staff records, departments, designations), Attendance | Planned | |
 | 5 | Payroll, PFBook, TDS/VAT/TAX | Planned | |
-| 6 | Account (GL, vouchers) + SuperAdmin GL mappings | Planned | |
+| 6 | Account (GL, vouchers), SuperAdmin `AccountConfigurations` + GL mappings, financial/management dashboards | Planned | |
 | 7 | SupplyChain (store, purchase, indents) | Planned | |
 | 8 | Pharmacy | Planned | |
-| 9 | Hospital (registration, billing, IPD), OPD | Planned | |
+| 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords` | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

@@ -86,11 +86,27 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         status === 404 ? 'route_not_found' : (TITLES[status] ?? 'http_error').toLowerCase().replace(/ /g, '_');
       return { ...this.head(status, code), detail: this.httpDetail(exception), ...base };
     }
+    const clientError = this.bodyParserError(exception);
+    if (clientError) {
+      const code = (TITLES[clientError.status] ?? 'http_error').toLowerCase().replace(/ /g, '_');
+      return { ...this.head(clientError.status, code), detail: clientError.message, ...base };
+    }
     return { ...this.head(500, 'internal_error'), detail: 'An unexpected error occurred', ...base };
   }
 
   private head(status: number, code: string): Pick<ProblemDetails, 'type' | 'title' | 'status' | 'code'> {
     return { type: `urn:problem-type:${code}`, title: TITLES[status] ?? 'Error', status, code };
+  }
+
+  /**
+   * Express body parsers reject oversized or malformed bodies with http-errors
+   * (`expose: true`, 4xx status) rather than HttpException.
+   */
+  private bodyParserError(exception: unknown): { status: number; message: string } | null {
+    if (!exception || typeof exception !== 'object') return null;
+    const { status, expose, message } = exception as { status?: unknown; expose?: unknown; message?: unknown };
+    if (expose !== true || typeof status !== 'number' || status < 400 || status > 499) return null;
+    return { status, message: typeof message === 'string' ? message : 'Invalid request body' };
   }
 
   private httpDetail(exception: HttpException): string {
