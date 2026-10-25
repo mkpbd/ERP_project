@@ -1,0 +1,37 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tr><th style="width: 20%">Employee</th><td>{{member.employeeNo}} — {{member.staffName}}</td></tr>
+  <tr><th>Department / designation</th><td>{{member.department}} / {{member.designation}}</td></tr>
+  <tr><th>Joining date</th><td>{{date member.joiningDate}}</td></tr>
+</table>
+
+<h3 style="font-size: 12px; margin: 8px 0 4px">Balance</h3>
+{{#if hasPolicy}}
+<table class="report">
+  <thead><tr><th>Leave type</th><th class="num">Entitled</th><th class="num">Taken</th><th class="num">Pending</th><th class="num">Remaining</th></tr></thead>
+  <tbody>
+    {{#each balances}}
+    <tr>
+      <td>{{name}} ({{code}})</td>
+      <td class="num">{{#if (eq entitled null)}}No limit{{else}}{{entitled}}{{/if}}</td>
+      <td class="num">{{taken}}</td>
+      <td class="num">{{pending}}</td>
+      <td class="num">{{#if (eq remaining null)}}—{{else}}{{remaining}}{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}<p class="muted">No leave policy has been set for this year.</p>{{/if}}
+
+<h3 style="font-size: 12px; margin: 12px 0 4px">Leave taken</h3>
+{{#if entries.length}}
+<table class="report">
+  <thead><tr><th>Leave type</th><th>From</th><th>To</th><th class="num">Days</th><th>Source</th><th>Note</th></tr></thead>
+  <tbody>
+    {{#each entries}}
+    <tr><td>{{leaveType}}</td><td>{{date startDate}}</td><td>{{date endDate}}</td><td class="num">{{days}}</td><td>{{source}}</td><td>{{note}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}<p class="muted">No leave in this year.</p>{{/if}}
+{{/with}}

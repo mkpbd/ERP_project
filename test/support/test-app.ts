@@ -45,6 +45,8 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
     truncate table audit_logs, outbox_messages, refresh_tokens, user_sessions, password_reset_tokens,
       email_verification_tokens, role_reports, role_menus, menus,
+      leave_application_approvals, leave_applications, leave_records, leave_delegates, leave_approval_levels,
+      staff_leave_entitlements, staff_leave_policies, leave_policy_entitlements, leave_policies, leave_types,
       department_incharges, staff_documents, staff_photos, staff_festivals, staff_emergency_contacts,
       staff_education, staff_records, govt_holidays, festivals, designations, hr_sub_departments,
       hr_departments, hr_divisions, user_roles, role_permissions, roles, users,

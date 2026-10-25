@@ -114,6 +114,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `/hr/department-incharges` | read: authenticated; write: `hr:manage` |
 | `GET /hr/staff`, `GET /hr/staff/:id[/photo,/documents/:documentId]` | `hr:read`, or your own linked record (`GET /hr/staff/me`) |
 | `POST/PATCH /hr/staff…` (status, lists, photo, documents) | `hr:manage` |
+| `POST /hr/leave/applications`, `GET …/mine`, `…/awaiting-me`, `GET /hr/leave/balance` | yourself (linked staff record) or a delegate; `leave:manage` for anyone |
+| `POST /hr/leave/applications/:id/{approve,reject}` | the current level's approver, or `leave:approve-any`; never your own |
+| `/hr/leave/{policies,approval-levels,delegates,records}`, `GET /hr/leave/applications` | `leave:read` / `leave:manage` |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

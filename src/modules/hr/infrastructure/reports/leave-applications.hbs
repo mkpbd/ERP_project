@@ -1,0 +1,39 @@
+{{#if data.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 28px">#</th>
+      <th>Employee no</th>
+      <th>Name</th>
+      <th>Department</th>
+      <th>Leave type</th>
+      <th>From</th>
+      <th>To</th>
+      <th class="num">Days</th>
+      <th class="num">Approved</th>
+      <th>Status</th>
+      <th>Reason</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{employeeNo}}</td>
+      <td>{{staffName}}</td>
+      <td>{{department}}</td>
+      <td>{{leaveType}}</td>
+      <td>{{date startDate}}</td>
+      <td>{{date endDate}}</td>
+      <td class="num">{{days}}</td>
+      <td class="num">{{approvedDays}}</td>
+      <td>{{status}}</td>
+      <td>{{decisionReason}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p class="muted">Applications: {{data.length}}</p>
+{{else}}
+<p class="empty">No leave applications in this period.</p>
+{{/if}}

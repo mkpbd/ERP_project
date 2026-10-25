@@ -1,0 +1,37 @@
+<style>
+  table.report td.cell { text-align: center; white-space: nowrap; }
+  .legend { font-size: 9px; color: #444; margin: 4px 0 8px; }
+</style>
+<div class="legend">Each cell: remaining / entitled (taken + pending). "—" = no limit for that leave type.</div>
+{{#if data.total}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 28px">#</th>
+      <th>Employee no</th>
+      <th>Name</th>
+      <th>Designation</th>
+      {{#each data.types}}<th class="center" title="{{name}}">{{code}}</th>{{/each}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each data.departments}}
+    <tr class="group-row"><td colspan="{{@root.data.columnCount}}">{{department}} ({{rows.length}})</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{employeeNo}}</td>
+      <td>{{staffName}}</td>
+      <td>{{designation}}</td>
+      {{#each cells}}
+      <td class="cell">{{#if (eq entitled null)}}—{{else}}<b>{{remaining}}</b> / {{entitled}}{{/if}} <span class="muted">({{taken}}{{#if pending}} + {{pending}}{{/if}})</span></td>
+      {{/each}}
+    </tr>
+    {{/each}}
+    {{/each}}
+  </tbody>
+</table>
+<p class="muted">Employees: {{data.total}}</p>
+{{else}}
+<p class="empty">No active employees match these filters.</p>
+{{/if}}

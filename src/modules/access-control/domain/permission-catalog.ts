@@ -29,6 +29,12 @@ export const PERMISSION_CATALOG = [
   { key: 'hr:read', description: 'View staff records (personal data), photos and documents' },
   { key: 'hr:manage', description: 'Add and edit staff records, their status, documents and department incharges' },
   { key: 'hr-masters:manage', description: 'Change HR divisions, departments, designations, festivals and holidays' },
+  { key: 'leave:read', description: "See everyone's leave applications, balances, policies and recorded leave" },
+  {
+    key: 'leave:manage',
+    description: 'Set leave policies, approval chains and delegates; record leave; cancel approved leave',
+  },
+  { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 
 export type PermissionKey = (typeof PERMISSION_CATALOG)[number]['key'];
