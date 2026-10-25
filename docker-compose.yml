@@ -1,0 +1,64 @@
+# Local development stack. Not a production deployment descriptor.
+#   docker compose up --build
+# API: http://localhost:3000/api/docs   Mail UI: http://localhost:8025
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres_dev_password
+    ports:
+      # 55432 avoids clashing with a PostgreSQL already installed on the host.
+      - '55432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./docker/postgres/init-roles.sql:/docker-entrypoint-initdb.d/10-init-roles.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d erp_dev']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - '8025:8025'
+      - '1025:1025'
+
+  migrate:
+    build: .
+    command: ['node', 'dist/cli/migrate.js']
+    environment:
+      MIGRATION_DATABASE_URL: postgres://erp_owner:owner_dev_password@postgres:5432/erp_dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    build: .
+    ports:
+      - '3000:3000'
+    environment:
+      NODE_ENV: development
+      PORT: '3000'
+      LOG_LEVEL: info
+      DATABASE_URL: postgres://erp_app:app_dev_password@postgres:5432/erp_dev
+      JWT_ISSUER: erp-backend
+      JWT_AUDIENCE: erp-clients
+      # Development placeholder only.
+      JWT_SIGNING_KEYS: dev1:compose-development-signing-key-not-for-production
+      CORS_ORIGINS: http://localhost:5173
+      COOKIE_SECURE: 'false'
+      APP_PUBLIC_URL: http://localhost:5173
+      MAIL_FROM: ERP <no-reply@example.com>
+      MAIL_TRANSPORT: smtp
+      SMTP_URL: smtp://mailpit:1025
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      mailpit:
+        condition: service_started
+
+volumes:
+  pgdata:
