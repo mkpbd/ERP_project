@@ -151,6 +151,11 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /scm/stock`, `/scm/stock/card`, `/scm/stock-receives[/:id]`, GRN faults (read) | `scm:read` |
 | stock receives (draft, edit, post, delete), GRN faults (write) | `scm:receive` |
 | `POST /scm/opening-stock` | `scm:manage` |
+| `GET /scm/{store-indents,store-requests,store-issues,stock-transfers}[/:id]`, indent shortfall | `scm:read` |
+| store indents (draft, edit, submit, cancel), store requests | `scm:indent` (+ department access) |
+| `POST /scm/store-indents/:id/decision` | the indent approval level's role |
+| `POST /scm/store-indents/:id/acknowledge` | the person who raised the indent |
+| issues, transfers, accepting transfers | `scm:issue` (+ store access) |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |

@@ -1,0 +1,36 @@
+{{#with data.issue}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Issue no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date issueDate}}</td></tr>
+    <tr><td>From</td><td>{{subStoreName}}</td><td>To</td><td>{{departmentName}}</td></tr>
+    <tr><td>Indent</td><td colspan="3">{{#if indentNumber}}{{indentNumber}}{{else}}without indent{{/if}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Unit</th><th>Batch</th><th>Expiry</th>
+      <th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each parts}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}</td>
+      <td>{{unit}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{#if expiryDate}}{{date expiryDate}}{{/if}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{money unitCost}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="7">Total value</td><td class="num">{{money value}}</td></tr>
+  </tbody>
+</table>
+{{#if note}}<p><b>Note:</b> {{note}}</p>{{/if}}
+<table style="width: 100%; margin-top: 48px; text-align: center">
+  <tr><td>Issued by</td><td>Received by</td><td>Approved by</td></tr>
+</table>
+{{/with}}

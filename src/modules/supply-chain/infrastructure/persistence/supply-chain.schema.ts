@@ -622,7 +622,7 @@ export const stockLots = pgTable(
   ],
 );
 
-export const STOCK_MOVEMENT_KINDS = ['opening', 'receive'] as const;
+export const STOCK_MOVEMENT_KINDS = ['opening', 'receive', 'issue', 'transfer'] as const;
 
 // Every quantity in or out of a store, by lot, with its unit cost. Stock is the sum; the old system added up
 // receive, transfer, issue and return tables in each report.
@@ -653,7 +653,7 @@ export const stockMovements = pgTable(
     index('stock_movements_document_idx').on(t.documentId),
     check('stock_movements_store_ck', sql`(${t.mainStoreId} is null) <> (${t.subStoreId} is null)`),
     check('stock_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
-    check('stock_movements_kind_ck', sql`${t.kind} in ('opening', 'receive')`),
+    check('stock_movements_kind_ck', sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer')`),
   ],
 );
 
@@ -779,5 +779,297 @@ export const grnFaults = pgTable(
     index('grn_faults_order_idx').on(t.purchaseOrderId),
     check('grn_faults_qty_ck', sql`${t.qty} > 0`),
     check('grn_faults_description_len_ck', sql`char_length(${t.description}) between 1 and 1000`),
+  ],
+);
+
+// Old StoreIndentApprovalSettings (store, role, "Level1".."Final").
+export const storeIndentApprovalLevels = pgTable(
+  'store_indent_approval_levels',
+  {
+    id: uuid('id').primaryKey(),
+    subStoreId: uuid('sub_store_id')
+      .notNull()
+      .references(() => subStores.id, { onDelete: 'cascade' }),
+    levelOrder: smallint('level_order').notNull(),
+    name: text('name').notNull(),
+    roleId: uuid('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'restrict' }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('store_indent_approval_levels_order_uq').on(t.subStoreId, t.levelOrder),
+    check('store_indent_approval_levels_order_ck', sql`${t.levelOrder} between 1 and 20`),
+    nameLength('store_indent_approval_levels', t.name, 50),
+  ],
+);
+
+export const INDENT_STATUSES = [
+  'draft',
+  'pending',
+  'approved',
+  'partially_served',
+  'served',
+  'acknowledged',
+  'rejected',
+  'cancelled',
+] as const;
+
+// Old StoreIndents / StoreIndentDetails / IndentApprovals.
+export const storeIndents = pgTable(
+  'store_indents',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    subStoreId: uuid('sub_store_id')
+      .notNull()
+      .references(() => subStores.id, { onDelete: 'restrict' }),
+    departmentId: uuid('department_id').references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    indentDate: day('indent_date').notNull(),
+    priority: text('priority', {
+      enum: ['routine', 'emergency', 'critical_care', 'new_admission', 'discharge', 'other'],
+    }).notNull(),
+    note: text('note'),
+    status: text('status', { enum: INDENT_STATUSES }).notNull(),
+    currentLevel: smallint('current_level'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    acknowledgedBy: uuid('acknowledged_by').references(() => users.id, { onDelete: 'set null' }),
+    acknowledgedAt: tz('acknowledged_at'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('store_indents_number_uq').on(t.number),
+    index('store_indents_store_idx').on(t.subStoreId, t.status),
+    index('store_indents_date_idx').on(t.indentDate),
+    check(
+      'store_indents_status_ck',
+      sql`${t.status} in ('draft', 'pending', 'approved', 'partially_served', 'served', 'acknowledged', 'rejected', 'cancelled')`,
+    ),
+    check(
+      'store_indents_priority_ck',
+      sql`${t.priority} in ('routine', 'emergency', 'critical_care', 'new_admission', 'discharge', 'other')`,
+    ),
+    check('store_indents_level_ck', sql`(${t.status} = 'pending') = (${t.currentLevel} is not null)`),
+  ],
+);
+
+export const storeIndentLines = pgTable(
+  'store_indent_lines',
+  {
+    indentId: uuid('indent_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    approvedQty: quantity('approved_qty'),
+    servedQty: quantity('served_qty').notNull().default(0),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.indentId, t.position] }),
+    foreignKey({
+      name: 'store_indent_lines_indent_fk',
+      columns: [t.indentId],
+      foreignColumns: [storeIndents.id],
+    }).onDelete('cascade'),
+    uniqueIndex('store_indent_lines_variant_uq').on(t.indentId, t.variantId),
+    check(
+      'store_indent_lines_qty_ck',
+      sql`${t.qty} > 0 and (${t.approvedQty} is null or ${t.approvedQty} between 0 and ${t.qty}) and ${t.servedQty} >= 0`,
+    ),
+  ],
+);
+
+export const storeIndentApprovals = pgTable(
+  'store_indent_approvals',
+  {
+    indentId: uuid('indent_id').notNull(),
+    levelOrder: smallint('level_order').notNull(),
+    levelName: text('level_name').notNull(),
+    decision: text('decision', { enum: ['approved', 'rejected'] }).notNull(),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at').notNull(),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.indentId, t.levelOrder] }),
+    foreignKey({
+      name: 'store_indent_approvals_indent_fk',
+      columns: [t.indentId],
+      foreignColumns: [storeIndents.id],
+    }).onDelete('cascade'),
+    check('store_indent_approvals_decision_ck', sql`${t.decision} in ('approved', 'rejected')`),
+  ],
+);
+
+// Old PRIndents / PRIndentDetails (and PRSubmitted, now the link to the purchase requisition).
+export const storeRequests = pgTable(
+  'store_requests',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    subStoreId: uuid('sub_store_id')
+      .notNull()
+      .references(() => subStores.id, { onDelete: 'restrict' }),
+    mainStoreId: uuid('main_store_id')
+      .notNull()
+      .references(() => mainStores.id, { onDelete: 'restrict' }),
+    requestDate: day('request_date').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['open', 'partially_served', 'served', 'closed'] }).notNull(),
+    purchaseRequisitionId: uuid('purchase_requisition_id'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('store_requests_number_uq').on(t.number),
+    foreignKey({
+      name: 'store_requests_purchase_requisition_fk',
+      columns: [t.purchaseRequisitionId],
+      foreignColumns: [purchaseRequisitions.id],
+    }).onDelete('set null'),
+    index('store_requests_main_idx').on(t.mainStoreId, t.status),
+    check('store_requests_status_ck', sql`${t.status} in ('open', 'partially_served', 'served', 'closed')`),
+  ],
+);
+
+export const storeRequestLines = pgTable(
+  'store_request_lines',
+  {
+    requestId: uuid('request_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    servedQty: quantity('served_qty').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.position] }),
+    foreignKey({
+      name: 'store_request_lines_request_fk',
+      columns: [t.requestId],
+      foreignColumns: [storeRequests.id],
+    }).onDelete('cascade'),
+    uniqueIndex('store_request_lines_variant_uq').on(t.requestId, t.variantId),
+    check('store_request_lines_qty_ck', sql`${t.qty} > 0 and ${t.servedQty} >= 0`),
+  ],
+);
+
+// Old Issues / IssueDetails: goods given from a sub-store to a department. The lots taken are the issue's
+// stock movements.
+export const storeIssues = pgTable(
+  'store_issues',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    subStoreId: uuid('sub_store_id')
+      .notNull()
+      .references(() => subStores.id, { onDelete: 'restrict' }),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    indentId: uuid('indent_id').references(() => storeIndents.id, { onDelete: 'restrict' }),
+    issueDate: day('issue_date').notNull(),
+    receivedByStaffId: uuid('received_by_staff_id').references(() => staffRecords.id, { onDelete: 'set null' }),
+    note: text('note'),
+    issuedBy: uuid('issued_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('store_issues_number_uq').on(t.number),
+    index('store_issues_store_idx').on(t.subStoreId, t.issueDate),
+    index('store_issues_department_idx').on(t.departmentId, t.issueDate),
+    index('store_issues_indent_idx').on(t.indentId),
+  ],
+);
+
+export const storeIssueLines = pgTable(
+  'store_issue_lines',
+  {
+    issueId: uuid('issue_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    lotId: uuid('lot_id').references(() => stockLots.id, { onDelete: 'restrict' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.issueId, t.position] }),
+    foreignKey({ name: 'store_issue_lines_issue_fk', columns: [t.issueId], foreignColumns: [storeIssues.id] }).onDelete(
+      'cascade',
+    ),
+    check('store_issue_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old SStockTransfers (main → sub), SubStoreToMainTransfers (sub → main) and SCMStockTransfers (sub → sub,
+// accepted by the receiving store).
+export const stockTransfers = pgTable(
+  'stock_transfers',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    kind: text('kind', { enum: ['main_to_sub', 'sub_to_main', 'sub_to_sub'] }).notNull(),
+    fromMainStoreId: uuid('from_main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
+    fromSubStoreId: uuid('from_sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    toMainStoreId: uuid('to_main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
+    toSubStoreId: uuid('to_sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    requestId: uuid('request_id').references(() => storeRequests.id, { onDelete: 'restrict' }),
+    transferDate: day('transfer_date').notNull(),
+    status: text('status', { enum: ['pending', 'completed', 'rejected'] }).notNull(),
+    note: text('note'),
+    rejectReason: text('reject_reason'),
+    sentBy: uuid('sent_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('stock_transfers_number_uq').on(t.number),
+    index('stock_transfers_date_idx').on(t.transferDate),
+    index('stock_transfers_request_idx').on(t.requestId),
+    check('stock_transfers_kind_ck', sql`${t.kind} in ('main_to_sub', 'sub_to_main', 'sub_to_sub')`),
+    check('stock_transfers_status_ck', sql`${t.status} in ('pending', 'completed', 'rejected')`),
+    check(
+      'stock_transfers_stores_ck',
+      sql`(${t.kind} = 'main_to_sub' and ${t.fromMainStoreId} is not null and ${t.toSubStoreId} is not null
+            and ${t.fromSubStoreId} is null and ${t.toMainStoreId} is null)
+        or (${t.kind} = 'sub_to_main' and ${t.fromSubStoreId} is not null and ${t.toMainStoreId} is not null
+            and ${t.fromMainStoreId} is null and ${t.toSubStoreId} is null)
+        or (${t.kind} = 'sub_to_sub' and ${t.fromSubStoreId} is not null and ${t.toSubStoreId} is not null
+            and ${t.fromMainStoreId} is null and ${t.toMainStoreId} is null and ${t.fromSubStoreId} <> ${t.toSubStoreId})`,
+    ),
+  ],
+);
+
+export const stockTransferLines = pgTable(
+  'stock_transfer_lines',
+  {
+    transferId: uuid('transfer_id').notNull(),
+    position: smallint('position').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: quantity('qty').notNull(),
+    acceptedQty: quantity('accepted_qty'),
+    lotId: uuid('lot_id').references(() => stockLots.id, { onDelete: 'restrict' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.transferId, t.position] }),
+    foreignKey({
+      name: 'stock_transfer_lines_transfer_fk',
+      columns: [t.transferId],
+      foreignColumns: [stockTransfers.id],
+    }).onDelete('cascade'),
+    check(
+      'stock_transfer_lines_qty_ck',
+      sql`${t.qty} > 0 and (${t.acceptedQty} is null or ${t.acceptedQty} between 0 and ${t.qty})`,
+    ),
   ],
 );

@@ -1,8 +1,10 @@
+import type { LotBalance } from './allocation.js';
 import type { ComparativeStudy } from './comparative-study.js';
 import type { ApprovalLevel } from './documents.js';
 import type { PurchaseOrder } from './purchase-order.js';
 import type { PurchaseRequisition } from './requisition.js';
 import type { StockReceive } from './stock-receive.js';
+import type { MoveLine, StoreIndent, StoreRequest, TransferKind, TransferStatus } from './store-documents.js';
 
 /** Serial numbers per document kind and year. */
 export abstract class ScmSequences {
@@ -56,6 +58,8 @@ export abstract class OrderRepository {
 
 export type StoreRef = { readonly mainStoreId: string } | { readonly subStoreId: string };
 
+export type MovementKind = 'opening' | 'receive' | 'issue' | 'transfer';
+
 export interface NewMovement {
   readonly store: StoreRef;
   readonly variantId: string;
@@ -64,7 +68,7 @@ export interface NewMovement {
   readonly qty: number;
   readonly unitCost: number;
   readonly movedOn: string;
-  readonly kind: 'opening' | 'receive';
+  readonly kind: MovementKind;
   readonly documentId: string;
   readonly documentNumber: string;
 }
@@ -73,6 +77,8 @@ export abstract class StockLedger {
   /** The lot of a variant with this batch and expiry, created on first use. */
   abstract lot(variantId: string, batchNo: string | null, expiryDate: string | null): Promise<string>;
   abstract add(movements: readonly NewMovement[]): Promise<void>;
+  /** What the store holds of each variant, by lot (lots with nothing left are left out). */
+  abstract balances(store: StoreRef, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>>;
 }
 
 export interface CatalogueVariant {
@@ -117,4 +123,66 @@ export interface OpeningRecord {
 
 export abstract class OpeningRepository {
   abstract insert(opening: OpeningRecord): Promise<void>;
+}
+
+export abstract class IndentRepository {
+  abstract findForUpdate(id: string): Promise<StoreIndent | null>;
+  /** Throws NotFoundError for a missing sub-store, department or item. */
+  abstract insert(indent: StoreIndent): Promise<void>;
+  abstract update(indent: StoreIndent): Promise<void>;
+  abstract delete(id: string): Promise<void>;
+  /** A sub-store's indent approval levels, in order. */
+  abstract levels(subStoreId: string): Promise<PurchaseApprovalLevel[]>;
+}
+
+export abstract class RequestRepository {
+  abstract findForUpdate(id: string): Promise<StoreRequest | null>;
+  abstract insert(request: StoreRequest): Promise<void>;
+  abstract update(request: StoreRequest): Promise<void>;
+}
+
+export interface IssueRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly subStoreId: string;
+  readonly departmentId: string;
+  readonly indentId: string | null;
+  readonly issueDate: string;
+  readonly receivedByStaffId: string | null;
+  readonly note: string | null;
+  readonly issuedBy: string;
+  readonly lines: readonly MoveLine[];
+}
+
+export interface TransferRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly kind: TransferKind;
+  readonly from: StoreRef;
+  readonly to: StoreRef;
+  readonly requestId: string | null;
+  readonly transferDate: string;
+  status: TransferStatus;
+  readonly note: string | null;
+  rejectReason: string | null;
+  readonly sentBy: string | null;
+  decidedBy: string | null;
+  decidedAt: Date | null;
+  version: number;
+  lines: (MoveLine & { acceptedQty: number | null })[];
+}
+
+export abstract class StoreMoveRepository {
+  abstract insertIssue(issue: IssueRecord): Promise<void>;
+  abstract insertTransfer(transfer: TransferRecord): Promise<void>;
+  abstract findTransferForUpdate(id: string): Promise<TransferRecord | null>;
+  abstract updateTransfer(transfer: TransferRecord): Promise<void>;
+}
+
+/** Who may do what in which store (old DeptStoreAcess, StoreDeptUserAccess, IssueStoreAcess). */
+export abstract class StoreAccess {
+  /** The sub-store's main store, or null when there is no such sub-store. */
+  abstract mainStoreOf(subStoreId: string): Promise<string | null>;
+  abstract mayIndentFor(userId: string, departmentId: string): Promise<boolean>;
+  abstract mayIssueFrom(userId: string, subStoreId: string): Promise<boolean>;
 }

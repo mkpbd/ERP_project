@@ -16,7 +16,9 @@ import {
   type NewMovement,
   type OpeningRecord,
   type PayableSupplier,
+  type StoreRef,
 } from '../../domain/repositories.js';
+import type { LotBalance } from '../../domain/allocation.js';
 import { StockReceive } from '../../domain/stock-receive.js';
 import {
   items,
@@ -94,6 +96,35 @@ export class DrizzleStockLedger extends StockLedger {
         ),
       );
     return existing!.id;
+  }
+
+  async balances(store: StoreRef, variantIds: readonly string[]): Promise<Map<string, LotBalance[]>> {
+    const balances = new Map<string, LotBalance[]>();
+    if (variantIds.length === 0) return balances;
+    const columns = storeColumns(store);
+    const rows = await this.context.db
+      .select({
+        variantId: stockMovements.variantId,
+        lotId: stockMovements.lotId,
+        batchNo: stockLots.batchNo,
+        expiryDate: stockLots.expiryDate,
+        qty: sql<number>`sum(${stockMovements.qty})`.mapWith(Number),
+        value: sql<number>`sum(${stockMovements.qty} * ${stockMovements.unitCost})`.mapWith(Number),
+      })
+      .from(stockMovements)
+      .innerJoin(stockLots, eq(stockLots.id, stockMovements.lotId))
+      .where(
+        and(
+          columns.mainStoreId
+            ? eq(stockMovements.mainStoreId, columns.mainStoreId)
+            : eq(stockMovements.subStoreId, columns.subStoreId!),
+          inArray(stockMovements.variantId, [...new Set(variantIds)]),
+        ),
+      )
+      .groupBy(stockMovements.variantId, stockMovements.lotId, stockLots.batchNo, stockLots.expiryDate)
+      .having(sql`sum(${stockMovements.qty}) > 0`);
+    for (const { variantId, ...lot } of rows) balances.set(variantId, [...(balances.get(variantId) ?? []), lot]);
+    return balances;
   }
 
   async add(movements: readonly NewMovement[]): Promise<void> {

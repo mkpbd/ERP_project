@@ -66,7 +66,8 @@ export class PurchaseDesk {
     readonly orders: OrderRepository,
   ) {}
 
-  async number(kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS', date: string): Promise<string> {
+  /** PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request, IS issue, TR transfer. */
+  async number(kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR', date: string): Promise<string> {
     const year = Number(date.slice(0, 4));
     return documentNumber(kind, year, await this.sequences.next(kind, year));
   }

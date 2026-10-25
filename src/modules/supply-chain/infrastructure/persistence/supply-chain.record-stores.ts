@@ -32,6 +32,7 @@ import {
   purchaseApprovalLevels,
   roleGroupRestrictions,
   storeDepartments,
+  storeIndentApprovalLevels,
   subStores,
   suppliers,
   supplierTypes,
@@ -188,6 +189,20 @@ export function supplyChainRecordTypes(context: DbContext): RecordType[] {
       references: {
         [fk('purchase_approval_levels', 'main_store_id', 'main_stores')]: R.mainStore,
         [fk('purchase_approval_levels', 'role_id', 'roles')]: 'role',
+      },
+    }),
+    record(R.indentApprovalLevel, storeIndentApprovalLevels, {
+      orderBy: [storeIndentApprovalLevels.subStoreId, storeIndentApprovalLevels.levelOrder],
+      filters: { subStoreId: storeIndentApprovalLevels.subStoreId },
+      unique: {
+        store_indent_approval_levels_order_uq: taken(
+          'store_indent_approval_level_exists',
+          'The sub-store already has this level',
+        ),
+      },
+      references: {
+        [fk('store_indent_approval_levels', 'sub_store_id', 'sub_stores')]: R.subStore,
+        [fk('store_indent_approval_levels', 'role_id', 'roles')]: 'role',
       },
     }),
     record(R.csApprovalLevel, csApprovalLevels, {

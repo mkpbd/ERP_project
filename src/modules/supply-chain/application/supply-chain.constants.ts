@@ -17,6 +17,7 @@ export const SCM_RECORDS = {
   supplier: 'supplier',
   purchaseApprovalLevel: 'purchase_approval_level',
   csApprovalLevel: 'cs_approval_level',
+  indentApprovalLevel: 'store_indent_approval_level',
 } as const;
 
 /** Stores, the item catalogue and suppliers. */
@@ -29,3 +30,7 @@ export const SCM_PURCHASE = 'scm:purchase';
 export const SCM_RECEIVE = 'scm:receive';
 
 export const GRN_FAULT = 'grn_fault';
+/** Raising store indents and store requests. */
+export const SCM_INDENT = 'scm:indent';
+/** Issuing from sub-stores and transferring between stores. */
+export const SCM_ISSUE = 'scm:issue';

@@ -1,0 +1,41 @@
+{{#with data.indent}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Indent no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date indentDate}}</td></tr>
+    <tr><td>Sub-store</td><td>{{subStoreName}}</td><td>Department</td><td>{{departmentName}}</td></tr>
+    <tr><td>Priority</td><td>{{../data.priority}}</td><td>Status</td><td>{{../data.status}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Item</th><th>Unit</th>
+      <th class="num">Requested</th><th class="num">Approved</th><th class="num">Served</th><th>Remarks</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}{{#if code}} ({{code}}){{/if}}</td>
+      <td>{{unit}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{approvedQty}}</td>
+      <td class="num">{{servedQty}}</td>
+      <td>{{remarks}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if note}}<p><b>Note:</b> {{note}}</p>{{/if}}
+{{#if decisions.length}}
+<table class="report" style="margin-top: 10px">
+  <thead><tr><th>Level</th><th>Decision</th><th>When</th><th>Remarks</th></tr></thead>
+  <tbody>
+    {{#each decisions}}
+    <tr><td>{{levelName}}</td><td>{{decision}}</td><td>{{date decidedAt}}</td><td>{{remarks}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

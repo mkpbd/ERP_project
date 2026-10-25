@@ -1,5 +1,6 @@
 import { ConflictError, DomainError } from '../../../shared/domain/errors.js';
 import {
+  approvedLines,
   firstLevel,
   nextLevel,
   validLineSet,
@@ -134,23 +135,7 @@ export class PurchaseRequisition {
     now: Date;
   }): void {
     this.assertDecidable(params.level);
-    for (const variantId of params.quantities.keys()) {
-      if (!this.props.lines.some((line) => line.variantId === variantId)) {
-        throw new DomainError('invalid_line', 'An approved quantity is for an item not on the requisition');
-      }
-    }
-    const lines = this.props.lines.map((line, index) => {
-      const approved = params.quantities.get(line.variantId) ?? line.approvedQty ?? line.requestedQty;
-      validQuantity(approved, `Line ${index + 1}`, true);
-      if (approved > line.requestedQty) {
-        throw new DomainError('approval_exceeds_request', `Line ${index + 1}: more than requested is approved`);
-      }
-      return { ...line, approvedQty: approved };
-    });
-    if (lines.every((line) => line.approvedQty === 0)) {
-      throw new DomainError('nothing_approved', 'Approve at least one line, or reject the requisition');
-    }
-    this.props.lines = lines;
+    this.props.lines = approvedLines(this.props.lines, params.quantities, (line) => line.requestedQty, 'requisition');
     this.decide(params.level, 'approved', params.by, validRemarks(params.remarks, false), params.now);
     const next = nextLevel(params.levels, params.level);
     this.props.currentLevel = next?.order ?? null;

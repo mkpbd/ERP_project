@@ -202,3 +202,9 @@ const csLevel = shapes({ levelOrder, name: name(50), approverStaffId: ref, isFin
 export class CreateCsApprovalLevelDto extends createZodDto(csLevel.create) {}
 export class UpdateCsApprovalLevelDto extends createZodDto(csLevel.update) {}
 export class CsApprovalLevelResponseDto extends responseDto(csLevel.response) {}
+
+const indentLevel = shapes({ subStoreId: ref, levelOrder, name: name(50), roleId: ref });
+export class CreateIndentApprovalLevelDto extends createZodDto(indentLevel.create) {}
+export class UpdateIndentApprovalLevelDto extends createZodDto(indentLevel.update) {}
+export class IndentApprovalLevelFilterDto extends createZodDto(z.object({ subStoreId: ref.optional() })) {}
+export class IndentApprovalLevelResponseDto extends responseDto(indentLevel.response) {}

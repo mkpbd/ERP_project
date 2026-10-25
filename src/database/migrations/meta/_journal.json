@@ -134,6 +134,13 @@
       "when": 1792952491553,
       "tag": "0018_scm_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792954465845,
+      "tag": "0019_scm_store_operations",
+      "breakpoints": true
     }
   ]
 }

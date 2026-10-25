@@ -63,6 +63,10 @@ import {
   CreateCsApprovalLevelDto,
   UpdateCsApprovalLevelDto,
   CsApprovalLevelResponseDto,
+  CreateIndentApprovalLevelDto,
+  UpdateIndentApprovalLevelDto,
+  IndentApprovalLevelFilterDto,
+  IndentApprovalLevelResponseDto,
 } from './dto/supply-chain.dto.js';
 
 const scm = { tag: 'supply-chain', readPermission: 'scm:read', managePermission: 'scm:manage' } as const;
@@ -265,6 +269,18 @@ export const CsApprovalLevelsController = createRecordController({
   response: CsApprovalLevelResponseDto,
 });
 
+export const IndentApprovalLevelsController = createRecordController({
+  ...scm,
+  className: 'IndentApprovalLevelsController',
+  path: 'scm/indent-approval-levels',
+  type: R.indentApprovalLevel,
+  label: 'store indent approval level',
+  create: CreateIndentApprovalLevelDto,
+  update: UpdateIndentApprovalLevelDto,
+  response: IndentApprovalLevelResponseDto,
+  filter: IndentApprovalLevelFilterDto,
+});
+
 export const SCM_RECORD_CONTROLLERS = [
   MainStoresController,
   SubStoresController,
@@ -283,4 +299,5 @@ export const SCM_RECORD_CONTROLLERS = [
   SuppliersController,
   PurchaseApprovalLevelsController,
   CsApprovalLevelsController,
+  IndentApprovalLevelsController,
 ];

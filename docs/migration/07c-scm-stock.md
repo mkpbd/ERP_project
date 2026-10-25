@@ -1,6 +1,6 @@
 # Step 7c — Supply chain: stock receive, lots, stock ledger, posting to accounts
 
-Status: **done** (2026-10-26). Previous: [step 7b](07b-scm-purchase.md) · Next: step 7d (store operations).
+Status: **done** (2026-10-26). Previous: [step 7b](07b-scm-purchase.md) · Next: [step 7d](07d-scm-store-operations.md) (store operations).
 
 ## Where the old logic lives
 
