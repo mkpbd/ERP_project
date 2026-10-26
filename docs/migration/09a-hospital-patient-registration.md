@@ -1,17 +1,18 @@
 # Step 9a — Hospital: patient registration and UHID
 
-Status: **done** (2026-10-26). Previous: [step 8h](08h-pharmacy-reports.md) · Next: step 9b (doctors and OPD
-consultations).
+Status: **done** (2026-10-26). Previous: [step 8h](08h-pharmacy-reports.md) · Next: [step 9b](09b-hospital-doctors-appointments.md)
+(doctors and appointments).
 
 Step 9 is split up. The plan below is tentative:
 
 * **9a** registration and UHID;
-* **9b** doctors and OPD consultations (with `UHIDUsesRecords`);
-* **9c** hospital service billing and collections;
-* **9d** admissions, beds and discharge;
-* **9e** the indoor bill, patient ledgers and due collection.
+* **9b** doctors, schedules and appointments;
+* **9c** OPD consultation billing (with `UHIDUsesRecords`);
+* **9d** OPD and emergency service billing;
+* **9e** admissions, beds and discharge;
+* **9f** the indoor bill, patient ledgers, due collection and UHID merge.
 
-The pharmacy's indoor patients (step 8i) follow 9d.
+The pharmacy's indoor patients (step 8i) follow 9e.
 
 ## Where the old logic lives
 
@@ -112,7 +113,7 @@ What the old registration did, and what changes:
 * The UHID is printed with the organization's prefix from the general settings.
 * The card has a QR code as well as the barcode.
 * The patient's own mobile is optional when the contact person's is given.
-* Merging two UHIDs of the same person comes with step 9e, once visits and bills exist; until then the duplicate is
+* Merging two UHIDs of the same person comes with step 9f, once visits and bills exist; until then the duplicate is
   taken out of use.
 * Registration stays free, as in the old system.
 

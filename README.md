@@ -178,6 +178,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /hospital/patients/*` (search, view, matches, photo) | `patient:read` |
 | registering patients, changing their details and photos | `patient:register` |
 | taking a patient record out of use and back | `patient:manage` |
+| `GET` doctors, specialities, schedules, days off, appointments and the doctor board | `opd:read` |
+| doctors, specialities, chamber schedules and days off | `opd:manage` |
+| booking appointments; arrival, no-show, cancellation, attaching the patient | `opd:book` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

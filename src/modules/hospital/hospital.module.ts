@@ -3,10 +3,22 @@ import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
+import { DbContext } from '../../database/drizzle-transaction-manager.js';
+import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
+import { AppointmentReadRepository } from './application/appointment.messages.js';
 import { HOSPITAL_SETTINGS, PATIENT_HANDLERS } from './application/patient.handlers.js';
 import { PatientReadRepository } from './application/patient.messages.js';
-import { PatientRepository } from './domain/repositories.js';
+import { AppointmentRepository, PatientRepository } from './domain/repositories.js';
+import {
+  DrizzleAppointmentReadRepository,
+  DrizzleAppointmentRepository,
+} from './infrastructure/persistence/drizzle-appointment.repositories.js';
+import { hospitalRecordTypes } from './infrastructure/persistence/hospital.record-stores.js';
+import { appointmentSlipReport, doctorAppointmentsReport } from './infrastructure/reports/appointment.reports.js';
+import { APPOINTMENT_CONTROLLERS } from './presentation/appointment.controllers.js';
+import { DOCTOR_CONTROLLERS } from './presentation/doctor.controllers.js';
 import {
   DrizzlePatientReadRepository,
   DrizzlePatientRepository,
@@ -15,15 +27,18 @@ import { patientCardReport, patientRegisterReport } from './infrastructure/repor
 import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 
 /**
- * Hospital (old Hospital area): patient registration with the UHID kept for every visit (step 9a). OPD, billing and
- * admissions follow in later steps.
+ * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
+ * chamber schedules and appointments (step 9b). Consultation billing and admissions follow in later steps.
  */
 @Module({
-  controllers: [...PATIENT_CONTROLLERS],
+  controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS],
   providers: [
     ...PATIENT_HANDLERS,
+    ...APPOINTMENT_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
+    { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
+    { provide: AppointmentReadRepository, useClass: DrizzleAppointmentReadRepository },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -33,14 +48,20 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 })
 export class HospitalModule implements OnModuleInit {
   constructor(
+    private readonly records: RecordTypeRegistry,
+    private readonly context: DbContext,
     private readonly reports: ReportRegistry,
     private readonly read: PatientReadRepository,
     private readonly locations: LocationDirectory,
     private readonly organization: OrganizationProfile,
+    private readonly appointments: AppointmentReadRepository,
   ) {}
 
   onModuleInit(): void {
+    for (const type of hospitalRecordTypes(this.context)) this.records.register(type);
     this.reports.register(patientCardReport(this.read, this.organization));
     this.reports.register(patientRegisterReport(this.read, this.locations, this.organization));
+    this.reports.register(doctorAppointmentsReport(this.appointments, this.organization));
+    this.reports.register(appointmentSlipReport(this.appointments, this.organization));
   }
 }

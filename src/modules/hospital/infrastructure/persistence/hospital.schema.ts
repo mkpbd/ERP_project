@@ -7,6 +7,7 @@ import {
   date,
   index,
   integer,
+  numeric,
   pgTable,
   primaryKey,
   smallint,
@@ -25,6 +26,9 @@ const SEXES = ['male', 'female', 'other'] as const;
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 const MARITAL_STATUSES = ['single', 'married', 'widowed', 'divorced', 'separated'] as const;
 const ID_TYPES = ['nid', 'passport', 'driving_licence', 'birth_certificate'] as const;
+const money = (name: string) => numeric(name, { precision: 12, scale: 2, mode: 'number' });
+const VISIT_TYPES = ['first', 'new', 'follow_up', 'report'] as const;
+const APPOINTMENT_STATUSES = ['booked', 'arrived', 'no_show', 'cancelled'] as const;
 const bytea = customType<{ data: Buffer; driverData: Buffer }>({ dataType: () => 'bytea' });
 
 // Old Admin.InvoiceGenerators as used for UHIDs (spGetNextInvoiceNo with the patient registration service unit): one
@@ -121,5 +125,142 @@ export const patientPhotos = pgTable(
   (t) => [
     check('hospital_patient_photos_type_ck', sql`${t.contentType} in ('image/png', 'image/jpeg', 'image/webp')`),
     check('hospital_patient_photos_size_ck', sql`octet_length(${t.data}) between 1 and 1048576`),
+  ],
+);
+
+// Old Marketing.DoctorFieldOfSpecialities.
+export const specialities = pgTable(
+  'hospital_specialities',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_specialities_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_specialities_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Marketing.Doctors: consultants who see patients here and doctors who refer them (one table, as before). The
+// old six free-text degree lines are one text; the old chamber and self-chamber fee pairs are one fee per visit type
+// (the old page fell back from one to the other anyway). A doctor may be tied to a login (old Users.DoctorId).
+export const doctors = pgTable(
+  'hospital_doctors',
+  {
+    id: uuid('id').primaryKey(),
+    code: text('code'),
+    name: text('name').notNull(),
+    degrees: text('degrees'),
+    specialityId: uuid('speciality_id').references(() => specialities.id, { onDelete: 'restrict' }),
+    phone: text('phone'),
+    roomNo: text('room_no'),
+    /** Sees patients in a chamber here (old IsChamberPractitioner); others only refer. */
+    isConsultant: boolean('is_consultant').notNull().default(false),
+    /** Old OPDChamberVisitFeeMaiden / New / Old and OPDChamberReportConsultancyFee. */
+    firstVisitFee: money('first_visit_fee').notNull().default(0),
+    newVisitFee: money('new_visit_fee').notNull().default(0),
+    followUpFee: money('follow_up_fee').notNull().default(0),
+    reportFee: money('report_fee').notNull().default(0),
+    userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_doctors_code_uq').on(sql`upper(${t.code})`),
+    uniqueIndex('hospital_doctors_user_uq').on(t.userId),
+    index('hospital_doctors_name_idx').on(sql`lower(${t.name})`),
+    check('hospital_doctors_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+    check(
+      'hospital_doctors_fees_ck',
+      sql`${t.firstVisitFee} >= 0 and ${t.newVisitFee} >= 0 and ${t.followUpFee} >= 0 and ${t.reportFee} >= 0`,
+    ),
+  ],
+);
+
+// Old OPD.DoctorChamberSchedules (and the single weekly ChamberPractionerSettings before it): one sitting per doctor
+// and weekday — the first patient's time, minutes per patient and how many are seen.
+export const doctorSchedules = pgTable(
+  'hospital_doctor_schedules',
+  {
+    id: uuid('id').primaryKey(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'cascade' }),
+    /** 0 = Sunday … 6 = Saturday. */
+    dayOfWeek: smallint('day_of_week').notNull(),
+    startTime: text('start_time').notNull(),
+    slotMinutes: smallint('slot_minutes').notNull(),
+    maxPatients: smallint('max_patients').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_doctor_schedules_day_uq').on(t.doctorId, t.dayOfWeek),
+    check('hospital_doctor_schedules_day_ck', sql`${t.dayOfWeek} between 0 and 6`),
+    check('hospital_doctor_schedules_time_ck', sql`${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`),
+    check('hospital_doctor_schedules_slot_ck', sql`${t.slotMinutes} between 1 and 240`),
+    check('hospital_doctor_schedules_max_ck', sql`${t.maxPatients} between 1 and 500`),
+  ],
+);
+
+// Old ChamberPractionerRoutines (IsChamberOpen = false) and the schedule's IsClosed / ClosedReason: days a doctor
+// does not sit.
+export const doctorClosures = pgTable(
+  'hospital_doctor_closures',
+  {
+    id: uuid('id').primaryKey(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'cascade' }),
+    closedOn: day('closed_on').notNull(),
+    reason: text('reason'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('hospital_doctor_closures_day_uq').on(t.doctorId, t.closedOn)],
+);
+
+// Old OPD.DoctorAppointments: a serial with a doctor on a day. A patient not registered yet is booked by name and
+// mobile (the old UHID 0) and attached when registered. The old status strings Booked → Invoiced → Vital →
+// Prescribed become booked → arrived (billing and the Rx steps keep their own records).
+export const appointments = pgTable(
+  'hospital_appointments',
+  {
+    id: uuid('id').primaryKey(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    appointmentDate: day('appointment_date').notNull(),
+    serial: smallint('serial').notNull(),
+    slotTime: text('slot_time').notNull(),
+    visitType: text('visit_type', { enum: VISIT_TYPES }).notNull(),
+    patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'restrict' }),
+    patientName: text('patient_name').notNull(),
+    mobileNo: text('mobile_no').notNull(),
+    referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    /** The doctor's fee for the visit type when booked (what the counter quotes). */
+    fee: money('fee').notNull(),
+    status: text('status', { enum: APPOINTMENT_STATUSES }).notNull(),
+    statusReason: text('status_reason'),
+    remarks: text('remarks'),
+    bookedBy: uuid('booked_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    // One booking per serial; a cancelled booking frees its serial.
+    uniqueIndex('hospital_appointments_serial_uq')
+      .on(t.doctorId, t.appointmentDate, t.serial)
+      .where(sql`${t.status} <> 'cancelled'`),
+    index('hospital_appointments_date_idx').on(t.appointmentDate),
+    index('hospital_appointments_patient_idx').on(t.patientId),
+    check('hospital_appointments_serial_ck', sql`${t.serial} between 1 and 500`),
+    check('hospital_appointments_mobile_ck', sql`${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
+    check('hospital_appointments_fee_ck', sql`${t.fee} >= 0`),
   ],
 );

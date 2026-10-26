@@ -78,10 +78,11 @@ Order follows dependencies: later modules reference earlier ones.
 | 8h | Pharmacy: reports — product ledger, stock movement, expiry, physical inventory summary, purchase and sales summaries, cash counter | **Done** | [08h-pharmacy-reports.md](08h-pharmacy-reports.md) |
 | 8i | Pharmacy: indoor patients (indents, IPD sales and returns, dues) — after the admissions of step 9 | Planned | |
 | 9a | Hospital: patient registration with UHID, duplicate check, age or birth date, photo, patient card with barcode, registration register | **Done** | [09a-hospital-patient-registration.md](09a-hospital-patient-registration.md) |
-| 9b | Hospital: doctors and OPD consultations, `UHIDUsesRecords` | Next | |
-| 9c | Hospital: service billing and collections | Planned | |
-| 9d | Hospital: admissions, beds and discharge | Planned | |
-| 9e | Hospital: indoor bill, consultant and IPD patient ledgers, due collection | Planned | |
+| 9b | Hospital: doctors, specialities, chamber schedules and days off, appointments by serial, doctor board, appointment list and slip | **Done** | [09b-hospital-doctors-appointments.md](09b-hospital-doctors-appointments.md) |
+| 9c | Hospital: OPD consultation billing, doctor's share, due collection, cancel and refund, `UHIDUsesRecords` | Next | |
+| 9d | Hospital: OPD and emergency service billing and collections | Planned | |
+| 9e | Hospital: admissions, beds and discharge | Planned | |
+| 9f | Hospital: indoor bill, consultant and IPD patient ledgers, due collection, UHID merge | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

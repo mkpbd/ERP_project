@@ -253,6 +253,13 @@
       "when": 1793006339985,
       "tag": "0035_hospital_patient_contact_phone",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1793007226252,
+      "tag": "0036_hospital_doctors_appointments",
+      "breakpoints": true
     }
   ]
 }

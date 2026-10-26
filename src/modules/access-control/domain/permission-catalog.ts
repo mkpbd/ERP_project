@@ -73,6 +73,9 @@ export const PERMISSION_CATALOG = [
     description: 'Sell medicines over the counter at the outlets you work at and collect loyal member dues',
   },
   { key: 'pharmacy:count', description: 'Open, count and cancel stock counts at the outlets you work at' },
+  { key: 'opd:read', description: 'See doctors, their chamber schedules and the appointment books' },
+  { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
+  { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },
   { key: 'patient:register', description: 'Register patients, give UHIDs and change their details and photos' },
   {

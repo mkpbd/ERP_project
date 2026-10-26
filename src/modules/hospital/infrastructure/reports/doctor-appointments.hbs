@@ -1,0 +1,30 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 40px">Serial</th><th>Time</th><th>UHID</th><th>Patient</th><th>Mobile</th>
+      <th>Visit</th><th class="num">Fee</th><th>Status</th><th style="width: 22%">Remarks</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center"><b>{{serial}}</b></td>
+      <td>{{slotTime}}</td>
+      <td>{{uhidLabel}}</td>
+      <td>{{patientName}}{{#if referredByName}}<br /><small>Ref. {{referredByName}}</small>{{/if}}</td>
+      <td>{{mobileNo}}</td>
+      <td>{{visit}}</td>
+      <td class="num">{{money fee}}</td>
+      <td>{{state}}</td>
+      <td>{{remarks}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="9">{{rows.length}} patients</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>No appointment on this day.</p>
+{{/if}}
+{{/with}}
