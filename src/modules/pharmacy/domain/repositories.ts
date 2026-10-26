@@ -4,6 +4,7 @@ import type { DiscountPolicy, ProductDiscount } from './discount.js';
 import type { PharmacyOrder } from './purchase-order.js';
 import type { ReturnChannel, ReturnPolicy } from './return-window.js';
 import type { PharmacySale, ReturnedPart, SaleDue } from './sale.js';
+import type { StockCount } from './stock-count.js';
 import type { OutletTransfer } from './transfer.js';
 import type { PharmacyReceive } from './receive.js';
 import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
@@ -22,7 +23,8 @@ export type MovementKind =
   | 'transfer_in'
   | 'sale'
   | 'sale_cancel'
-  | 'sale_return';
+  | 'sale_return'
+  | 'count_adjustment';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -217,4 +219,23 @@ export interface SaleReturnRecord {
 
 export abstract class SaleReturnRepository {
   abstract insert(saleReturn: SaleReturnRecord): Promise<void>;
+}
+
+/** A lot an outlet holds as of a date. */
+export interface HeldLot {
+  readonly productId: string;
+  readonly lotId: string;
+  readonly qty: number;
+  /** Value of the units at the costs they came in at. */
+  readonly value: number;
+}
+
+export abstract class StockCountRepository {
+  abstract findForUpdate(id: string): Promise<StockCount | null>;
+  abstract insert(count: StockCount): Promise<void>;
+  abstract update(count: StockCount): Promise<void>;
+  /** Every lot the outlet holds (or owes) as of the date, optionally of some products only. */
+  abstract lotsAsOf(outletId: string, asOf: string, productIds?: readonly string[]): Promise<HeldLot[]>;
+  /** Units of the lots at the outlet as of the date. */
+  abstract balancesAsOf(outletId: string, lotIds: readonly string[], asOf: string): Promise<Map<string, number>>;
 }

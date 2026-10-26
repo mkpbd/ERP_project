@@ -7,6 +7,8 @@ import { PURCHASE_HANDLERS } from './application/purchase.handlers.js';
 import { PharmacyReadRepository } from './application/purchase.messages.js';
 import { SUPPLIER_HANDLERS } from './application/supplier.handlers.js';
 import { SupplierReadRepository } from './application/supplier.messages.js';
+import { COUNT_HANDLERS } from './application/count.handlers.js';
+import { CountReadRepository } from './application/count.messages.js';
 import { RETURN_HANDLERS } from './application/return.handlers.js';
 import { ReturnReadRepository } from './application/return.messages.js';
 import { SALE_HANDLERS } from './application/sale.handlers.js';
@@ -28,6 +30,7 @@ import {
   SaleRepository,
   ReturnPolicies,
   SaleReturnRepository,
+  StockCountRepository,
 } from './domain/repositories.js';
 import { DrizzleCatalogueReadRepository } from './infrastructure/persistence/drizzle-catalogue.read-repository.js';
 import { DrizzlePharmacyReadRepository } from './infrastructure/persistence/drizzle-pharmacy.read-repository.js';
@@ -49,6 +52,10 @@ import {
   DrizzleReturnReadRepository,
   DrizzleSaleReturnRepository,
 } from './infrastructure/persistence/drizzle-return.repositories.js';
+import {
+  DrizzleCountReadRepository,
+  DrizzleStockCountRepository,
+} from './infrastructure/persistence/drizzle-count.repositories.js';
 import { DrizzleSaleReadRepository } from './infrastructure/persistence/drizzle-sale.read-repository.js';
 import { DrizzleDiscountRules, DrizzleSaleRepository } from './infrastructure/persistence/drizzle-sale.repositories.js';
 import { DrizzleTransferReadRepository } from './infrastructure/persistence/drizzle-transfer.read-repository.js';
@@ -69,6 +76,8 @@ import { memberDuesReport, saleReceiptReport } from './infrastructure/reports/sa
 import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
 import { returnReceiptReport } from './infrastructure/reports/return.reports.js';
 import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
+import { countResultReport, countSheetReport } from './infrastructure/reports/count.reports.js';
+import { COUNT_CONTROLLERS } from './presentation/count.controllers.js';
 
 /**
  * Pharmacy: the medicine catalogue (generic groups and generics, formations, strengths, units, manufacturers,
@@ -76,7 +85,7 @@ import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
  * receives into outlets by lot, opening stock, the outlet movement ledger and posting purchases (step 8b);
  * supplier payments over receives and supplier returns settled by replacements (step 8c); outlet indents and
  * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e);
- * returns from customers within the return period (step 8f).
+ * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g).
  */
 @Module({
   controllers: [
@@ -86,6 +95,7 @@ import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
     ...TRANSFER_CONTROLLERS,
     ...SALE_CONTROLLERS,
     ...RETURN_CONTROLLERS,
+    ...COUNT_CONTROLLERS,
   ],
   providers: [
     ...CATALOGUE_HANDLERS,
@@ -94,6 +104,7 @@ import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
     ...TRANSFER_HANDLERS,
     ...SALE_HANDLERS,
     ...RETURN_HANDLERS,
+    ...COUNT_HANDLERS,
     { provide: CatalogueReadRepository, useClass: DrizzleCatalogueReadRepository },
     { provide: PharmacyReadRepository, useClass: DrizzlePharmacyReadRepository },
     { provide: PharmacySequences, useClass: DrizzlePharmacySequences },
@@ -114,6 +125,8 @@ import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
     { provide: ReturnPolicies, useClass: DrizzleReturnPolicies },
     { provide: SaleReturnRepository, useClass: DrizzleSaleReturnRepository },
     { provide: ReturnReadRepository, useClass: DrizzleReturnReadRepository },
+    { provide: StockCountRepository, useClass: DrizzleStockCountRepository },
+    { provide: CountReadRepository, useClass: DrizzleCountReadRepository },
   ],
 })
 export class PharmacyModule implements OnModuleInit {
@@ -127,6 +140,7 @@ export class PharmacyModule implements OnModuleInit {
     private readonly transfers: TransferReadRepository,
     private readonly sales: SaleReadRepository,
     private readonly returns: ReturnReadRepository,
+    private readonly counts: CountReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -141,5 +155,7 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(saleReceiptReport(this.sales));
     this.reports.register(memberDuesReport(this.sales));
     this.reports.register(returnReceiptReport(this.returns));
+    this.reports.register(countSheetReport(this.counts));
+    this.reports.register(countResultReport(this.counts));
   }
 }

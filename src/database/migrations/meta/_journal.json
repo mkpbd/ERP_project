@@ -225,6 +225,13 @@
       "when": 1792997619466,
       "tag": "0031_pharmacy_return_damaged",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1792998127343,
+      "tag": "0032_pharmacy_stock_counts",
+      "breakpoints": true
     }
   ]
 }

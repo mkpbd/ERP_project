@@ -1,0 +1,47 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr>
+      <td style="width: 12%">Count</td><td><b>{{count.number}}</b></td>
+      <td style="width: 12%">Outlet</td><td>{{count.outletName}}</td>
+      <td style="width: 12%">As of</td><td>{{date count.countDate}}</td>
+    </tr>
+    <tr>
+      <td>Status</td><td>{{count.status}}{{#if count.voucherNumber}} · {{count.voucherNumber}}{{/if}}</td>
+      <td>Lots counted</td><td>{{count.countedLines}} of {{count.lineCount}}</td>
+      <td>Note</td><td>{{count.note}}</td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th>
+      <th class="num">System</th><th class="num">Counted</th><th class="num">Difference</th>
+      <th class="num">Unit cost</th><th class="num">Value</th><th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{line}}</td>
+      <td>{{displayName}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}{{#if expired}} <b>expired</b>{{/if}}</td>
+      <td class="num">{{system}}</td>
+      <td class="num">{{countedQty}}</td>
+      <td class="num">{{#if difference}}<b>{{difference}}</b>{{else}}{{difference}}{{/if}}</td>
+      <td class="num">{{unitCost}}</td>
+      <td class="num">{{#if differenceValue}}{{money differenceValue}}{{/if}}</td>
+      <td>{{note}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="8">Short</td><td class="num">{{money short}}</td><td></td></tr>
+    <tr class="group-row"><td colspan="8">Over</td><td class="num">{{money over}}</td><td></td></tr>
+    <tr class="group-row"><td colspan="8">Expired stock on hand (at cost)</td><td class="num">{{money expiredValue}}</td><td></td></tr>
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Counted by</td><td>Checked by</td><td>Pharmacy in-charge</td><td>Accounts</td></tr>
+</table>
+{{/with}}

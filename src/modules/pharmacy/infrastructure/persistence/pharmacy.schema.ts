@@ -235,6 +235,7 @@ export const PHARMACY_MOVEMENT_KINDS = [
   'sale',
   'sale_cancel',
   'sale_return',
+  'count_adjustment',
 ] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
@@ -267,7 +268,7 @@ export const pharmacyMovements = pgTable(
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'pharmacy_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return')`,
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return', 'count_adjustment')`,
     ),
   ],
 );
@@ -966,5 +967,72 @@ export const saleReturnLines = pgTable(
       foreignColumns: [saleReturns.id],
     }).onDelete('cascade'),
     check('pharmacy_sale_return_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old Pharmacy.StockAudits / StockAuditDetails / AuditedStocks: an outlet's stock counted lot by lot as of a date, and
+// the deviations applied in one go.
+export const stockCounts = pgTable(
+  'pharmacy_stock_counts',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    /** The stock counted is the stock at the end of this day. */
+    countDate: day('count_date').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['counting', 'applied', 'cancelled'] }).notNull(),
+    shortageValue: money('shortage_value').notNull().default(0),
+    excessValue: money('excess_value').notNull().default(0),
+    voucherNumber: text('voucher_number'),
+    cancelReason: text('cancel_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    appliedBy: uuid('applied_by').references(() => users.id, { onDelete: 'set null' }),
+    appliedAt: tz('applied_at'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_stock_counts_number_uq').on(t.number),
+    index('pharmacy_stock_counts_outlet_idx').on(t.outletId, t.countDate),
+    check('pharmacy_stock_counts_status_ck', sql`${t.status} in ('counting', 'applied', 'cancelled')`),
+  ],
+);
+
+export const stockCountLines = pgTable(
+  'pharmacy_stock_count_lines',
+  {
+    countId: uuid('count_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    /** What the ledger held as of the count date when the count was opened (or when the lot was added). */
+    systemQty: integer('system_qty').notNull(),
+    countedQty: integer('counted_qty'),
+    /** What a unit of the lot costs at the outlet (or the cost given for a lot the outlet never held). */
+    unitCost: unitCost('unit_cost').notNull(),
+    note: text('note'),
+    /** Set when applied: the ledger as of the count date then, and the units moved to match the count. */
+    appliedSystemQty: integer('applied_system_qty'),
+    adjustedQty: integer('adjusted_qty'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.countId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_stock_count_lines_fk',
+      columns: [t.countId],
+      foreignColumns: [stockCounts.id],
+    }).onDelete('cascade'),
+    uniqueIndex('pharmacy_stock_count_lines_lot_uq').on(t.countId, t.lotId),
+    check(
+      'pharmacy_stock_count_lines_qty_ck',
+      sql`${t.systemQty} >= 0 and (${t.countedQty} is null or ${t.countedQty} >= 0) and ${t.unitCost} >= 0`,
+    ),
   ],
 );

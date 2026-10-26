@@ -72,6 +72,7 @@ export const PERMISSION_CATALOG = [
     key: 'pharmacy:sell',
     description: 'Sell medicines over the counter at the outlets you work at and collect loyal member dues',
   },
+  { key: 'pharmacy:count', description: 'Open, count and cancel stock counts at the outlets you work at' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

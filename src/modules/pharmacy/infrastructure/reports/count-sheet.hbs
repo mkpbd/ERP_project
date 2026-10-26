@@ -1,0 +1,33 @@
+{{#with data.count}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th>
+      <th style="width: 18%">Counted</th><th style="width: 22%">Remarks</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{line}}</td>
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}{{#if expired}} <b>expired</b>{{/if}}</td>
+      <td style="height: 22px"></td>
+      <td></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p>{{lines.length}} lots. Count every unit on the shelf and in the store room; write lots not listed below.</p>
+<table class="report" style="margin-top: 6px">
+  <thead><tr><th>Product</th><th>Batch</th><th>Expiry</th><th>Sale rate</th><th>Counted</th></tr></thead>
+  <tbody>
+    <tr><td style="height: 22px"></td><td></td><td></td><td></td><td></td></tr>
+    <tr><td style="height: 22px"></td><td></td><td></td><td></td><td></td></tr>
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Counted by</td><td>Checked by</td><td>Pharmacy in-charge</td></tr>
+</table>
+{{/with}}

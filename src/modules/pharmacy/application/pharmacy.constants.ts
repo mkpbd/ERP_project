@@ -30,3 +30,5 @@ export const PHARMACY_PAYMENT = 'pharmacy:payment';
 export const PHARMACY_TRANSFER = 'pharmacy:transfer';
 /** Selling over the counter at the outlets one works at, and collecting loyal members' dues. */
 export const PHARMACY_SELL = 'pharmacy:sell';
+/** Opening, counting and cancelling stock counts at the outlets one works at (applying needs pharmacy:manage). */
+export const PHARMACY_COUNT = 'pharmacy:count';

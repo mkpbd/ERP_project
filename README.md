@@ -172,6 +172,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | outlet indents (raise, edit, cancel, close) and transfers (send, accept, reject) | `pharmacy:transfer` + works at the outlet concerned |
 | counter sales and returns; collecting loyal member dues | `pharmacy:sell` (+ works at the outlet for sales and returns) |
 | return periods | `pharmacy:manage` |
+| stock counts (open, count, add a lot found, cancel) | `pharmacy:count` + works at the outlet |
+| applying a stock count (someone other than who opened it) | `pharmacy:manage` |
 | discount policy and product discounts, loyal members, cancelling sales (sellers: their own the same day) | `pharmacy:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |

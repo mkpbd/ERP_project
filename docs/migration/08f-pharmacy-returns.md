@@ -1,7 +1,7 @@
 # Step 8f — Pharmacy: returns from customers
 
-Status: **done** (2026-10-26). Previous: [step 8e](08e-pharmacy-counter-sales.md) · Next: step 8g (physical inventory;
-step 8 is re-ordered: reports in 8h, indoor patients in 8i after step 9's admissions).
+Status: **done** (2026-10-26). Previous: [step 8e](08e-pharmacy-counter-sales.md) · Next: [step 8g](08g-pharmacy-stock-counts.md)
+(physical inventory; step 8 is re-ordered: reports in 8h, indoor patients in 8i after step 9's admissions).
 
 ## Where the old logic lives
 
