@@ -52,6 +52,12 @@ import {
 } from './infrastructure/persistence/drizzle-stock.repositories.js';
 import { gatePassReport, supplierReturnReport } from './infrastructure/reports/department.reports.js';
 import { disposalInvoiceReport } from './infrastructure/reports/disposal.reports.js';
+import {
+  expiryReport,
+  gatePassRegisterReport,
+  movementRegisterReport,
+  stockMovementReport,
+} from './infrastructure/reports/ledger.reports.js';
 import { stockCardReport, stockReceiveReport, stockReport } from './infrastructure/reports/stock.reports.js';
 import { stockTransferReport, storeIndentReport, storeIssueReport } from './infrastructure/reports/store.reports.js';
 import { STOCK_CONTROLLERS } from './presentation/stock.controllers.js';
@@ -176,5 +182,9 @@ export class SupplyChainModule implements OnModuleInit {
     this.reports.register(supplierReturnReport(this.departments));
     this.reports.register(gatePassReport(this.departments));
     this.reports.register(disposalInvoiceReport(this.assetRequests));
+    this.reports.register(stockMovementReport(this.context));
+    this.reports.register(expiryReport(this.context));
+    this.reports.register(movementRegisterReport(this.context));
+    this.reports.register(gatePassRegisterReport(this.context));
   }
 }

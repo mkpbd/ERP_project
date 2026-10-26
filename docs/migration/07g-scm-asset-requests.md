@@ -1,6 +1,6 @@
 # Step 7g — Supply chain: asset service and discard requests, disposal journal, scrap sales
 
-Status: **done** (2026-10-26). Previous: [step 7f](07f-scm-fixed-assets.md) · Next: step 7h (supply chain
+Status: **done** (2026-10-26). Previous: [step 7f](07f-scm-fixed-assets.md) · Next: [step 7h](07h-scm-stock-reports.md) (supply chain
 reports).
 
 ## Where the old logic lives

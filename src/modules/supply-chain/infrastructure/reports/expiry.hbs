@@ -1,0 +1,30 @@
+{{#with data}}
+{{#if lots.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Store / department</th><th>Item</th><th>Batch</th>
+      <th>Expiry</th><th class="num">Days left</th><th class="num">Quantity</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lots}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{place}}</td>
+      <td>{{itemName}} — {{variantName}}</td>
+      <td>{{#if batchNo}}{{batchNo}}{{else}}—{{/if}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{#if expired}}<b>expired</b>{{else}}{{daysLeft}}{{/if}}</td>
+      <td class="num">{{qty}} {{unit}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="7">Already expired</td><td class="num">{{money expiredValue}}</td></tr>
+    <tr class="group-row"><td colspan="7">Total value</td><td class="num">{{money value}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>Nothing in stock expires by {{date until}}.</p>
+{{/if}}
+{{/with}}

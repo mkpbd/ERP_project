@@ -1,0 +1,28 @@
+{{#with data}}
+{{#if passes.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Gate pass</th><th>Date</th><th>Kind</th><th>Party</th>
+      <th>Reference</th><th>Note</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each passes}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{number}}</td>
+      <td>{{date passDate}}</td>
+      <td>{{kindLabel}}</td>
+      <td>{{partyName}}</td>
+      <td>{{reference}}</td>
+      <td>{{note}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p>{{passes.length}} gate passes.</p>
+{{else}}
+<p>No gate passes in this period.</p>
+{{/if}}
+{{/with}}

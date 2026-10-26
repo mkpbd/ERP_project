@@ -1,0 +1,53 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" rowspan="2" style="width: 24px">#</th><th rowspan="2">Item</th><th rowspan="2">Unit</th>
+      <th class="center" colspan="2">Opening</th><th class="center" colspan="2">In</th>
+      <th class="center" colspan="2">Out</th><th class="center" colspan="2">Closing</th>
+    </tr>
+    <tr>
+      <th class="num">Qty</th><th class="num">Value</th><th class="num">Qty</th><th class="num">Value</th>
+      <th class="num">Qty</th><th class="num">Value</th><th class="num">Qty</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{itemName}} — {{variantName}}{{#if code}} ({{code}}){{/if}}<br /><small>{{groupName}}</small></td>
+      <td>{{unit}}</td>
+      <td class="num">{{opening.qty}}</td><td class="num">{{money opening.value}}</td>
+      <td class="num">{{in.qty}}</td><td class="num">{{money in.value}}</td>
+      <td class="num">{{out.qty}}</td><td class="num">{{money out.value}}</td>
+      <td class="num">{{closing.qty}}</td><td class="num">{{money closing.value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="3">Total value</td>
+      <td></td><td class="num">{{money totals.opening.value}}</td>
+      <td></td><td class="num">{{money totals.in.value}}</td>
+      <td></td><td class="num">{{money totals.out.value}}</td>
+      <td></td><td class="num">{{money totals.closing.value}}</td>
+    </tr>
+  </tbody>
+</table>
+
+{{#if byKind.length}}
+<h3 style="margin: 14px 0 6px">In the period, by kind of movement</h3>
+<table class="report" style="width: 60%">
+  <thead>
+    <tr><th>Kind</th><th>Direction</th><th class="num">Quantity</th><th class="num">Value</th></tr>
+  </thead>
+  <tbody>
+    {{#each byKind}}
+    <tr><td>{{kind}}</td><td>{{#if (eq direction "in")}}In{{else}}Out{{/if}}</td><td class="num">{{qty}}</td><td class="num">{{money value}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{else}}
+<p>No stock and no movement in this period.</p>
+{{/if}}
+{{/with}}

@@ -1,0 +1,34 @@
+{{#with data}}
+{{#if documents.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Date</th><th>Document</th><th>Kind</th><th>Store / department</th>
+      <th class="num">Items</th><th class="num">Qty in</th><th class="num">Qty out</th>
+      <th class="num">Value in</th><th class="num">Value out</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each documents}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{date movedOn}}</td>
+      <td>{{documentNumber}}</td>
+      <td>{{kindLabel}}</td>
+      <td>{{place}}</td>
+      <td class="num">{{items}}</td>
+      <td class="num">{{#if qtyIn}}{{qtyIn}}{{/if}}</td>
+      <td class="num">{{#if qtyOut}}{{qtyOut}}{{/if}}</td>
+      <td class="num">{{#if valueIn}}{{money valueIn}}{{/if}}</td>
+      <td class="num">{{#if valueOut}}{{money valueOut}}{{/if}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="8">Total</td><td class="num">{{money valueIn}}</td><td class="num">{{money valueOut}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No stock documents in this period.</p>
+{{/if}}
+{{/with}}
