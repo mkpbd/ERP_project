@@ -23,7 +23,7 @@
   <div class="rule"></div>
   <table>
     {{#each saleReturn.lines}}
-    <tr><td colspan="2">{{displayName}}<br /><span class="small">Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · exp {{date expiryDate}}</span></td></tr>
+    <tr><td colspan="2">{{displayName}}{{#if damaged}} <b>(damaged)</b>{{/if}}<br /><span class="small">Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · exp {{date expiryDate}}</span></td></tr>
     <tr><td class="small">{{qty}} × {{money saleRate}}{{#if discount}} − {{money discount}}{{/if}}</td><td class="num">{{money refund}}</td></tr>
     {{/each}}
   </table>
@@ -33,7 +33,7 @@
     <tr><td>Discount taken back</td><td class="num">{{money saleReturn.discount}}</td></tr>
     <tr class="total"><td>Refund</td><td class="num">{{money saleReturn.refund}}</td></tr>
     {{#if saleReturn.dueReduced}}<tr><td>Off the due</td><td class="num">{{money saleReturn.dueReduced}}</td></tr>{{/if}}
-    <tr class="total"><td>Paid back in cash</td><td class="num">{{money saleReturn.cashRefund}}</td></tr>
+    <tr class="total"><td>Paid back ({{saleReturn.saleMethod}})</td><td class="num">{{money saleReturn.paidBack}}</td></tr>
   </table>
   <div class="rule"></div>
   {{#if saleReturn.reason}}<div class="small">Reason: {{saleReturn.reason}}</div>{{/if}}

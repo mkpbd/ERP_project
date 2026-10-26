@@ -34,7 +34,13 @@ class PharmacyReturnSaleDto extends createZodDto(
     returnedOn: day,
     reason: z.string().trim().max(500).nullable().default(null),
     lines: z
-      .array(z.strictObject({ line: z.int().min(1).max(300), qty: z.int().min(1).max(10_000_000) }))
+      .array(
+        z.strictObject({
+          line: z.int().min(1).max(300),
+          qty: z.int().min(1).max(10_000_000),
+          damaged: z.boolean().default(false),
+        }),
+      )
       .min(1)
       .max(300),
   }),
@@ -44,7 +50,7 @@ class PharmacyReturnedResponseDto extends responseDto({
   number: z.string(),
   refund: z.number(),
   dueReduced: z.number(),
-  cashRefund: z.number(),
+  paidBack: z.number(),
   voucherNumber: z.string().nullable(),
 }) {}
 class PharmacyReturnListQueryDto extends createZodDto(
@@ -65,7 +71,7 @@ const returnShape = {
   outletName: z.string(),
   refund: z.number(),
   dueReduced: z.number(),
-  cashRefund: z.number(),
+  paidBack: z.number(),
 };
 class PharmacySaleReturnPageResponseDto extends responseDto({
   items: z.array(z.object(returnShape)),
@@ -79,6 +85,8 @@ class PharmacySaleReturnResponseDto extends responseDto({
   reason: z.string().nullable(),
   amount: z.number(),
   discount: z.number(),
+  saleMethod: z.string(),
+  damagedCost: z.number(),
   voucherNumber: z.string().nullable(),
   lines: z.array(
     z.object({
@@ -94,6 +102,7 @@ class PharmacySaleReturnResponseDto extends responseDto({
       amount: z.number(),
       discount: z.number(),
       refund: z.number(),
+      damaged: z.boolean(),
     }),
   ),
 }) {}

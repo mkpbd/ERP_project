@@ -207,8 +207,9 @@ export interface SaleReturnRecord {
   readonly discount: number;
   readonly refund: number;
   readonly dueReduced: number;
-  readonly cashRefund: number;
+  readonly paidBack: number;
   readonly cost: number;
+  readonly damagedCost: number;
   readonly voucherNumber: string | null;
   readonly createdBy: string;
   readonly parts: readonly ReturnedPart[];

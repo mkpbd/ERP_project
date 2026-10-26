@@ -917,8 +917,11 @@ export const saleReturns = pgTable(
     refund: money('refund').notNull(),
     /** The part of the refund that took the sale's due down. */
     dueReduced: money('due_reduced').notNull(),
-    cashRefund: money('cash_refund').notNull(),
+    /** Paid back by the sale's own method (column kept from the first version, when it was always cash). */
+    paidBack: money('cash_refund').notNull(),
     cost: money('cost').notNull(),
+    /** The part of the cost written off: units given back damaged or expired, not put back into stock. */
+    damagedCost: money('damaged_cost').notNull().default(0),
     voucherNumber: text('voucher_number'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
     createdAt: tz('created_at').notNull().defaultNow(),
@@ -928,7 +931,7 @@ export const saleReturns = pgTable(
     index('pharmacy_sale_returns_sale_idx').on(t.saleId),
     check(
       'pharmacy_sale_returns_amounts_ck',
-      sql`${t.refund} = ${t.amount} - ${t.discount} and ${t.refund} = ${t.dueReduced} + ${t.cashRefund}`,
+      sql`${t.refund} = ${t.amount} - ${t.discount} and ${t.refund} = ${t.dueReduced} + ${t.paidBack}`,
     ),
   ],
 );
@@ -952,6 +955,8 @@ export const saleReturnLines = pgTable(
     discount: money('discount').notNull(),
     refund: money('refund').notNull(),
     unitCost: unitCost('unit_cost').notNull(),
+    /** Damaged or expired: written off instead of put back into stock. */
+    damaged: boolean('damaged').notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.returnId, t.position] }),

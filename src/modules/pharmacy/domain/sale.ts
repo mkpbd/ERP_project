@@ -34,6 +34,8 @@ export interface ReturnedPart {
   readonly amount: number;
   readonly discount: number;
   readonly refund: number;
+  /** Damaged or expired: written off, not put back into stock. */
+  readonly damaged: boolean;
 }
 
 export interface SaleProps {
@@ -226,9 +228,10 @@ export class PharmacySale {
   /**
    * Medicines given back (old ProcessOpdProductReturn): units of sale lines (1-based), never more than sold less what
    * came back before. Each is worth its line's total per unit, so the discount given comes back with it. The refund
-   * takes the sale's open due down first; the rest is paid back. Returns the parts and how the refund splits.
+   * takes the sale's open due down first; the rest is paid back. Units marked damaged (or expired) are refunded all
+   * the same but written off at cost instead of going back into stock. Returns the parts and how the refund splits.
    */
-  giveBack(lines: readonly { line: number; qty: number }[], now: Date) {
+  giveBack(lines: readonly { line: number; qty: number; damaged?: boolean }[], now: Date) {
     if (this.props.status !== 'completed') throw new DomainError('sale_state', 'A cancelled sale takes no returns');
     if (lines.length === 0) throw new DomainError('invalid_lines', 'A return gives something back');
     const seen = new Set<number>();
@@ -258,6 +261,7 @@ export class PharmacySale {
         amount,
         discount: taka(paisa(amount) - paisa(refund)),
         refund,
+        damaged: entry.damaged ?? false,
       };
     });
     this.props.lines = this.props.lines.map((line, index) => {
@@ -277,8 +281,12 @@ export class PharmacySale {
       discount: sum(parts, (part) => part.discount),
       refund,
       dueReduced,
-      cashRefund: taka(paisa(refund) - paisa(dueReduced)),
+      paidBack: taka(paisa(refund) - paisa(dueReduced)),
       cost: sum(parts, (part) => part.unitCost * part.qty),
+      damagedCost: sum(
+        parts.filter((part) => part.damaged),
+        (part) => part.unitCost * part.qty,
+      ),
     };
   }
 

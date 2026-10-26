@@ -49,7 +49,7 @@ describe('PharmacySale.giveBack', () => {
       discount: 0.18,
       refund: 3.42,
       dueReduced: 0,
-      cashRefund: 3.42,
+      paidBack: 3.42,
       cost: 2.55,
     });
     expect(sale.lines[0]!.returnedQty).toBe(3);
@@ -71,8 +71,13 @@ describe('PharmacySale.giveBack', () => {
     // Total 11.40 + 18 = 29.40; 20 paid, 9.40 due.
     const sale = make(20, 'member');
     const given = sale.giveBack([{ line: 2, qty: 2 }], now);
-    expect(given).toMatchObject({ refund: 12, dueReduced: 9.4, cashRefund: 2.6 });
-    expect(sale.giveBack([{ line: 2, qty: 1 }], now)).toMatchObject({ dueReduced: 0, cashRefund: 6 });
+    expect(given).toMatchObject({ refund: 12, dueReduced: 9.4, paidBack: 2.6 });
+    expect(sale.giveBack([{ line: 2, qty: 1, damaged: true }], now)).toMatchObject({
+      dueReduced: 0,
+      paidBack: 6,
+      cost: 4,
+      damagedCost: 4,
+    });
   });
 
   it('refuses unknown or repeated lines, and a sale with returns cannot be cancelled', () => {

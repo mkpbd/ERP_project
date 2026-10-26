@@ -218,6 +218,13 @@
       "when": 1792995638267,
       "tag": "0030_pharmacy_sale_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1792997619466,
+      "tag": "0031_pharmacy_return_damaged",
+      "breakpoints": true
     }
   ]
 }

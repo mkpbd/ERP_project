@@ -8,6 +8,9 @@ import { ReturnPolicies, SaleReturnRepository } from '../domain/repositories.js'
 import { assertWithinReturnWindow, validReturnDays } from '../domain/return-window.js';
 import { PHARMACY_MANAGE, PHARMACY_READ, PHARMACY_SELL } from './pharmacy.constants.js';
 import { PHARMACY_INVENTORY_ROLE, PURCHASE_JOURNAL } from './purchase.handlers.js';
+
+/** Medicines given back damaged or expired, written off at cost. */
+export const PHARMACY_DAMAGE_ROLE = 'pharmacy_damage_loss';
 import {
   GetReturnPoliciesQuery,
   GetSaleReturnQuery,
@@ -62,10 +65,11 @@ export class GetReturnPoliciesHandler implements IQueryHandler<GetReturnPolicies
 
 /**
  * Old ProcessOpdProductReturn: medicines a customer brings back, within the return period (judged on the sale's
- * own date), never more than was sold less what came back before. They go back into the same lots at their cost;
- * the refund takes the sale's open due down first and the rest is paid back in cash. One voucher: Dr pharmacy sales
- * (gross) / Cr sales discount, cash and the receivable; Dr pharmacy inventory / Cr cost of medicines sold. The sale's
- * version guards against submitting the same return twice.
+ * own date), never more than was sold less what came back before. They go back into the same lots at their cost,
+ * except units marked damaged, written off; the refund takes the sale's open due down first and the rest is paid
+ * back the way the sale was paid. One voucher: Dr pharmacy sales (gross) / Cr sales discount, cash (card, wallet)
+ * and the receivable; Dr pharmacy inventory and damage loss / Cr cost of medicines sold. The sale's version guards
+ * against submitting the same return twice.
  */
 @CommandHandler(ReturnSaleCommand)
 export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
@@ -94,18 +98,26 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
         ...(given.discount > 0
           ? [{ account: { role: PHARMACY_DISCOUNT_ROLE }, debit: 0, credit: given.discount, narration }]
           : []),
-        ...(given.cashRefund > 0
-          ? [{ account: { role: RECEIPT_ROLES.cash }, debit: 0, credit: given.cashRefund, narration }]
+        ...(given.paidBack > 0
+          ? [{ account: { role: RECEIPT_ROLES[sale.method] }, debit: 0, credit: given.paidBack, narration }]
           : []),
         ...(given.dueReduced > 0
           ? [{ account: { role: PHARMACY_RECEIVABLE_ROLE }, debit: 0, credit: given.dueReduced, narration }]
           : []),
-        ...(given.cost > 0
+        ...(given.cost - given.damagedCost > 0
           ? [
-              { account: { role: PHARMACY_INVENTORY_ROLE }, debit: given.cost, credit: 0, narration },
-              { account: { role: PHARMACY_COGS_ROLE }, debit: 0, credit: given.cost, narration },
+              {
+                account: { role: PHARMACY_INVENTORY_ROLE },
+                debit: Math.round((given.cost - given.damagedCost) * 100) / 100,
+                credit: 0,
+                narration,
+              },
             ]
           : []),
+        ...(given.damagedCost > 0
+          ? [{ account: { role: PHARMACY_DAMAGE_ROLE }, debit: given.damagedCost, credit: 0, narration }]
+          : []),
+        ...(given.cost > 0 ? [{ account: { role: PHARMACY_COGS_ROLE }, debit: 0, credit: given.cost, narration }] : []),
       ];
       const voucher =
         voucherLines.length > 0
@@ -118,7 +130,10 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
               postedBy: actor.userId,
             })
           : null;
-      await keeper.putIn(sale.outletId, given.parts, { id, number, on: returnedOn }, 'sale_return');
+      const restocked = given.parts.filter((part) => !part.damaged);
+      if (restocked.length > 0) {
+        await keeper.putIn(sale.outletId, restocked, { id, number, on: returnedOn }, 'sale_return');
+      }
       await this.sales.sales.update(sale);
       await this.returns.insert({
         id,
@@ -131,8 +146,9 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
         discount: given.discount,
         refund: given.refund,
         dueReduced: given.dueReduced,
-        cashRefund: given.cashRefund,
+        paidBack: given.paidBack,
         cost: given.cost,
+        damagedCost: given.damagedCost,
         voucherNumber: voucher?.number ?? null,
         createdBy: actor.userId,
         parts: given.parts,
@@ -143,7 +159,7 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
         number,
         refund: given.refund,
         dueReduced: given.dueReduced,
-        cashRefund: given.cashRefund,
+        paidBack: given.paidBack,
         voucherNumber: voucher?.number ?? null,
       };
     });

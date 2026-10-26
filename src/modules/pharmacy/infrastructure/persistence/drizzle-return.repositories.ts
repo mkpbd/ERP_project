@@ -65,6 +65,7 @@ export class DrizzleSaleReturnRepository extends SaleReturnRepository {
         discount: part.discount,
         refund: part.refund,
         unitCost: part.unitCost,
+        damaged: part.damaged,
       })),
     );
   }
@@ -102,8 +103,10 @@ export class DrizzleReturnReadRepository extends ReturnReadRepository {
         discount: saleReturns.discount,
         refund: saleReturns.refund,
         dueReduced: saleReturns.dueReduced,
-        cashRefund: saleReturns.cashRefund,
+        paidBack: saleReturns.paidBack,
         voucherNumber: saleReturns.voucherNumber,
+        saleMethod: pharmacySales.method,
+        damagedCost: saleReturns.damagedCost,
       })
       .from(saleReturns)
       .innerJoin(pharmacySales, eq(pharmacySales.id, saleReturns.saleId))
@@ -136,6 +139,8 @@ export class DrizzleReturnReadRepository extends ReturnReadRepository {
           amount: _a,
           discount: _d,
           voucherNumber: _v,
+          saleMethod: _m,
+          damagedCost: _dc,
           ...row
         }) => row,
       ),
@@ -158,6 +163,7 @@ export class DrizzleReturnReadRepository extends ReturnReadRepository {
         amount: saleReturnLines.amount,
         discount: saleReturnLines.discount,
         refund: saleReturnLines.refund,
+        damaged: saleReturnLines.damaged,
       })
       .from(saleReturnLines)
       .innerJoin(pharmacyLots, eq(pharmacyLots.id, saleReturnLines.lotId))

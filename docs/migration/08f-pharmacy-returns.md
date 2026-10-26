@@ -35,11 +35,14 @@ a return dated before the sale is refused; switched off or not set up = no limit
   return takes the line's share up to its units less its share before them, so all returns of a line add up to
   exactly its total.
 * The refund **takes the sale's open due down first** (a loyal member's due: what is still owed after collections
-  and earlier returns); the rest is **paid back in cash**.
+  and earlier returns); the rest is **paid back the way the sale was paid** (cash, card or wallet).
+* A line may be marked **`damaged`** (opened, broken, expired): its units are refunded all the same but **written
+  off at cost** (`pharmacy_damage_loss`) instead of going back into stock.
 * Stock movements `sale_return`, into the same lots at the sale line's unit cost.
 * One voucher: **Dr** `pharmacy_sales` (gross) / **Cr** `pharmacy_sales_discount` (the discount taken back),
-  `cash_in_hand` (paid back) and `pharmacy_receivable` (the due taken down); **Dr** `pharmacy_inventory` / **Cr**
-  `pharmacy_cogs` at cost.
+  `cash_in_hand` / `card_receipts` / `mobile_wallet_receipts` (paid back) and `pharmacy_receivable` (the due taken
+  down); **Dr** `pharmacy_inventory` (restocked) and `pharmacy_damage_loss` (damaged) / **Cr** `pharmacy_cogs` at
+  cost.
 * The sale keeps the units returned per line and the value returned; a sale with returns can no longer be
   cancelled (422 `sale_state`), and its due for collections is what is left.
 
@@ -61,11 +64,10 @@ batch and expiry, units × rate less the discount taken back, refund, what came 
 Exchanges (a return and a new purchase on one screen) are two documents: a return and a new sale. Returns of
 indoor patients' medicines (return indents) come with step 8g.
 
-## Open questions
+## Decisions taken (after the first version of this step; migration `0031_pharmacy_return_damaged`)
 
-1. Should a returned unit go back into stock only if it is unopened and unexpired (a check by the pharmacist), or
-   be written off instead (damaged)?
-2. Should refunds be paid back by the way the sale was paid (card back to card), or always in cash as now?
+* Damaged or expired units are marked on the return line and written off.
+* Refunds are paid back the way the sale was paid.
 
 ## Verification
 

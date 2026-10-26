@@ -88,6 +88,8 @@ beforeEach(async () => {
   for (const [key, nature, balance, code, name, glRole] of [
     ['inventory', '1', 'debit', '1350', 'Medicine inventory', 'pharmacy_inventory'],
     ['cash', '1', 'debit', '1001', 'Cash in hand', 'cash_in_hand'],
+    ['card', '1', 'debit', '1002', 'Card receipts', 'card_receipts'],
+    ['damage', '5', 'debit', '5103', 'Damaged medicines', 'pharmacy_damage_loss'],
     ['receivable', '1', 'debit', '1201', 'Pharmacy receivable', 'pharmacy_receivable'],
     ['sales', '4', 'credit', '4101', 'Medicine sales', 'pharmacy_sales'],
     ['discount', '5', 'debit', '5102', 'Sales discount', 'pharmacy_sales_discount'],
@@ -150,7 +152,7 @@ describe('pharmacy returns from customers', () => {
       { line: 1, qty: 3 },
       { line: 2, qty: 1 },
     ]).expect(201);
-    expect(returned.body).toMatchObject({ number: 'SR-2026-00001', refund: 9.42, dueReduced: 0, cashRefund: 9.42 });
+    expect(returned.body).toMatchObject({ number: 'SR-2026-00001', refund: 9.42, dueReduced: 0, paidBack: 9.42 });
     // The same return submitted again carries the old version.
     expect((await giveBack(1, [{ line: 1, qty: 3 }])).body.code).toBe('stale_sale');
     expect((await giveBack(2, [{ line: 2, qty: 3 }])).body.code).toBe('over_return');
@@ -204,7 +206,7 @@ describe('pharmacy returns from customers', () => {
       returnedOn: '2026-04-11',
       lines: [{ line: 1, qty: 2 }],
     }).expect(201);
-    expect(returned.body).toMatchObject({ refund: 2.28, dueReduced: 2.28, cashRefund: 0 });
+    expect(returned.body).toMatchObject({ refund: 2.28, dueReduced: 2.28, paidBack: 0 });
     expect((await ph('get', `loyal-members/${member}/dues`, seller).expect(200)).body.due).toBe(3.42);
     expect(await closing('receivable')).toBe(3.42);
     expect(await closing('cash')).toBe(0);
@@ -213,5 +215,45 @@ describe('pharmacy returns from customers', () => {
       amount: 3.43,
     });
     expect(over.body.code).toBe('overpayment');
+  });
+
+  it('pays a card sale back to the card and writes damaged units off instead of restocking them', async () => {
+    const seclo0 = (await ph('get', `stock?outletId=${outdoor}&productId=${seclo}`, admin).expect(200)).body.items[0]
+      .qty;
+    const sold = await ph('post', 'sales', seller, {
+      outletId: outdoor,
+      soldOn: '2026-04-10',
+      lines: [
+        { productId: napa, qty: 10 },
+        { productId: seclo, qty: 3 },
+      ],
+      method: 'card',
+      tendered: 29.4,
+    }).expect(201);
+    const returned = await ph('post', `sales/${sold.body.id}/returns`, seller, {
+      version: 1,
+      returnedOn: '2026-04-11',
+      lines: [
+        { line: 1, qty: 3 },
+        { line: 2, qty: 1, damaged: true },
+      ],
+    }).expect(201);
+    expect(returned.body).toMatchObject({ refund: 9.42, paidBack: 9.42 });
+    // The refund goes back to the card, not the cash box.
+    expect(await closing('card')).toBe(19.98);
+    expect(await closing('cash')).toBe(0);
+    // Napa back in stock; the damaged Seclo is written off at its cost of 4.
+    expect(await napaStock()).toBe(93);
+    expect((await ph('get', `stock?outletId=${outdoor}&productId=${seclo}`, admin).expect(200)).body.items[0].qty).toBe(
+      seclo0 - 3,
+    );
+    expect(await closing('damage')).toBe(4);
+    expect(await closing('inventory')).toBe(-(8.5 + 12) + 2.55);
+    const view = await ph('get', `sale-returns/${returned.body.id}`, seller).expect(200);
+    expect(view.body).toMatchObject({
+      saleMethod: 'card',
+      damagedCost: 4,
+      lines: [{ damaged: false }, { damaged: true }],
+    });
   });
 });

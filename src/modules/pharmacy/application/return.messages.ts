@@ -20,7 +20,7 @@ export interface SaleReturnSummary {
   readonly outletName: string;
   readonly refund: number;
   readonly dueReduced: number;
-  readonly cashRefund: number;
+  readonly paidBack: number;
 }
 
 export interface SaleReturnView extends SaleReturnSummary {
@@ -30,6 +30,9 @@ export interface SaleReturnView extends SaleReturnSummary {
   readonly reason: string | null;
   readonly amount: number;
   readonly discount: number;
+  /** How the sale was paid, and so the refund. */
+  readonly saleMethod: string;
+  readonly damagedCost: number;
   readonly voucherNumber: string | null;
   readonly lines: (ProductRef & {
     readonly saleLine: number;
@@ -40,6 +43,7 @@ export interface SaleReturnView extends SaleReturnSummary {
     readonly amount: number;
     readonly discount: number;
     readonly refund: number;
+    readonly damaged: boolean;
   })[];
 }
 
@@ -70,7 +74,7 @@ export class ReturnSaleCommand extends Command<{
   number: string;
   refund: number;
   dueReduced: number;
-  cashRefund: number;
+  paidBack: number;
   voucherNumber: string | null;
 }> {
   constructor(
@@ -80,7 +84,7 @@ export class ReturnSaleCommand extends Command<{
     readonly version: number,
     readonly returnedOn: string,
     readonly reason: string | null,
-    readonly lines: readonly { line: number; qty: number }[],
+    readonly lines: readonly { line: number; qty: number; damaged: boolean }[],
   ) {
     super();
   }

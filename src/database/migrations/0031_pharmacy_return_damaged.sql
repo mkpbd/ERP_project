@@ -1,0 +1,2 @@
+ALTER TABLE "pharmacy_sale_return_lines" ADD COLUMN "damaged" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "pharmacy_sale_returns" ADD COLUMN "damaged_cost" numeric(14, 2) DEFAULT 0 NOT NULL;
