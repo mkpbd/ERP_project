@@ -164,6 +164,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /scm/{asset-service-requests,asset-discard-requests,scrap-sales}[/:id]` | `scm:read` |
 | raise service and discard requests and scrap sales, receive from service, sell written-off pieces | `scm:assets` |
 | `POST /scm/{asset-service-requests,asset-discard-requests,scrap-sales}/:id/decision` | the asset approval level's role (not the raiser) |
+| `GET /pharmacy/*` (catalogue, outlets, outlet users, reorder levels) | `pharmacy:read` |
+| set up the medicine catalogue, outlets, outlet users and reorder levels | `pharmacy:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

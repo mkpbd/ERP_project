@@ -1,0 +1,30 @@
+{{#with data}}
+{{#if groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Manufacturer</th><th>Pack</th>
+      <th class="num">Purchase price</th><th class="num">Sale price</th><th>Barcode</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    <tr class="group-row"><td colspan="7">{{title}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}{{#unless isActive}} <small>(inactive)</small>{{/unless}}</td>
+      <td>{{manufacturerName}}</td>
+      <td>{{#if packageUnitName}}{{packageUnitName}} of {{/if}}{{unitsPerPack}}{{#if unitName}} {{unitName}}{{/if}}</td>
+      <td class="num">{{money purchasePrice}}</td>
+      <td class="num">{{money salePrice}}</td>
+      <td>{{barcode}}</td>
+    </tr>
+    {{/each}}
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No products for this selection.</p>
+{{/if}}
+{{/with}}

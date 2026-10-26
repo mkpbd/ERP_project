@@ -56,6 +56,11 @@ export const PERMISSION_CATALOG = [
   { key: 'scm:department', description: 'Record consumption, returns and stock counts of your departments' },
   { key: 'scm:adjust', description: 'Approve or reject department stock counts (not your own)' },
   { key: 'scm:assets', description: 'Configure, run and reverse fixed asset depreciation; describe asset pieces' },
+  { key: 'pharmacy:read', description: 'See the medicine catalogue, outlets and reorder levels' },
+  {
+    key: 'pharmacy:manage',
+    description: 'Set up the medicine catalogue, outlets, who works at each outlet and reorder levels',
+  },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

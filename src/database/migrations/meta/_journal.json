@@ -169,6 +169,13 @@
       "when": 1792980931542,
       "tag": "0023_scm_asset_service_stock_and_sale_ladder",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792984067901,
+      "tag": "0024_pharmacy_catalogue",
+      "breakpoints": true
     }
   ]
 }
