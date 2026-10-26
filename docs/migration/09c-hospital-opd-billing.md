@@ -106,6 +106,15 @@ The old billing had these faults; this step fixes them:
 `opd:bill` (bill, collect, cancel on the day), `opd:discount` (above the counter's limit), `opd:manage` (policy,
 cancel later).
 
+## Decisions taken (after the first version of this step)
+
+* The doctor's share is worked out on the gross fee: the hospital bears the whole discount, as before.
+* A bill is cancelled as a whole and billed again; there is no cancelling of one doctor's line.
+* Paying doctors their share (Dr consultant payable / Cr cash or bank) comes with step 9f, with the IPD consultant
+  ledger.
+* Corporate clients and staff billing come with step 9d.
+* The fee stays the doctor's fee for the visit type; the counter cannot change it, only discount it.
+
 ## Verification
 
 * `npm run typecheck`, `npm run lint`, `npm run format:check`, architecture test: clean

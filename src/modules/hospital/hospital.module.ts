@@ -41,7 +41,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
- * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c). Consultation billing and admissions follow in later steps.
+ * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c). Service
+ * billing and admissions follow in later steps.
  */
 @Module({
   controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS, ...OPD_CONTROLLERS],
