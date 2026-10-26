@@ -42,6 +42,8 @@ of the hospital's own outlets. Now:
 * **Decided** by someone working at the receiving outlet: `accept` (stock in, movement `transfer_in`) or `reject`
   with a reason (stock back to the sender, and the quantities given back to the indent). Once only (422
   `transfer_state`), not dated before the transfer.
+* **Line by line** (old per-line accept): `accept` may name `rejectLines` (1-based) with a reason; those lines go
+  back to the sender and to the indent, the rest come in; at least one line is kept (422 `nothing_accepted`).
 * The stock card shows `transfer_out` and `transfer_in` movements; stock in transit is in neither outlet.
 
 ## Endpoints (under `/api/v1/pharmacy`)
@@ -72,11 +74,11 @@ with the date and reason), lines by lot with batch, expiry, units, unit cost and
 | `ClaimOutletIndentAcceptCommand`, `ProcessAcceptOutletTransferCommand` | `POST /pharmacy/transfers/:id/decision` |
 | `GetStockTransferRecordQuery`, `GetStockTransferDetailByTransferIdQuery`, `GetStockTransferIdByOutletIndentNoQuery` | `GET /pharmacy/transfers[/:id]` |
 
-## Open questions
+## Decisions taken
 
-1. Should part of a transfer be accepted (and the rest rejected), as the old accept allowed per line?
-2. Should an outlet be able to return stock to the central store without an indent (it can now: a transfer
-   without an indent), or should that be its own document?
+* Transfers are accepted line by line (added after the first version of this step; migration
+  `0028_pharmacy_transfer_line_rejected`).
+* An outlet returns stock to the central store with a transfer without an indent; no separate document.
 
 ## Verification
 

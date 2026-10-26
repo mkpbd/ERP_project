@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { NotFoundError } from '../../../../shared/domain/errors.js';
 import { foreignKeyViolationConstraint } from '../../../../shared/infrastructure/persistence/pg-errors.js';
@@ -93,7 +93,13 @@ export class DrizzleTransferRepository extends TransferRepository {
   }
 
   async update(transfer: OutletTransfer): Promise<void> {
-    const { lines: _lines, ...row } = transfer.toSnapshot();
+    const { lines, ...row } = transfer.toSnapshot();
     await this.context.db.update(outletTransfers).set(row).where(eq(outletTransfers.id, row.id));
+    for (const [position, line] of lines.entries()) {
+      await this.context.db
+        .update(outletTransferLines)
+        .set({ rejected: line.rejected })
+        .where(and(eq(outletTransferLines.transferId, row.id), eq(outletTransferLines.position, position)));
+    }
   }
 }

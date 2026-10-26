@@ -183,14 +183,14 @@ export class SendTransferHandler implements ICommandHandler<SendTransferCommand>
 }
 
 /**
- * Old ProcessAcceptOutletTransfer: the receiving outlet takes the stock into the same lots at the same cost. A
- * rejection puts it back into the sending outlet and gives the quantities back to the indent.
+ * Old ProcessAcceptOutletTransfer: the receiving outlet takes the stock into the same lots at the same cost. What
+ * it sends back (the whole transfer, or some lines) goes back into the sending outlet and to the indent.
  */
 @CommandHandler(DecideTransferCommand)
 export class DecideTransferHandler implements ICommandHandler<DecideTransferCommand> {
   constructor(private readonly transfers: TransferDesk) {}
 
-  async execute({ actor, id, version, decision, on, reason }: DecideTransferCommand): Promise<void> {
+  async execute({ actor, id, version, decision, on, reason, rejectLines }: DecideTransferCommand): Promise<void> {
     const { desk, keeper, indents, transfers } = this.transfers;
     await desk.access.authorize(actor.userId, { permissions: [PHARMACY_TRANSFER] });
     await desk.tx.run(async () => {
@@ -198,15 +198,16 @@ export class DecideTransferHandler implements ICommandHandler<DecideTransferComm
       await desk.assertWorksAt(actor.userId, transfer.toOutletId);
       const now = desk.clock.now();
       const document = { id: transfer.id, number: transfer.number, on };
-      if (decision === 'accept') {
-        transfer.accept({ on, by: actor.userId, now });
-        await keeper.putIn(transfer.toOutletId, transfer.lines, document, 'transfer_in');
-      } else {
-        transfer.reject({ on, by: actor.userId, reason: reason ?? '', now });
-        await keeper.putIn(transfer.fromOutletId, transfer.lines, document, 'transfer_in');
+      if (decision === 'accept') transfer.accept({ on, by: actor.userId, rejectLines, reason, now });
+      else transfer.reject({ on, by: actor.userId, reason: reason ?? '', now });
+      const kept = transfer.lines.filter((line) => !line.rejected);
+      const sentBack = transfer.lines.filter((line) => line.rejected);
+      if (kept.length > 0) await keeper.putIn(transfer.toOutletId, kept, document, 'transfer_in');
+      if (sentBack.length > 0) {
+        await keeper.putIn(transfer.fromOutletId, sentBack, document, 'transfer_in');
         if (transfer.indentId) {
           const indent = await this.transfers.indent(transfer.indentId);
-          indent.untransfer(transfer.quantities(), now);
+          indent.untransfer(transfer.quantities(true), now);
           await indents.update(indent);
         }
       }

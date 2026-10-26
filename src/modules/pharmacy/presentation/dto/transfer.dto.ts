@@ -61,6 +61,7 @@ export class PharmacyDecideTransferDto extends createZodDto(
     decision: z.enum(['accept', 'reject']),
     on: day,
     reason: optionalText(500).default(null),
+    rejectLines: z.array(z.int().min(1).max(300)).max(300).default([]),
   }),
 ) {}
 export class PharmacyTransferListQueryDto extends createZodDto(
@@ -133,6 +134,7 @@ export class PharmacyTransferResponseDto extends responseDto({
       qty: z.int(),
       unitCost: z.number(),
       value: z.number(),
+      rejected: z.boolean(),
     }),
   ),
 }) {}

@@ -1,0 +1,1 @@
+ALTER TABLE "pharmacy_transfer_lines" ADD COLUMN "rejected" boolean DEFAULT false NOT NULL;

@@ -242,6 +242,34 @@ describe('outlet indents and transfers', () => {
     expect(refused.body.code).toBe('insufficient_stock');
     const transit = await ph('get', `transfers?toOutletId=${outdoor}&status=in_transit`, seller).expect(200);
     expect(transit.body.items.map((item: { number: string }) => item.number)).toEqual([direct.body.number]);
+
+    // Two lots sent; the second line is sent back, the first kept.
+    const lotB = lots.find((lot) => lot.batchNo === 'B')!.lotId;
+    const mixed = await ph('post', 'transfers', keeper, {
+      fromOutletId: central,
+      toOutletId: outdoor,
+      transferDate: '2026-04-10',
+      lines: [
+        { productId: napa, qty: 20, lotId: lotB },
+        { productId: napa, qty: 30, lotId: lotC },
+      ],
+    }).expect(201);
+    expect((await stockOf(central)).qty).toBe(290);
+    await ph('post', `transfers/${mixed.body.id}/decision`, seller, {
+      version: 1,
+      decision: 'accept',
+      on: '2026-04-11',
+      rejectLines: [2],
+      reason: 'Short dated for this ward',
+    }).expect(204);
+    expect((await stockOf(outdoor)).lots.map((lot) => [lot.batchNo, lot.qty])).toEqual([['B', 20]]);
+    expect((await stockOf(central)).qty).toBe(320);
+    const decided = await ph('get', `transfers/${mixed.body.id}`, seller).expect(200);
+    expect(decided.body).toMatchObject({
+      status: 'accepted',
+      rejectReason: 'Short dated for this ward',
+      lines: [{ rejected: false }, { rejected: true }],
+    });
     const self = await ph('post', 'outlet-indents', seller, {
       requestingOutletId: outdoor,
       supplyingOutletId: outdoor,

@@ -18,7 +18,7 @@
     {{#each lines}}
     <tr>
       <td class="center">{{inc @index}}</td>
-      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{displayName}}{{#if rejected}} <b>(sent back)</b>{{/if}}<br /><small>{{genericName}}</small></td>
       <td>{{batchNo}}</td>
       <td>{{date expiryDate}}</td>
       <td class="num">{{qty}}{{#if unitName}} {{unitName}}{{/if}}</td>

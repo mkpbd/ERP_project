@@ -669,6 +669,8 @@ export const outletTransferLines = pgTable(
       .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
     qty: integer('qty').notNull(),
     unitCost: unitCost('unit_cost').notNull(),
+    /** Sent back by the receiving outlet. */
+    rejected: boolean('rejected').notNull().default(false),
   },
   (t) => [
     primaryKey({ columns: [t.transferId, t.position] }),

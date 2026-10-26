@@ -142,7 +142,7 @@ export class PharmacyTransfersController {
   @ApiOperation({ summary: 'Accept the stock at the receiving outlet, or reject it back to the sender' })
   async decide(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PharmacyDecideTransferDto) {
     await this.commandBus.execute(
-      new DecideTransferCommand(actor, params.id, dto.version, dto.decision, dto.on, dto.reason),
+      new DecideTransferCommand(actor, params.id, dto.version, dto.decision, dto.on, dto.reason, dto.rejectLines),
     );
   }
 }

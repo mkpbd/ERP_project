@@ -117,10 +117,28 @@ describe('OutletTransfer', () => {
   it('is accepted or rejected once, not before it was sent, a rejection with a reason', () => {
     expect(send().quantities()).toEqual(new Map([['a', 150]]));
     const transfer = send();
-    expect(() => transfer.accept({ on: '2026-04-09', by: 'u', now })).toThrow(/before it was sent/);
+    const accept = { by: 'u', rejectLines: [], reason: null, now };
+    expect(() => transfer.accept({ ...accept, on: '2026-04-09' })).toThrow(/before it was sent/);
     expect(() => transfer.reject({ on: '2026-04-10', by: 'u', reason: ' ', now })).toThrow(/Give a reason/);
-    transfer.accept({ on: '2026-04-11', by: 'u', now });
+    transfer.accept({ ...accept, on: '2026-04-11' });
     expect(transfer.status).toBe('accepted');
     expect(() => transfer.reject({ on: '2026-04-11', by: 'u', reason: 'x', now })).toThrow(/decided already/);
+  });
+
+  it('sends lines back one by one, with a reason, keeping at least one', () => {
+    const accept = { on: '2026-04-11', by: 'u', now };
+    expect(() => send().accept({ ...accept, rejectLines: [3], reason: 'x' })).toThrow(/no line 3/);
+    expect(() => send().accept({ ...accept, rejectLines: [1, 2], reason: 'x' })).toThrow(/Keep at least one line/);
+    expect(() => send().accept({ ...accept, rejectLines: [2], reason: null })).toThrow(
+      /reason for the lines sent back/,
+    );
+    const transfer = send();
+    transfer.accept({ ...accept, rejectLines: [2], reason: 'Damaged strips' });
+    expect(transfer.lines.map((line) => line.rejected)).toEqual([false, true]);
+    expect(transfer.quantities(true)).toEqual(new Map([['a', 50]]));
+    expect(transfer.quantities(false)).toEqual(new Map([['a', 100]]));
+    const rejected = send();
+    rejected.reject({ on: '2026-04-11', by: 'u', reason: 'Not ordered', now });
+    expect(rejected.lines.every((line) => line.rejected)).toBe(true);
   });
 });

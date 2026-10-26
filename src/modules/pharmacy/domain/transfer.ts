@@ -8,6 +8,8 @@ export interface TransferLine {
   readonly lotId: string;
   readonly qty: number;
   readonly unitCost: number;
+  /** Sent back by the receiving outlet (old per-line accept). */
+  readonly rejected: boolean;
 }
 
 export interface TransferProps {
@@ -32,7 +34,7 @@ export interface TransferProps {
 /**
  * Old StockTransfer (ProcessStockTransfer) and its accept (ProcessAcceptOutletTransfer): stock leaves the sending
  * outlet by lot when sent and is in transit until the receiving outlet accepts it into the same lots at the same
- * cost, or rejects it back to the sender.
+ * cost, or rejects it back to the sender; lines may be sent back one by one.
  */
 export class OutletTransfer {
   private constructor(private readonly props: TransferProps) {}
@@ -45,7 +47,7 @@ export class OutletTransfer {
     toOutletId: string;
     transferDate: string;
     note: string | null;
-    lines: readonly TransferLine[];
+    lines: readonly Omit<TransferLine, 'rejected'>[];
     createdBy: string;
     now: Date;
   }): OutletTransfer {
@@ -60,7 +62,7 @@ export class OutletTransfer {
       decidedOn: null,
       decidedBy: null,
       rejectReason: null,
-      lines: [...params.lines],
+      lines: params.lines.map((line) => ({ ...line, rejected: false })),
       version: 1,
       createdAt: params.now,
       updatedAt: params.now,
@@ -93,16 +95,38 @@ export class OutletTransfer {
     return this.props.lines;
   }
 
-  /** Product → units sent. */
-  quantities(): Map<string, number> {
+  /** Product → units sent (or, with `rejected`, only those sent back). */
+  quantities(rejected?: boolean): Map<string, number> {
     const quantities = new Map<string, number>();
     for (const line of this.props.lines) {
+      if (rejected !== undefined && line.rejected !== rejected) continue;
       quantities.set(line.productId, (quantities.get(line.productId) ?? 0) + line.qty);
     }
     return quantities;
   }
 
-  accept(params: { on: string; by: string; now: Date }): void {
+  /**
+   * Accepts the transfer, sending back the lines numbered in `rejectLines` (1-based; a reason is then needed).
+   * Something must be kept, or the whole transfer is rejected instead.
+   */
+  accept(params: { on: string; by: string; rejectLines: readonly number[]; reason: string | null; now: Date }): void {
+    this.assertInTransit();
+    for (const line of params.rejectLines) {
+      if (!Number.isInteger(line) || line < 1 || line > this.props.lines.length) {
+        throw new DomainError('invalid_line', `There is no line ${line} on the transfer`);
+      }
+    }
+    if (params.rejectLines.length > 0) {
+      if (new Set(params.rejectLines).size === this.props.lines.length) {
+        throw new DomainError('nothing_accepted', 'Keep at least one line, or reject the transfer');
+      }
+      const reason = text(params.reason, 500, 'reason', 'Transfer');
+      if (!reason) throw new DomainError('invalid_remarks', 'Give a reason for the lines sent back');
+      this.props.rejectReason = reason;
+    }
+    this.props.lines = this.props.lines.map((line, index) =>
+      params.rejectLines.includes(index + 1) ? { ...line, rejected: true } : line,
+    );
     this.decide(params.on, params.by, params.now);
     this.props.status = 'accepted';
   }
@@ -114,6 +138,7 @@ export class OutletTransfer {
     this.decide(params.on, params.by, params.now);
     this.props.status = 'rejected';
     this.props.rejectReason = reason;
+    this.props.lines = this.props.lines.map((line) => ({ ...line, rejected: true }));
   }
 
   assertVersion(version: number): void {

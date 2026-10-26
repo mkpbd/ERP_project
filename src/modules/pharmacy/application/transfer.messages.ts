@@ -67,6 +67,7 @@ export interface TransferView extends TransferSummary {
     readonly qty: number;
     readonly unitCost: number;
     readonly value: number;
+    readonly rejected: boolean;
   })[];
 }
 
@@ -138,6 +139,8 @@ export class DecideTransferCommand extends Command<void> {
     readonly decision: 'accept' | 'reject',
     readonly on: string,
     readonly reason: string | null,
+    /** Accepting: line numbers (1-based) sent back. */
+    readonly rejectLines: readonly number[],
   ) {
     super();
   }

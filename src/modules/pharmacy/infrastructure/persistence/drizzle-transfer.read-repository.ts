@@ -177,6 +177,7 @@ export class DrizzleTransferReadRepository extends TransferReadRepository {
         expiryDate: pharmacyLots.expiryDate,
         qty: outletTransferLines.qty,
         unitCost: outletTransferLines.unitCost,
+        rejected: outletTransferLines.rejected,
       })
       .from(outletTransferLines)
       .innerJoin(pharmacyLots, eq(pharmacyLots.id, outletTransferLines.lotId))
