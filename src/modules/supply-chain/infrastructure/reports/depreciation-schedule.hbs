@@ -1,0 +1,55 @@
+{{#with data}}
+{{#if assets.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Asset no</th><th>Item</th><th>Store / department</th>
+      <th class="num">Cost</th><th class="num">Brought forward</th><th class="num">Charge</th>
+      <th class="num">Carried forward</th><th class="num">Book value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each assets}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{assetNo}}</td>
+      <td>{{itemName}} — {{variantName}}<br /><small>{{groupName}}</small></td>
+      <td>{{place}}</td>
+      <td class="num">{{money cost}}</td>
+      <td class="num">{{money opening}}</td>
+      <td class="num">{{money charge}}</td>
+      <td class="num">{{money closing}}</td>
+      <td class="num">{{money bookValue}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="4">Total</td>
+      <td class="num">{{money cost}}</td><td class="num">{{money opening}}</td><td class="num">{{money charge}}</td>
+      <td class="num">{{money closing}}</td><td class="num">{{money bookValue}}</td>
+    </tr>
+  </tbody>
+</table>
+
+<div style="display: flex; gap: 24px; margin-top: 14px; align-items: flex-start">
+  {{#if months.length}}
+  <table class="report" style="width: 40%">
+    <thead><tr><th>Charged in</th><th class="num">Depreciation</th></tr></thead>
+    <tbody>
+      {{#each months}}<tr><td>{{month}}</td><td class="num">{{money amount}}</td></tr>{{/each}}
+      <tr class="group-row"><td>Total</td><td class="num">{{money @root.data.charge}}</td></tr>
+    </tbody>
+  </table>
+  {{/if}}
+  {{#if departments.length}}
+  <table class="report" style="width: 40%">
+    <thead><tr><th>Department when charged</th><th class="num">Depreciation</th></tr></thead>
+    <tbody>
+      {{#each departments}}<tr><td>{{department}}</td><td class="num">{{money amount}}</td></tr>{{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+</div>
+{{else}}
+<p>No depreciating assets for this selection.</p>
+{{/if}}
+{{/with}}

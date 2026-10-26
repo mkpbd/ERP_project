@@ -1,6 +1,6 @@
 # Step 7h — Supply chain: stock reports and registers
 
-Status: **done** (2026-10-26). Previous: [step 7g](07g-scm-asset-requests.md) · Next: step 7i (asset reports).
+Status: **done** (2026-10-26). Previous: [step 7g](07g-scm-asset-requests.md) · Next: [step 7i](07i-scm-asset-reports.md) (asset reports).
 
 Step 7h is split in two: the stock reports and registers here, the fixed-asset reports (register, depreciation
 schedule, maintenance register, labels) in **7i**.

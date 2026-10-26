@@ -1,0 +1,34 @@
+{{#with data}}
+{{#if lines.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Request</th><th>Sent to</th><th>Asset</th><th>Type</th>
+      <th>Problem</th><th>State</th><th class="num">Expected cost</th><th class="num">Actual cost</th><th>Voucher</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{number}}<br /><small>{{date requestDate}}</small></td>
+      <td>{{sentTo}}{{#if gatePassNumber}}<br /><small>{{gatePassNumber}}</small>{{/if}}</td>
+      <td>{{assetNo}}<br /><small>{{itemName}} — {{variantName}}</small></td>
+      <td>{{#if (eq serviceType "warranty")}}Warranty{{else}}Maintenance{{/if}}</td>
+      <td>{{problem}}</td>
+      <td>{{state}}{{#if returnedOn}}<br /><small>{{date returnedOn}}</small>{{/if}}</td>
+      <td class="num">{{money cost}}</td>
+      <td class="num">{{#if returnedOn}}{{money actualCost}}{{/if}}</td>
+      <td>{{voucherNumber}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="7">Total · still out: {{out}}</td>
+      <td class="num">{{money expected}}</td><td class="num">{{money actual}}</td><td></td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No service requests in this period.</p>
+{{/if}}
+{{/with}}

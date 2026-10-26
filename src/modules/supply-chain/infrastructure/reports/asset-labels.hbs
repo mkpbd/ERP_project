@@ -1,0 +1,18 @@
+<style>
+  /* One label per 60 × 37 mm page (old 170 × 105 pt label), for a label printer. */
+  .label { height: 27mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; page-break-after: always; overflow: hidden; }
+  .label:last-child { page-break-after: auto; }
+  .label .bars { width: 46mm; height: 10mm; }
+  .label .bars svg { width: 100%; height: 100%; display: block; }
+  .label .no { font-weight: 800; font-size: 10pt; margin-top: 1mm; letter-spacing: 0.5pt; }
+  .label .name { font-size: 8pt; line-height: 1.15; max-height: 2.4em; overflow: hidden; }
+</style>
+{{#each data.labels}}
+<div class="label">
+  <div class="bars">{{{barcode}}}</div>
+  <div class="no">{{assetNo}}</div>
+  <div class="name">{{itemName}} — {{variantName}}</div>
+</div>
+{{else}}
+<div class="label">No fixed-asset pieces for this selection.</div>
+{{/each}}

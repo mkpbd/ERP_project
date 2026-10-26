@@ -1,0 +1,44 @@
+{{#with data}}
+{{#if groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Asset no</th><th>Item</th><th>Serial no</th>
+      <th>Store / department</th><th>Status</th><th>Acquired</th><th>Source</th>
+      <th class="num">Cost</th><th class="num">Accumulated depreciation</th><th class="num">Book value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    <tr class="group-row"><td colspan="11">{{name}}</td></tr>
+    {{#each assets}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{assetNo}}</td>
+      <td>{{itemName}} — {{variantName}}</td>
+      <td>{{serialNo}}</td>
+      <td>{{place}}</td>
+      <td>{{statusLabel}}</td>
+      <td>{{date acquiredOn}}</td>
+      <td>{{sourceNumber}}{{#if supplierName}}<br /><small>{{supplierName}}</small>{{/if}}</td>
+      <td class="num">{{money cost}}</td>
+      <td class="num">{{money accumulated}}</td>
+      <td class="num">{{money bookValue}}</td>
+    </tr>
+    {{/each}}
+    <tr>
+      <td colspan="8"><b>{{name}}: {{assets.length}} pieces</b></td>
+      <td class="num"><b>{{money cost}}</b></td><td class="num"><b>{{money accumulated}}</b></td>
+      <td class="num"><b>{{money bookValue}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="8">Total: {{count}} pieces</td>
+      <td class="num">{{money cost}}</td><td class="num">{{money accumulated}}</td><td class="num">{{money bookValue}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No fixed assets for this selection.</p>
+{{/if}}
+{{/with}}

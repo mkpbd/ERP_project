@@ -1,3 +1,4 @@
+import ExcelJS from 'exceljs';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -13,6 +14,7 @@ let accountant: string;
 let main: string;
 let supplier: string;
 let pieces: string[];
+let receive: string;
 const gl: Record<string, string> = {};
 
 const PASSWORD = 'quite long passphrase 42';
@@ -77,6 +79,37 @@ const statusOf = async () =>
   ((await scm('get', 'fixed-assets', admin).expect(200)).body.items as { assetNo: string; status: string }[]).map(
     (asset) => `${asset.assetNo}:${asset.status}`,
   );
+
+function binary(response: request.Response, callback: (error: Error | null, body: Buffer) => void): void {
+  const chunks: Buffer[] = [];
+  response.on('data', (chunk: Buffer) => chunks.push(chunk));
+  response.on('end', () => callback(null, Buffer.concat(chunks)));
+}
+
+const render = (key: string, format: 'pdf' | 'xlsx', params: Record<string, unknown>) =>
+  request(http)
+    .post(`/api/v1/reports/${key}/render`)
+    .set(bearer(admin))
+    .send({ format, params })
+    .buffer(true)
+    .parse(binary);
+
+/** The report's table as Excel gives it: one object per row, keyed by column header (the PDF must render too). */
+async function table(key: string, params: Record<string, unknown>): Promise<Record<string, unknown>[]> {
+  expect((await render(key, 'pdf', params)).status).toBe(200);
+  const response = await render(key, 'xlsx', params);
+  expect(response.status, String(response.body).slice(0, 300)).toBe(200);
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(Uint8Array.from(response.body as Buffer).buffer);
+  const rows: unknown[][] = [];
+  workbook.worksheets[0]!.eachRow((row) => rows.push((row.values as unknown[]).slice(1)));
+  // The banner rows are merged across the columns (one repeated value); the header row has distinct names.
+  const headerAt = rows.findIndex((row) => new Set(row).size > 2 && row.every((cell) => typeof cell === 'string'));
+  const headers = rows[headerAt] as string[];
+  return rows
+    .slice(headerAt + 1)
+    .map((row) => Object.fromEntries(headers.map((header, index) => [header, row[index] ?? null])));
+}
 
 beforeAll(async () => {
   t = await createTestApp();
@@ -156,7 +189,7 @@ beforeEach(async () => {
   const ecg = await create('scm/item-variants', { itemId: item, name: '12 channel' });
   const local = await create('scm/supplier-types', { name: 'Local' });
   supplier = await create('scm/suppliers', { typeId: local, name: 'Medical Systems Ltd', subLedgerId: party });
-  const receive = await create('scm/stock-receives', {
+  receive = await create('scm/stock-receives', {
     mainStoreId: main,
     supplierId: supplier,
     receivedOn: '2025-12-15',
@@ -336,6 +369,85 @@ describe('asset service, discard and scrap sale', () => {
         .set(bearer(admin))
         .send({ format: 'pdf', params });
       expect(response.status, JSON.stringify(response.body).slice(0, 200)).toBe(200);
+    }
+  });
+
+  it('reports the register, the depreciation schedule, the maintenance register and prints labels', async () => {
+    const register = await table('scm.asset-register', { asOf: '2026-02-28' });
+    expect(
+      register.map((row) => [row['Asset no'], row.Cost, row['Accumulated depreciation'], row['Book value']]),
+    ).toEqual([
+      ['FA-000001', 120_000, 3_600, 116_400],
+      ['FA-000002', 120_000, 3_600, 116_400],
+      ['FA-000003', 120_000, 3_600, 116_400],
+    ]);
+
+    const service = await scm('post', 'asset-service-requests', keeper, {
+      requestDate: '2026-03-01',
+      sentTo: 'Biomed Services',
+      lines: [{ assetId: pieces[0], serviceType: 'maintenance', problem: 'Lead fault', cost: 1_000 }],
+    }).expect(201);
+    await scm('post', `asset-service-requests/${service.body.id}/decision`, biomed, {
+      version: 1,
+      decision: 'approve',
+      on: '2026-03-02',
+    }).expect(200);
+    const discard = await scm('post', 'asset-discard-requests', keeper, {
+      requestDate: '2026-03-10',
+      reason: 'Beyond repair',
+      lines: [{ assetId: pieces[2] }],
+    }).expect(201);
+    await scm('post', `asset-discard-requests/${discard.body.id}/decision`, director, {
+      version: 1,
+      decision: 'approve',
+      on: '2026-03-16',
+    }).expect(200);
+
+    // Written-off pieces leave the register unless asked for; the place and status follow the piece.
+    expect(
+      (await table('scm.asset-register', { asOf: '2026-03-31' })).map((row) => [row['Asset no'], row.Status]),
+    ).toEqual([
+      ['FA-000001', 'Out for service'],
+      ['FA-000002', 'In use'],
+    ]);
+    expect(
+      (await table('scm.asset-register', { asOf: '2026-03-31', includeGone: true })).map((row) => row['Book value']),
+    ).toEqual([116_400, 116_400, 115_470.97]);
+
+    // February's run for every piece, then March only for the piece written off (16 of 31 days).
+    const schedule = await table('scm.depreciation-schedule', { from: '2026-02-01', to: '2026-03-31' });
+    expect(
+      schedule.map((row) => [row['Asset no'], row['Brought forward'], row.Charge, row['Carried forward']]),
+    ).toEqual([
+      ['FA-000001', 1_800, 1_800, 3_600],
+      ['FA-000002', 1_800, 1_800, 3_600],
+      ['FA-000003', 1_800, 2_729.03, 4_529.03],
+    ]);
+
+    await scm('post', `asset-service-requests/${service.body.id}/receive`, keeper, {
+      version: 2,
+      assetIds: [pieces[0]],
+      costs: [{ assetId: pieces[0], cost: 1_250 }],
+      on: '2026-03-20',
+    }).expect(204);
+    expect(await table('scm.maintenance-register', { from: '2026-03-01', to: '2026-03-31' })).toEqual([
+      expect.objectContaining({
+        Request: 'AS-2026-00001',
+        'Gate pass': 'GP-2026-00001',
+        'Asset no': 'FA-000001',
+        State: 'Back',
+        'Expected cost': 1_000,
+        'Actual cost': 1_250,
+      }),
+    ]);
+    expect(
+      await table('scm.maintenance-register', { from: '2026-03-01', to: '2026-03-31', serviceType: 'warranty' }),
+    ).toEqual([]);
+
+    for (const key of ['scm.asset-stickers', 'scm.asset-labels']) {
+      expect((await render(key, 'pdf', { sourceDocumentId: receive })).status).toBe(200);
+      expect((await render(key, 'pdf', { assetIds: [pieces[1]] })).status).toBe(200);
+      expect((await render(key, 'pdf', {})).status).toBe(400);
     }
   });
 });

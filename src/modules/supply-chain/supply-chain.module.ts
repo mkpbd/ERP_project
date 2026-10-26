@@ -51,6 +51,13 @@ import {
   DrizzleStockLedger,
 } from './infrastructure/persistence/drizzle-stock.repositories.js';
 import { gatePassReport, supplierReturnReport } from './infrastructure/reports/department.reports.js';
+import {
+  assetLabelsReport,
+  assetRegisterReport,
+  assetStickersReport,
+  depreciationScheduleReport,
+  maintenanceRegisterReport,
+} from './infrastructure/reports/asset.reports.js';
 import { disposalInvoiceReport } from './infrastructure/reports/disposal.reports.js';
 import {
   expiryReport,
@@ -186,5 +193,10 @@ export class SupplyChainModule implements OnModuleInit {
     this.reports.register(expiryReport(this.context));
     this.reports.register(movementRegisterReport(this.context));
     this.reports.register(gatePassRegisterReport(this.context));
+    this.reports.register(assetRegisterReport(this.context));
+    this.reports.register(depreciationScheduleReport(this.context));
+    this.reports.register(maintenanceRegisterReport(this.context));
+    this.reports.register(assetStickersReport(this.context));
+    this.reports.register(assetLabelsReport(this.context));
   }
 }

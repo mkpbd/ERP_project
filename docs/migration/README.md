@@ -67,8 +67,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 7f | Supply chain: fixed asset register, straight-line depreciation runs with vouchers | **Done** | [07f-scm-fixed-assets.md](07f-scm-fixed-assets.md) |
 | 7g | Supply chain: asset service and discard requests with approval ladders, disposal depreciation and journal, sale of written-off pieces, scrap sales, disposal invoice | **Done** | [07g-scm-asset-requests.md](07g-scm-asset-requests.md) |
 | 7h | Supply chain: stock movement summary, expiring stock, stock document register, gate pass register | **Done** | [07h-scm-stock-reports.md](07h-scm-stock-reports.md) |
-| 7i | Supply chain: asset register, depreciation schedule, maintenance register, asset labels | Next | |
-| 8 | Pharmacy | Planned | |
+| 7i | Supply chain: fixed asset register, depreciation schedule, maintenance register, Code 39 asset stickers and labels | **Done** | [07i-scm-asset-reports.md](07i-scm-asset-reports.md) |
+| 8 | Pharmacy | Next | |
 | 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
