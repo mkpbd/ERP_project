@@ -2,19 +2,28 @@ import { sql, type SQLWrapper } from 'drizzle-orm';
 import {
   boolean,
   check,
+  date,
+  foreignKey,
   index,
   integer,
   numeric,
   pgTable,
+  primaryKey,
+  smallint,
   text,
   timestamp,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
+import { vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
+import { suppliers } from '../../../supply-chain/infrastructure/persistence/supply-chain.schema.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
+const day = (name: string) => date(name, { mode: 'string' });
 const money = (name: string) => numeric(name, { precision: 14, scale: 2, mode: 'number' });
+const percent = (name: string) => numeric(name, { precision: 5, scale: 2, mode: 'number' });
+const unitCost = (name: string) => numeric(name, { precision: 16, scale: 4, mode: 'number' });
 const timestamps = {
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -179,5 +188,217 @@ export const reorderLevels = pgTable(
     uniqueIndex('pharmacy_reorder_levels_uq').on(t.outletId, t.productId),
     index('pharmacy_reorder_levels_product_idx').on(t.productId),
     check('pharmacy_reorder_levels_level_ck', sql`${t.level} between 0 and 10000000`),
+  ],
+);
+
+// Document numbers per kind and year (PO-2026-00001).
+export const pharmacySequences = pgTable(
+  'pharmacy_sequences',
+  {
+    kind: text('kind').notNull(),
+    year: smallint('year').notNull(),
+    last: integer('last').notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.kind, t.year] })],
+);
+
+// Old Pharmacy.LotRecords and the lot columns of Stocks: one lot per product, batch, expiry and sale rate (the old
+// stock row was keyed by product, expiry and outlet only, so a second receive of the same expiry kept the first
+// receive's rates).
+export const pharmacyLots = pgTable(
+  'pharmacy_lots',
+  {
+    id: uuid('id').primaryKey(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    batchNo: text('batch_no'),
+    expiryDate: day('expiry_date').notNull(),
+    /** What one unit of this lot sells for (the MRP printed on it). */
+    saleRate: money('sale_rate').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_lots_uq').on(t.productId, sql`coalesce(upper(${t.batchNo}), '')`, t.expiryDate, t.saleRate),
+    index('pharmacy_lots_expiry_idx').on(t.expiryDate),
+    check('pharmacy_lots_sale_rate_ck', sql`${t.saleRate} >= 0`),
+  ],
+);
+
+export const PHARMACY_MOVEMENT_KINDS = ['opening', 'receive'] as const;
+
+// Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
+// StockFlows, written by separate commits).
+export const pharmacyMovements = pgTable(
+  'pharmacy_movements',
+  {
+    id: uuid('id').primaryKey(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+    movedOn: day('moved_on').notNull(),
+    kind: text('kind', { enum: PHARMACY_MOVEMENT_KINDS }).notNull(),
+    documentId: uuid('document_id').notNull(),
+    documentNumber: text('document_number').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('pharmacy_movements_outlet_idx').on(t.outletId, t.productId, t.movedOn),
+    index('pharmacy_movements_lot_idx').on(t.lotId),
+    index('pharmacy_movements_document_idx').on(t.documentId),
+    check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
+    check('pharmacy_movements_kind_ck', sql`${t.kind} in ('opening', 'receive')`),
+  ],
+);
+
+// Opening stock entered per outlet (old: typed straight into Stocks).
+export const pharmacyOpenings = pgTable(
+  'pharmacy_openings',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    openedOn: day('opened_on').notNull(),
+    note: text('note'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('pharmacy_openings_number_uq').on(t.number)],
+);
+
+// Old Pharmacy.PurchaseOrders / PurchaseOrderDetails (status text per order and line).
+export const pharmacyOrders = pgTable(
+  'pharmacy_purchase_orders',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    orderDate: day('order_date').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['open', 'partly_received', 'received', 'closed', 'cancelled'] }).notNull(),
+    closeReason: text('close_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_purchase_orders_number_uq').on(t.number),
+    index('pharmacy_purchase_orders_supplier_idx').on(t.supplierId, t.status),
+    check(
+      'pharmacy_purchase_orders_status_ck',
+      sql`${t.status} in ('open', 'partly_received', 'received', 'closed', 'cancelled')`,
+    ),
+  ],
+);
+
+export const pharmacyOrderLines = pgTable(
+  'pharmacy_purchase_order_lines',
+  {
+    orderId: uuid('order_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    receivedQty: integer('received_qty').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.orderId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_purchase_order_lines_fk',
+      columns: [t.orderId],
+      foreignColumns: [pharmacyOrders.id],
+    }).onDelete('cascade'),
+    uniqueIndex('pharmacy_purchase_order_lines_product_uq').on(t.orderId, t.productId),
+    check('pharmacy_purchase_order_lines_qty_ck', sql`${t.qty} > 0 and ${t.receivedQty} between 0 and ${t.qty}`),
+  ],
+);
+
+// Old Pharmacy.StockReceives / StockReceiveDetails / RceivePurchOrders.
+export const pharmacyReceives = pgTable(
+  'pharmacy_receives',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    purchaseOrderId: uuid('purchase_order_id').references(() => pharmacyOrders.id, { onDelete: 'restrict' }),
+    receivedOn: day('received_on').notNull(),
+    supplierInvoiceNo: text('supplier_invoice_no'),
+    supplierInvoiceDate: day('supplier_invoice_date'),
+    challanNo: text('challan_no'),
+    remarks: text('remarks'),
+    status: text('status', { enum: ['draft', 'posted'] }).notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    vat: money('vat').notNull(),
+    total: money('total').notNull(),
+    voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    postedBy: uuid('posted_by').references(() => users.id, { onDelete: 'set null' }),
+    postedAt: tz('posted_at'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_receives_number_uq').on(t.number),
+    uniqueIndex('pharmacy_receives_invoice_uq')
+      .on(t.supplierId, sql`upper(${t.supplierInvoiceNo})`)
+      .where(sql`${t.supplierInvoiceNo} is not null`),
+    index('pharmacy_receives_date_idx').on(t.receivedOn),
+    check('pharmacy_receives_status_ck', sql`${t.status} in ('draft', 'posted')`),
+  ],
+);
+
+export const pharmacyReceiveLines = pgTable(
+  'pharmacy_receive_lines',
+  {
+    receiveId: uuid('receive_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id').references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    purchaseRate: unitCost('purchase_rate').notNull(),
+    saleRate: money('sale_rate').notNull(),
+    discountPercent: percent('discount_percent').notNull(),
+    vatPercent: percent('vat_percent').notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    vat: money('vat').notNull(),
+    total: money('total').notNull(),
+    batchNo: text('batch_no'),
+    expiryDate: day('expiry_date').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.receiveId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_receive_lines_fk',
+      columns: [t.receiveId],
+      foreignColumns: [pharmacyReceives.id],
+    }).onDelete('cascade'),
+    index('pharmacy_receive_lines_product_idx').on(t.productId),
+    check('pharmacy_receive_lines_qty_ck', sql`${t.qty} > 0`),
   ],
 );

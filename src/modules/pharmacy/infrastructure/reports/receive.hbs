@@ -1,0 +1,55 @@
+{{#with data.receive}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr>
+      <td style="width: 13%">Receive no</td><td><b>{{number}}</b>{{#if (eq status "draft")}} <small>(draft)</small>{{/if}}</td>
+      <td style="width: 13%">Date</td><td>{{date receivedOn}}</td>
+      <td style="width: 13%">Outlet</td><td>{{outletName}}</td>
+    </tr>
+    <tr>
+      <td>Supplier</td><td><b>{{supplierName}}</b></td>
+      <td>Invoice</td><td>{{supplierInvoiceNo}}{{#if supplierInvoiceDate}} · {{date supplierInvoiceDate}}{{/if}}</td>
+      <td>Challan</td><td>{{challanNo}}</td>
+    </tr>
+    <tr>
+      <td>Order</td><td>{{purchaseOrderNumber}}</td>
+      <td>Voucher</td><td>{{voucherNumber}}</td>
+      <td>Remarks</td><td>{{remarks}}</td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>
+      <th class="num">Purchase rate</th><th class="num">Sale rate</th><th class="num">Amount</th>
+      <th class="num">Discount</th><th class="num">VAT</th><th class="num">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{purchaseRate}}</td>
+      <td class="num">{{money saleRate}}</td>
+      <td class="num">{{money amount}}</td>
+      <td class="num">{{money discount}}{{#if discountPercent}}<br /><small>{{discountPercent}}%</small>{{/if}}</td>
+      <td class="num">{{money vat}}{{#if vatPercent}}<br /><small>{{vatPercent}}%</small>{{/if}}</td>
+      <td class="num">{{money total}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="7">Total</td><td class="num">{{money amount}}</td><td class="num">{{money discount}}</td>
+      <td class="num">{{money vat}}</td><td class="num">{{money total}}</td>
+    </tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords total}}</p>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Received by</td><td>Checked by</td><td>Pharmacy in-charge</td></tr>
+</table>
+{{/with}}

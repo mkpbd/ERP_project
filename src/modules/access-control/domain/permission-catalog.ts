@@ -61,6 +61,8 @@ export const PERMISSION_CATALOG = [
     key: 'pharmacy:manage',
     description: 'Set up the medicine catalogue, outlets, who works at each outlet and reorder levels',
   },
+  { key: 'pharmacy:purchase', description: 'Raise, edit, cancel and close medicine purchase orders' },
+  { key: 'pharmacy:receive', description: 'Draft and post medicine receives at the outlets you work at' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

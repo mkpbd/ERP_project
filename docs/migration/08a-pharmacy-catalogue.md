@@ -1,7 +1,7 @@
 # Step 8a — Pharmacy: medicine catalogue, outlets, reorder levels
 
-Status: **done** (2026-10-26). Previous: [step 7i](07i-scm-asset-reports.md) · Next: step 8b (pharmacy purchase
-and stock).
+Status: **done** (2026-10-26). Previous: [step 7i](07i-scm-asset-reports.md) · Next: [step 8b](08b-pharmacy-purchase-stock.md) (pharmacy purchase
+and stock; step 8 is re-planned there).
 
 ## Where the old logic lives
 

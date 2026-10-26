@@ -16,5 +16,9 @@ export const PHARMACY_RECORDS = {
 
 /** The medicine catalogue and the outlets. */
 export const PHARMACY_READ = 'pharmacy:read';
-/** Setting up the medicine catalogue, outlets, who works where and reorder levels. */
+/** Setting up the medicine catalogue, outlets, who works where and reorder levels; opening stock. */
 export const PHARMACY_MANAGE = 'pharmacy:manage';
+/** Raising, editing, cancelling and closing purchase orders. */
+export const PHARMACY_PURCHASE = 'pharmacy:purchase';
+/** Drafting and posting stock receives at the outlets one works at. */
+export const PHARMACY_RECEIVE = 'pharmacy:receive';

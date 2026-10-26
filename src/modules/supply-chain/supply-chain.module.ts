@@ -1,5 +1,6 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
+import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { ASSET_HANDLERS, AssetReadRepository } from './application/asset.handlers.js';
@@ -96,6 +97,7 @@ import {
   DrizzleStoreAccess,
   DrizzleStoreMoveRepository,
 } from './infrastructure/persistence/drizzle-store.repositories.js';
+import { DrizzleSupplierDirectory } from './infrastructure/persistence/drizzle-supplier-directory.js';
 import { supplyChainRecordTypes } from './infrastructure/persistence/supply-chain.record-stores.js';
 import { itemCatalogueReport, supplierListReport } from './infrastructure/reports/catalogue.reports.js';
 import {
@@ -114,7 +116,9 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
  * store requests, issues to departments and transfers between stores (step 7d); department stock (consumption,
  * returns, counts), supplier returns and gate passes (step 7e); the fixed asset register and straight-line
  * depreciation (step 7f); asset service and discard requests, disposal journals and scrap sales (step 7g).
+ * Publishes the supplier directory the pharmacy buys from.
  */
+@Global()
 @Module({
   controllers: [
     ...SCM_RECORD_CONTROLLERS,
@@ -159,7 +163,9 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
     { provide: StudyRepository, useClass: DrizzleStudyRepository },
     { provide: OrderRepository, useClass: DrizzleOrderRepository },
     { provide: PurchaseReadRepository, useClass: DrizzlePurchaseReadRepository },
+    { provide: SupplierDirectory, useClass: DrizzleSupplierDirectory },
   ],
+  exports: [SupplierDirectory],
 })
 export class SupplyChainModule implements OnModuleInit {
   constructor(

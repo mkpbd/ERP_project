@@ -1,0 +1,29 @@
+{{#with data.order}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Order no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date orderDate}}</td></tr>
+    <tr><td>Supplier</td><td><b>{{supplierName}}</b>{{#if supplierAddress}}<br /><small>{{supplierAddress}}</small>{{/if}}</td><td>For outlet</td><td>{{outletName}}</td></tr>
+    {{#if note}}<tr><td>Note</td><td colspan="3">{{note}}</td></tr>{{/if}}
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Product</th><th>Generic</th><th class="num">Ordered</th><th class="num">Received</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}</td>
+      <td>{{genericName}}</td>
+      <td class="num">{{qty}}{{#if unitName}} {{unitName}}{{/if}}</td>
+      <td class="num">{{receivedQty}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p>Status: {{status}}{{#if closeReason}} — {{closeReason}}{{/if}}</p>
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Prepared by</td><td>Pharmacy in-charge</td><td>Authorised by</td></tr>
+</table>
+{{/with}}

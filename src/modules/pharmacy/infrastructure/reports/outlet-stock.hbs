@@ -1,0 +1,40 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Manufacturer</th><th class="num">Quantity</th>
+      <th class="num">Reorder level</th><th class="num">Value at cost</th><th class="num">Value at sale rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}{{#if belowReorder}} <b>⚠ reorder</b>{{/if}}<br /><small>{{genericName}}</small></td>
+      <td>{{manufacturerName}}</td>
+      <td class="num">{{qty}}{{#if unitName}} {{unitName}}{{/if}}</td>
+      <td class="num">{{#if reorderLevel}}{{reorderLevel}}{{/if}}</td>
+      <td class="num">{{money value}}</td>
+      <td class="num">{{money saleValue}}</td>
+    </tr>
+    {{#if ../withLots}}
+    {{#each lots}}
+    <tr>
+      <td></td>
+      <td colspan="2" style="padding-left: 24px"><small>Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · expiry {{date expiryDate}} · sells at {{money saleRate}}</small></td>
+      <td class="num"><small>{{qty}}</small></td><td></td>
+      <td class="num"><small>{{money value}}</small></td><td></td>
+    </tr>
+    {{/each}}
+    {{/if}}
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">Total</td><td class="num">{{money value}}</td><td class="num">{{money saleValue}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>Nothing in stock for this selection.</p>
+{{/if}}
+{{/with}}
