@@ -140,3 +140,25 @@ export function defaultStartDate(acquiredOn: string): string {
 export function statusAfter(terms: DepreciationTerms, accumulated: number): DepreciationStatus {
   return paisa(accumulated) >= paisa(terms.cost - terms.residual) ? 'fully_depreciated' : 'active';
 }
+
+/**
+ * Old disposal close: the periods due up to the disposal date, then the period it falls in charged by the days
+ * up to and including that date. Returns the charges; the last one ends on the disposal date.
+ */
+export function disposalCharges(terms: DepreciationTerms, state: DepreciationState, disposedOn: string): Charge[] {
+  const charges = dueCharges(terms, state, disposedOn);
+  const periods = schedule(terms);
+  const current = periods[state.periodsDone + charges.length];
+  if (!current || disposedOn < terms.startDate) return charges;
+  const accumulated = paisa(state.accumulated) + charges.reduce((sum, charge) => sum + paisa(charge.amount), 0);
+  const remaining = paisa(terms.cost - terms.residual) - accumulated;
+  if (remaining <= 0) return charges;
+  const start = periodStart(current.periodEnd, terms.frequency);
+  const from = start > terms.startDate ? start : terms.startDate;
+  const elapsed = (toTime(disposedOn) - toTime(from)) / DAY + 1;
+  const length = (toTime(current.periodEnd) - toTime(from)) / DAY + 1;
+  const weightLeft = periods.slice(current.index).reduce((sum, entry) => sum + entry.weight, 0);
+  const share = (current.weight * Math.min(1, elapsed / length)) / weightLeft;
+  const amount = Math.min(remaining, Math.max(0, Math.round(remaining * share)));
+  return amount > 0 ? [...charges, { index: current.index, periodEnd: disposedOn, amount: taka(amount) }] : charges;
+}

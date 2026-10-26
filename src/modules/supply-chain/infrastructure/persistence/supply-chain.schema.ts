@@ -6,6 +6,7 @@ import {
   foreignKey,
   index,
   integer,
+  jsonb,
   numeric,
   pgTable,
   primaryKey,
@@ -633,6 +634,7 @@ export const STOCK_MOVEMENT_KINDS = [
   'department_return',
   'adjustment',
   'supplier_return',
+  'discard',
 ] as const;
 
 // Every quantity in or out of a store, by lot, with its unit cost. Stock is the sum; the old system added up
@@ -668,7 +670,7 @@ export const stockMovements = pgTable(
     check('stock_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'stock_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer', 'consumption', 'department_return', 'adjustment', 'supplier_return')`,
+      sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer', 'consumption', 'department_return', 'adjustment', 'supplier_return', 'discard')`,
     ),
   ],
 );
@@ -1395,6 +1397,10 @@ export const depreciationRuns = pgTable(
     id: uuid('id').primaryKey(),
     number: text('number').notNull(),
     asOf: day('as_of').notNull(),
+    /** Periodic runs, or the closing charge when pieces are written off (not reversed on their own). */
+    kind: text('kind', { enum: ['periodic', 'disposal'] })
+      .notNull()
+      .default('periodic'),
     status: text('status', { enum: ['posted', 'reversed'] }).notNull(),
     assetCount: integer('asset_count').notNull(),
     total: money('total').notNull(),
@@ -1436,5 +1442,195 @@ export const depreciationEntries = pgTable(
     primaryKey({ columns: [t.runId, t.assetId, t.periodIndex] }),
     uniqueIndex('depreciation_entries_period_uq').on(t.assetId, t.periodIndex),
     check('depreciation_entries_amount_ck', sql`${t.amount} >= 0`),
+  ],
+);
+
+// Old WarrantyMaintenanceApprovalSettings, AssetDiscardApprovalSettings and ManualDiscardApprovalSettings.
+export const assetApprovalLevels = pgTable(
+  'asset_approval_levels',
+  {
+    id: uuid('id').primaryKey(),
+    flow: text('flow', { enum: ['service', 'discard', 'scrap_sale'] }).notNull(),
+    levelOrder: smallint('level_order').notNull(),
+    name: text('name').notNull(),
+    roleId: uuid('role_id')
+      .notNull()
+      .references(() => roles.id, { onDelete: 'restrict' }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('asset_approval_levels_order_uq').on(t.flow, t.levelOrder),
+    check('asset_approval_levels_flow_ck', sql`${t.flow} in ('service', 'discard', 'scrap_sale')`),
+    check('asset_approval_levels_order_ck', sql`${t.levelOrder} between 1 and 20`),
+    nameLength('asset_approval_levels', t.name, 50),
+  ],
+);
+
+// Old AssetRequestLocks: one open request per piece, of either kind.
+export const assetLocks = pgTable(
+  'asset_locks',
+  {
+    assetId: uuid('asset_id')
+      .primaryKey()
+      .references(() => fixedAssets.id, { onDelete: 'cascade' }),
+    kind: text('kind', { enum: ['service', 'discard'] }).notNull(),
+    requestId: uuid('request_id').notNull(),
+    lockedAt: tz('locked_at').notNull().defaultNow(),
+  },
+  (t) => [index('asset_locks_request_idx').on(t.requestId)],
+);
+
+// Decisions of service and discard requests and scrap sales, one per level.
+export const assetDecisions = pgTable(
+  'asset_decisions',
+  {
+    documentId: uuid('document_id').notNull(),
+    levelOrder: smallint('level_order').notNull(),
+    levelName: text('level_name').notNull(),
+    decision: text('decision', { enum: ['approved', 'rejected'] }).notNull(),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    decidedAt: tz('decided_at').notNull(),
+    remarks: text('remarks'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.documentId, t.levelOrder] }),
+    check('asset_decisions_decision_ck', sql`${t.decision} in ('approved', 'rejected')`),
+  ],
+);
+
+// Old WarrantyMaintenanceIndents / Details.
+export const serviceRequests = pgTable(
+  'asset_service_requests',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    requestDate: day('request_date').notNull(),
+    sentTo: text('sent_to').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['pending', 'approved', 'closed', 'rejected'] }).notNull(),
+    currentLevel: smallint('current_level'),
+    gatePassId: uuid('gate_pass_id').references(() => gatePasses.id, { onDelete: 'set null' }),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('asset_service_requests_number_uq').on(t.number),
+    index('asset_service_requests_status_idx').on(t.status, t.requestDate),
+    check('asset_service_requests_status_ck', sql`${t.status} in ('pending', 'approved', 'closed', 'rejected')`),
+  ],
+);
+
+export const serviceRequestLines = pgTable(
+  'asset_service_request_lines',
+  {
+    requestId: uuid('request_id').notNull(),
+    position: smallint('position').notNull(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => fixedAssets.id, { onDelete: 'restrict' }),
+    serviceType: text('service_type', { enum: ['warranty', 'maintenance'] }).notNull(),
+    problem: text('problem'),
+    cost: money('cost').notNull(),
+    rejected: boolean('rejected').notNull(),
+    returnedOn: day('returned_on'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.position] }),
+    foreignKey({
+      name: 'asset_service_request_lines_fk',
+      columns: [t.requestId],
+      foreignColumns: [serviceRequests.id],
+    }).onDelete('cascade'),
+    index('asset_service_request_lines_asset_idx').on(t.assetId),
+    check('asset_service_request_lines_type_ck', sql`${t.serviceType} in ('warranty', 'maintenance')`),
+    check('asset_service_request_lines_cost_ck', sql`${t.cost} >= 0`),
+  ],
+);
+
+// Old AssetDiscardIndents / Details (with the sale: SoldTo, InvoiceNo, SaleAmount).
+export const discardRequests = pgTable(
+  'asset_discard_requests',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    requestDate: day('request_date').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status', { enum: ['pending', 'discarded', 'sold', 'rejected'] }).notNull(),
+    currentLevel: smallint('current_level'),
+    discardedOn: day('discarded_on'),
+    disposalRunId: uuid('disposal_run_id').references(() => depreciationRuns.id, { onDelete: 'set null' }),
+    disposalVoucherNumber: text('disposal_voucher_number'),
+    soldOn: day('sold_on'),
+    soldTo: text('sold_to'),
+    invoiceNo: text('invoice_no'),
+    saleVoucherNumber: text('sale_voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('asset_discard_requests_number_uq').on(t.number),
+    uniqueIndex('asset_discard_requests_invoice_uq')
+      .on(t.invoiceNo)
+      .where(sql`${t.invoiceNo} is not null`),
+    index('asset_discard_requests_status_idx').on(t.status, t.requestDate),
+    check('asset_discard_requests_status_ck', sql`${t.status} in ('pending', 'discarded', 'sold', 'rejected')`),
+  ],
+);
+
+export const discardRequestLines = pgTable(
+  'asset_discard_request_lines',
+  {
+    requestId: uuid('request_id').notNull(),
+    position: smallint('position').notNull(),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => fixedAssets.id, { onDelete: 'restrict' }),
+    reason: text('reason'),
+    rejected: boolean('rejected').notNull(),
+    saleAmount: money('sale_amount'),
+    /** Book value when written off (cost less accumulated depreciation). */
+    bookValue: money('book_value'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.requestId, t.position] }),
+    foreignKey({
+      name: 'asset_discard_request_lines_fk',
+      columns: [t.requestId],
+      foreignColumns: [discardRequests.id],
+    }).onDelete('cascade'),
+    index('asset_discard_request_lines_asset_idx').on(t.assetId),
+    check('asset_discard_request_lines_amount_ck', sql`${t.saleAmount} is null or ${t.saleAmount} >= 0`),
+  ],
+);
+
+// Old ManualDiscardRequisitions: scrap sold by description, not registered assets.
+export const scrapSales = pgTable(
+  'scrap_sales',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    saleDate: day('sale_date').notNull(),
+    buyer: text('buyer').notNull(),
+    status: text('status', { enum: ['pending', 'sold', 'rejected'] }).notNull(),
+    currentLevel: smallint('current_level'),
+    lines: jsonb('lines')
+      .$type<{ description: string; unit: string | null; qty: number; unitPrice: number; total: number }[]>()
+      .notNull(),
+    total: money('total').notNull(),
+    invoiceNo: text('invoice_no'),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('scrap_sales_number_uq').on(t.number),
+    uniqueIndex('scrap_sales_invoice_uq')
+      .on(t.invoiceNo)
+      .where(sql`${t.invoiceNo} is not null`),
+    check('scrap_sales_status_ck', sql`${t.status} in ('pending', 'sold', 'rejected')`),
+    check('scrap_sales_total_ck', sql`${t.total} >= 0`),
   ],
 );

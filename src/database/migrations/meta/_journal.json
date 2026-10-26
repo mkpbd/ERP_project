@@ -155,6 +155,13 @@
       "when": 1792977477852,
       "tag": "0021_scm_fixed_assets",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1792979064603,
+      "tag": "0022_scm_asset_requests",
+      "breakpoints": true
     }
   ]
 }

@@ -67,6 +67,10 @@ import {
   UpdateIndentApprovalLevelDto,
   IndentApprovalLevelFilterDto,
   IndentApprovalLevelResponseDto,
+  CreateAssetApprovalLevelDto,
+  UpdateAssetApprovalLevelDto,
+  AssetApprovalLevelFilterDto,
+  AssetApprovalLevelResponseDto,
 } from './dto/supply-chain.dto.js';
 
 const scm = { tag: 'supply-chain', readPermission: 'scm:read', managePermission: 'scm:manage' } as const;
@@ -281,6 +285,18 @@ export const IndentApprovalLevelsController = createRecordController({
   filter: IndentApprovalLevelFilterDto,
 });
 
+export const AssetApprovalLevelsController = createRecordController({
+  ...scm,
+  className: 'AssetApprovalLevelsController',
+  path: 'scm/asset-approval-levels',
+  type: R.assetApprovalLevel,
+  label: 'asset approval level',
+  create: CreateAssetApprovalLevelDto,
+  update: UpdateAssetApprovalLevelDto,
+  response: AssetApprovalLevelResponseDto,
+  filter: AssetApprovalLevelFilterDto,
+});
+
 export const SCM_RECORD_CONTROLLERS = [
   MainStoresController,
   SubStoresController,
@@ -300,4 +316,5 @@ export const SCM_RECORD_CONTROLLERS = [
   PurchaseApprovalLevelsController,
   CsApprovalLevelsController,
   IndentApprovalLevelsController,
+  AssetApprovalLevelsController,
 ];

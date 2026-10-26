@@ -199,7 +199,7 @@ export class DrizzleDepreciationRepository extends DepreciationRepository {
         voucherNumber: depreciationRuns.voucherNumber,
       })
       .from(depreciationRuns)
-      .where(eq(depreciationRuns.status, 'posted'))
+      .where(and(eq(depreciationRuns.status, 'posted'), eq(depreciationRuns.kind, 'periodic')))
       .orderBy(desc(depreciationRuns.asOf), desc(depreciationRuns.createdAt))
       .limit(1)
       .for('update');

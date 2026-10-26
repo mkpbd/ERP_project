@@ -161,9 +161,12 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | supplier returns (draft, send, settle) | `scm:receive` |
 | `GET /scm/fixed-assets[/:id]`, `GET /scm/depreciation-runs[/:id]` | `scm:read` |
 | describe pieces, configure depreciation, preview, post and reverse runs | `scm:assets` |
+| `GET /scm/{asset-service-requests,asset-discard-requests,scrap-sales}[/:id]` | `scm:read` |
+| raise service and discard requests and scrap sales, receive from service, sell written-off pieces | `scm:assets` |
+| `POST /scm/{asset-service-requests,asset-discard-requests,scrap-sales}/:id/decision` | the asset approval level's role (not the raiser) |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
-| `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |
+| `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |
 | `GET /health/live`, `/health/ready` | public |
 
 Errors are RFC 9457 Problem Details:

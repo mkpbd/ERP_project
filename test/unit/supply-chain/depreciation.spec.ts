@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   defaultStartDate,
+  disposalCharges,
   dueCharges,
   openingState,
   periodEnd,
@@ -79,5 +80,17 @@ describe('dueCharges', () => {
   it('starts on the 1st of the month after the acquisition, as before', () => {
     expect(defaultStartDate('2026-03-01')).toBe('2026-03-01');
     expect(defaultStartDate('2026-12-15')).toBe('2027-01-01');
+  });
+});
+
+describe('disposalCharges', () => {
+  it('charges the due periods and the current one by days up to the disposal date', () => {
+    const charges = disposalCharges(terms(), { periodsDone: 0, accumulated: 0 }, '2026-03-16');
+    expect(charges.map((charge) => [charge.periodEnd, charge.amount])).toEqual([
+      ['2026-01-31', 1_000],
+      ['2026-02-28', 1_000],
+      ['2026-03-16', 516.13],
+    ]);
+    expect(disposalCharges(terms(), { periodsDone: 12, accumulated: 12_000 }, '2027-02-01')).toEqual([]);
   });
 });

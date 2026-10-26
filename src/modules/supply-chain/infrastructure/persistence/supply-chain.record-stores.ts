@@ -15,6 +15,7 @@ import {
   SCM_RECORDS as R,
 } from '../../application/supply-chain.constants.js';
 import {
+  assetApprovalLevels,
   csApprovalLevels,
   grnFaults,
   purchaseOrderLines,
@@ -209,6 +210,14 @@ export function supplyChainRecordTypes(context: DbContext): RecordType[] {
         [fk('store_indent_approval_levels', 'sub_store_id', 'sub_stores')]: R.subStore,
         [fk('store_indent_approval_levels', 'role_id', 'roles')]: 'role',
       },
+    }),
+    record(R.assetApprovalLevel, assetApprovalLevels, {
+      orderBy: [assetApprovalLevels.flow, assetApprovalLevels.levelOrder],
+      filters: { flow: assetApprovalLevels.flow },
+      unique: {
+        asset_approval_levels_order_uq: taken('asset_approval_level_exists', 'The flow already has this level'),
+      },
+      references: { [fk('asset_approval_levels', 'role_id', 'roles')]: 'role' },
     }),
     record(R.csApprovalLevel, csApprovalLevels, {
       orderBy: [csApprovalLevels.levelOrder],

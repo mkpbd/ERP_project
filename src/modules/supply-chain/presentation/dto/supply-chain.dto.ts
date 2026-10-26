@@ -209,3 +209,10 @@ export class CreateIndentApprovalLevelDto extends createZodDto(indentLevel.creat
 export class UpdateIndentApprovalLevelDto extends createZodDto(indentLevel.update) {}
 export class IndentApprovalLevelFilterDto extends createZodDto(z.object({ subStoreId: ref.optional() })) {}
 export class IndentApprovalLevelResponseDto extends responseDto(indentLevel.response) {}
+
+const flow = z.enum(['service', 'discard', 'scrap_sale']);
+const assetLevel = shapes({ flow, levelOrder, name: name(50), roleId: ref });
+export class CreateAssetApprovalLevelDto extends createZodDto(assetLevel.create) {}
+export class UpdateAssetApprovalLevelDto extends createZodDto(assetLevel.update) {}
+export class AssetApprovalLevelFilterDto extends createZodDto(z.object({ flow: flow.optional() })) {}
+export class AssetApprovalLevelResponseDto extends responseDto(assetLevel.response) {}

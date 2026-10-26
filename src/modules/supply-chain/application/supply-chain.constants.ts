@@ -18,6 +18,7 @@ export const SCM_RECORDS = {
   purchaseApprovalLevel: 'purchase_approval_level',
   csApprovalLevel: 'cs_approval_level',
   indentApprovalLevel: 'store_indent_approval_level',
+  assetApprovalLevel: 'asset_approval_level',
 } as const;
 
 /** Stores, the item catalogue and suppliers. */

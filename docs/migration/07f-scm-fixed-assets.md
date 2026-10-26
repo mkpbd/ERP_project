@@ -1,6 +1,6 @@
 # Step 7f — Supply chain: fixed asset register and depreciation
 
-Status: **done** (2026-10-26). Previous: [step 7e](07e-scm-department-returns.md) · Next: step 7g (asset
+Status: **done** (2026-10-26). Previous: [step 7e](07e-scm-department-returns.md) · Next: [step 7g](07g-scm-asset-requests.md) (asset
 maintenance, warranty, discard and scrap sale).
 
 ## Where the old logic lives

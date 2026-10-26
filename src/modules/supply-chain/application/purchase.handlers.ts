@@ -50,6 +50,31 @@ import {
 } from './purchase.messages.js';
 import { SCM_PURCHASE, SCM_READ } from './supply-chain.constants.js';
 
+/**
+ * Document number kinds: PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request,
+ * IS issue, TR transfer, DC consumption, DR department return, DA stock count, RT supplier return, GP gate pass,
+ * DP depreciation run, AS asset service request, AD asset discard request, SS scrap sale.
+ */
+export type DocumentKind =
+  | 'PR'
+  | 'CS'
+  | 'PO'
+  | 'SR'
+  | 'OS'
+  | 'SI'
+  | 'RQ'
+  | 'IS'
+  | 'TR'
+  | 'DC'
+  | 'DR'
+  | 'DA'
+  | 'RT'
+  | 'GP'
+  | 'DP'
+  | 'AS'
+  | 'AD'
+  | 'SS';
+
 /** What the purchase handlers share: access, transactions, numbering and the audit trail. */
 @Injectable()
 export class PurchaseDesk {
@@ -66,14 +91,7 @@ export class PurchaseDesk {
     readonly orders: OrderRepository,
   ) {}
 
-  /**
-   * PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request, IS issue, TR transfer,
-   * DC consumption, DR department return, DA stock count, RT supplier return, GP gate pass, DP depreciation run.
-   */
-  async number(
-    kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR' | 'DC' | 'DR' | 'DA' | 'RT' | 'GP' | 'DP',
-    date: string,
-  ): Promise<string> {
+  async number(kind: DocumentKind, date: string): Promise<string> {
     const year = Number(date.slice(0, 4));
     return documentNumber(kind, year, await this.sequences.next(kind, year));
   }

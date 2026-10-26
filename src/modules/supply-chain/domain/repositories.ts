@@ -1,4 +1,5 @@
 import type { LotBalance } from './allocation.js';
+import type { AssetFlow, DiscardRequest, ScrapSale, ServiceRequest } from './asset-requests.js';
 import type { ComparativeStudy } from './comparative-study.js';
 import type { DepartmentAdjustment, DepartmentConsumption, DepartmentReturn } from './department.js';
 import type { ApprovalLevel } from './documents.js';
@@ -64,7 +65,15 @@ export type StoreRef = { readonly mainStoreId: string } | { readonly subStoreId:
 export type StockPlace = StoreRef | { readonly departmentId: string };
 
 export type MovementKind =
-  'opening' | 'receive' | 'issue' | 'transfer' | 'consumption' | 'department_return' | 'adjustment' | 'supplier_return';
+  | 'opening'
+  | 'receive'
+  | 'issue'
+  | 'transfer'
+  | 'consumption'
+  | 'department_return'
+  | 'adjustment'
+  | 'supplier_return'
+  | 'discard';
 
 export interface NewMovement {
   readonly store: StockPlace;
@@ -308,6 +317,7 @@ export interface RunRecord {
   readonly id: string;
   readonly number: string;
   readonly asOf: string;
+  readonly kind?: 'periodic' | 'disposal';
   readonly status: 'posted' | 'reversed';
   readonly assetCount: number;
   readonly total: number;
@@ -322,7 +332,7 @@ export abstract class DepreciationRepository {
   /** Active profiles (locked) whose next period ends on or before `asOf`, with where the piece is. */
   abstract due(asOf: string): Promise<(DepreciationRecord & { departmentId: string | null })[]>;
   abstract insertRun(run: RunRecord & { postedBy: string }, entries: readonly RunEntry[]): Promise<void>;
-  /** The most recent run that is still posted, locked. */
+  /** The most recent periodic run that is still posted, locked. */
   abstract latestPosted(): Promise<RunRecord | null>;
   abstract entries(runId: string): Promise<RunEntry[]>;
   abstract profiles(assetIds: readonly string[]): Promise<DepreciationRecord[]>;
@@ -331,4 +341,42 @@ export abstract class DepreciationRepository {
     runId: string,
     reversal: { by: string; at: Date; reason: string; voucher: { id: string; number: string } | null },
   ): Promise<void>;
+}
+
+export interface RequestPiece {
+  readonly id: string;
+  readonly assetNo: string;
+  readonly status: string;
+  readonly variantId: string;
+  readonly lotId: string;
+  readonly cost: number;
+  readonly place: StockPlace | null;
+  /** The item type's inventory account (else the store_inventory role). */
+  readonly inventoryGlAccountId: string | null;
+}
+
+/** Old AssetRequestLocks and the asset request documents. */
+export abstract class AssetRequestRepository {
+  abstract levels(flow: AssetFlow): Promise<PurchaseApprovalLevel[]>;
+  /** The pieces, locked; NotFoundError when one does not exist. */
+  abstract pieces(ids: readonly string[]): Promise<RequestPiece[]>;
+  /** ConflictError asset_busy when a piece is already on an open request. */
+  abstract lock(ids: readonly string[], kind: 'service' | 'discard', requestId: string): Promise<void>;
+  abstract unlock(ids: readonly string[]): Promise<void>;
+  abstract setStatus(ids: readonly string[], status: 'in_stock' | 'out_for_service'): Promise<void>;
+  /** Written off: out of the register's stock. */
+  abstract discard(ids: readonly string[]): Promise<void>;
+  abstract markSold(ids: readonly string[]): Promise<void>;
+
+  abstract findService(id: string): Promise<ServiceRequest | null>;
+  abstract saveService(request: ServiceRequest, isNew: boolean): Promise<void>;
+  abstract findDiscard(id: string): Promise<DiscardRequest | null>;
+  abstract saveDiscard(request: DiscardRequest, isNew: boolean): Promise<void>;
+  abstract recordDisposal(
+    requestId: string,
+    values: { runId: string | null; voucherNumber: string | null; bookValues: ReadonlyMap<string, number> },
+  ): Promise<void>;
+  abstract recordSale(requestId: string, voucherNumber: string | null): Promise<void>;
+  abstract findScrap(id: string): Promise<ScrapSale | null>;
+  abstract saveScrap(sale: ScrapSale, isNew: boolean, voucherNumber?: string | null): Promise<void>;
 }

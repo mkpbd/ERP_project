@@ -1,0 +1,29 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Invoice no</td><td><b>{{invoiceNo}}</b></td><td style="width: 16%">Date</td><td>{{date date}}</td></tr>
+    <tr><td>Sold to</td><td><b>{{document.party}}</b></td><td>Reference</td><td>{{document.number}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{description}}</td>
+      <td class="num">{{qty}}{{#if unit}} {{unit}}{{/if}}</td>
+      <td class="num">{{money unitPrice}}</td>
+      <td class="num">{{money total}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="4">Total</td><td class="num">{{money total}}</td></tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords total}}</p>
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Received by</td><td>Store</td><td>Authorised by</td></tr>
+</table>
+{{/with}}

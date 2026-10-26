@@ -3,6 +3,7 @@ import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { ASSET_HANDLERS, AssetReadRepository } from './application/asset.handlers.js';
+import { ASSET_REQUEST_HANDLERS, AssetRequestReadRepository } from './application/asset-request.handlers.js';
 import { DEPARTMENT_HANDLERS } from './application/department.handlers.js';
 import { DepartmentReadRepository } from './application/department.messages.js';
 import { PURCHASE_HANDLERS } from './application/purchase.handlers.js';
@@ -14,6 +15,7 @@ import { StockReadRepository } from './application/stock.messages.js';
 import {
   AdjustmentRepository,
   AssetRegister,
+  AssetRequestRepository,
   ApprovalLevels,
   CatalogueFacts,
   ConsumptionRepository,
@@ -49,12 +51,18 @@ import {
   DrizzleStockLedger,
 } from './infrastructure/persistence/drizzle-stock.repositories.js';
 import { gatePassReport, supplierReturnReport } from './infrastructure/reports/department.reports.js';
+import { disposalInvoiceReport } from './infrastructure/reports/disposal.reports.js';
 import { stockCardReport, stockReceiveReport, stockReport } from './infrastructure/reports/stock.reports.js';
 import { stockTransferReport, storeIndentReport, storeIssueReport } from './infrastructure/reports/store.reports.js';
 import { STOCK_CONTROLLERS } from './presentation/stock.controllers.js';
 import { STORE_CONTROLLERS } from './presentation/store.controllers.js';
 import { DEPARTMENT_CONTROLLERS } from './presentation/department.controllers.js';
 import { ASSET_CONTROLLERS } from './presentation/asset.controllers.js';
+import { ASSET_REQUEST_CONTROLLERS } from './presentation/asset-request.controllers.js';
+import {
+  DrizzleAssetRequestReadRepository,
+  DrizzleAssetRequestRepository,
+} from './infrastructure/persistence/drizzle-asset-request.repositories.js';
 import {
   DrizzleAssetReadRepository,
   DrizzleAssetRegister,
@@ -92,7 +100,7 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
  * opening stock and GRN faults, posting purchases to accounts (step 7c); store indents and their approval,
  * store requests, issues to departments and transfers between stores (step 7d); department stock (consumption,
  * returns, counts), supplier returns and gate passes (step 7e); the fixed asset register and straight-line
- * depreciation (step 7f).
+ * depreciation (step 7f); asset service and discard requests, disposal journals and scrap sales (step 7g).
  */
 @Module({
   controllers: [
@@ -102,6 +110,7 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
     ...STORE_CONTROLLERS,
     ...DEPARTMENT_CONTROLLERS,
     ...ASSET_CONTROLLERS,
+    ...ASSET_REQUEST_CONTROLLERS,
   ],
   providers: [
     ...PURCHASE_HANDLERS,
@@ -109,6 +118,9 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
     ...STORE_HANDLERS,
     ...DEPARTMENT_HANDLERS,
     ...ASSET_HANDLERS,
+    ...ASSET_REQUEST_HANDLERS,
+    { provide: AssetRequestRepository, useClass: DrizzleAssetRequestRepository },
+    { provide: AssetRequestReadRepository, useClass: DrizzleAssetRequestReadRepository },
     { provide: AssetRegister, useClass: DrizzleAssetRegister },
     { provide: DepreciationRepository, useClass: DrizzleDepreciationRepository },
     { provide: AssetReadRepository, useClass: DrizzleAssetReadRepository },
@@ -145,6 +157,7 @@ export class SupplyChainModule implements OnModuleInit {
     private readonly stock: StockReadRepository,
     private readonly store: StoreReadRepository,
     private readonly departments: DepartmentReadRepository,
+    private readonly assetRequests: AssetRequestReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -162,5 +175,6 @@ export class SupplyChainModule implements OnModuleInit {
     this.reports.register(stockTransferReport(this.store));
     this.reports.register(supplierReturnReport(this.departments));
     this.reports.register(gatePassReport(this.departments));
+    this.reports.register(disposalInvoiceReport(this.assetRequests));
   }
 }
