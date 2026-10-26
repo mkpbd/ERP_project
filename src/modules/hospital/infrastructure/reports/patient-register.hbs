@@ -1,0 +1,32 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Registered on</th><th>UHID</th><th>Name</th><th>Sex</th>
+      <th class="num">Age</th><th>Mobile</th><th>District</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{date registeredOn}}</td>
+      <td>{{uhid}}</td>
+      <td>{{#if title}}{{title}} {{/if}}{{fullName}}{{#if confidential}} <small>(confidential)</small>{{/if}}</td>
+      <td>{{sex}}</td>
+      <td class="num">{{ageYears}}</td>
+      <td>{{mobileNo}}</td>
+      <td>{{districtName}}</td>
+      <td>{{status}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="9">{{rows.length}} patients · male {{male}} · female {{female}} · other {{other}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No patient was registered in this period.</p>
+{{/if}}
+{{/with}}

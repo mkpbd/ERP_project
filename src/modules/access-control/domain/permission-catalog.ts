@@ -73,6 +73,12 @@ export const PERMISSION_CATALOG = [
     description: 'Sell medicines over the counter at the outlets you work at and collect loyal member dues',
   },
   { key: 'pharmacy:count', description: 'Open, count and cancel stock counts at the outlets you work at' },
+  { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },
+  { key: 'patient:register', description: 'Register patients, give UHIDs and change their details and photos' },
+  {
+    key: 'patient:manage',
+    description: 'Take patient records out of use (registered twice, made by mistake) and back into use',
+  },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

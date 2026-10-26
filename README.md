@@ -175,6 +175,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | stock counts (open, count, add a lot found, cancel) | `pharmacy:count` + works at the outlet |
 | applying a stock count (someone other than who opened it) | `pharmacy:manage` |
 | discount policy and product discounts, loyal members, cancelling sales (sellers: their own the same day) | `pharmacy:manage` |
+| `GET /hospital/patients/*` (search, view, matches, photo) | `patient:read` |
+| registering patients, changing their details and photos | `patient:register` |
+| taking a patient record out of use and back | `patient:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

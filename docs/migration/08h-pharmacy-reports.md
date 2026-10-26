@@ -1,6 +1,6 @@
 # Step 8h — Pharmacy: reports
 
-Status: **done** (2026-10-26). Previous: [step 8g](08g-pharmacy-stock-counts.md) · Next: step 9 (hospital;
+Status: **done** (2026-10-26). Previous: [step 8g](08g-pharmacy-stock-counts.md) · Next: [step 9a](09a-hospital-patient-registration.md) (hospital;
 indoor pharmacy patients follow as step 8i once admissions exist).
 
 ## Where the old logic lives

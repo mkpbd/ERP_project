@@ -239,6 +239,13 @@
       "when": 1792999991401,
       "tag": "0033_pharmacy_count_write_off",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793003835137,
+      "tag": "0034_hospital_patients",
+      "breakpoints": true
     }
   ]
 }
