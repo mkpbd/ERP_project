@@ -20,6 +20,7 @@ import {
 import { createZodDto } from '../../../shared/presentation/zod/zod-dto.js';
 import {
   CancelOpdBillCommand,
+  CollectCorporateDueCommand,
   CollectOpdDueCommand,
   CreateOpdBillCommand,
   GetOpdBillQuery,
@@ -50,10 +51,21 @@ class CreateOpdBillDto extends createZodDto(
     appointmentId: z.uuid().nullable().default(null),
     referredById: z.uuid().nullable().default(null),
     lines: z
-      .array(z.strictObject({ doctorId: z.uuid(), visitType: z.enum(VISIT_TYPES).nullable().default(null) }))
+      .array(
+        z.strictObject({
+          /** A consultation's doctor, or the doctor who gave a service. */
+          doctorId: z.uuid().nullable().default(null),
+          visitType: z.enum(VISIT_TYPES).nullable().default(null),
+          /** Set for a service. */
+          serviceId: z.uuid().nullable().default(null),
+          qty: z.int().min(1).max(1000).default(1),
+        }),
+      )
       .min(1)
       .max(10),
-    discount: money.default(0),
+    corporateClientId: z.uuid().nullable().default(null),
+    staffId: z.uuid().nullable().default(null),
+    discount: money.nullable().default(null),
     discountReason: z.string().trim().max(200).nullable().default(null),
     payment: z
       .strictObject({
@@ -86,8 +98,21 @@ class OpdBillListQueryDto extends createZodDto(
       .enum(['true', 'false'])
       .transform((value) => value === 'true')
       .optional(),
+    corporateClientId: z.uuid().optional(),
+    staffId: z.uuid().optional(),
   }),
 ) {}
+class CollectCorporateDueDto extends createZodDto(
+  z.strictObject({
+    amount: money,
+    method: z.enum(PAYMENT_METHODS).default('cash'),
+    reference: z.string().trim().max(100).nullable().default(null),
+  }),
+) {}
+class CorporateCollectedResponseDto extends responseDto({
+  number: z.string(),
+  settled: z.array(z.object({ billId: z.uuid(), number: z.string(), amount: z.number() })),
+}) {}
 class SuggestVisitQueryDto extends createZodDto(z.object({ patientId: z.uuid(), doctorId: z.uuid() })) {}
 
 const summaryShape = {
@@ -104,6 +129,9 @@ const summaryShape = {
   collected: z.number(),
   due: z.number(),
   status: z.enum(['billed', 'cancelled']),
+  corporateClientId: z.uuid().nullable(),
+  corporateClientName: z.string().nullable(),
+  staffId: z.uuid().nullable(),
   version: z.int(),
 };
 class OpdBillCreatedResponseDto extends responseDto({
@@ -139,10 +167,14 @@ class OpdBillResponseDto extends responseDto({
   lines: z.array(
     z.object({
       line: z.int(),
-      doctorId: z.uuid(),
-      doctorName: z.string(),
+      doctorId: z.uuid().nullable(),
+      doctorName: z.string().nullable(),
       roomNo: z.string().nullable(),
-      visitType: z.enum(VISIT_TYPES),
+      visitType: z.enum(VISIT_TYPES).nullable(),
+      serviceId: z.uuid().nullable(),
+      serviceName: z.string().nullable(),
+      qty: z.int(),
+      rate: z.number(),
       fee: z.number(),
       sharePercent: z.number(),
       shareAmount: z.number(),
@@ -225,6 +257,16 @@ export class OpdBillsController {
   collect(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: CollectOpdDueDto) {
     return this.commandBus.execute(
       new CollectOpdDueCommand(actor, params.id, dto.version, dto.amount, dto.method, dto.reference),
+    );
+  }
+
+  @Post('corporate-clients/:id/collections')
+  @RequirePermissions('opd:bill')
+  @ApiOperation({ summary: "A corporate client's payment, settling its bills oldest first on one receipt" })
+  @ApiCreatedResponse({ type: CorporateCollectedResponseDto })
+  collectCorporate(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: CollectCorporateDueDto) {
+    return this.commandBus.execute(
+      new CollectCorporateDueCommand(actor, params.id, dto.amount, dto.method, dto.reference),
     );
   }
 

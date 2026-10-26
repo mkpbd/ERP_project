@@ -6,6 +6,7 @@ import { OrganizationProfile } from '../../shared/application/contracts/organiza
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
 import { OPD_HANDLERS } from './application/opd.handlers.js';
@@ -19,9 +20,11 @@ import {
   DrizzleOpdBillRepository,
 } from './infrastructure/persistence/drizzle-opd.repositories.js';
 import {
+  corporateStatementReport,
   doctorConsultationsReport,
   opdCollectionReport,
   opdReceiptReport,
+  serviceIncomeReport,
 } from './infrastructure/reports/opd.reports.js';
 import { OPD_CONTROLLERS } from './presentation/opd.controllers.js';
 import {
@@ -41,8 +44,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
- * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c). Service
- * billing and admissions follow in later steps.
+ * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
+ * emergency services, corporate clients and staff billing (step 9d). Admissions follow in later steps.
  */
 @Module({
   controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS, ...OPD_CONTROLLERS],
@@ -74,6 +77,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly appointments: AppointmentReadRepository,
     private readonly bills: OpdBillReadRepository,
     private readonly users: UserDirectory,
+    private readonly staff: StaffDirectory,
   ) {}
 
   onModuleInit(): void {
@@ -82,8 +86,10 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(patientRegisterReport(this.read, this.locations, this.organization));
     this.reports.register(doctorAppointmentsReport(this.appointments, this.organization));
     this.reports.register(appointmentSlipReport(this.appointments, this.organization));
-    this.reports.register(opdReceiptReport(this.bills, this.organization));
+    this.reports.register(opdReceiptReport(this.bills, this.organization, this.staff));
     this.reports.register(opdCollectionReport(this.context, this.users));
     this.reports.register(doctorConsultationsReport(this.context));
+    this.reports.register(corporateStatementReport(this.context));
+    this.reports.register(serviceIncomeReport(this.context));
   }
 }

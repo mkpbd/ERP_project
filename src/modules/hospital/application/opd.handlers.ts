@@ -9,18 +9,23 @@ import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { feeFor } from '../domain/appointment.js';
-import { OpdBill, suggestedVisit, validMoney } from '../domain/opd-bill.js';
+import { StaffDirectory } from '../../../shared/application/contracts/staff-directory.js';
+import { OpdBill, suggestedVisit, validMoney, type BillPayer } from '../domain/opd-bill.js';
 import {
   AppointmentRepository,
   OpdBillRepository,
   type BillableDoctor,
+  type CorporateClient,
+  type DoctorLedgerEntry,
   type OpdPolicy,
 } from '../domain/repositories.js';
 import { OPD_MANAGE, OPD_READ } from './hospital.constants.js';
 import {
   CancelOpdBillCommand,
+  CollectCorporateDueCommand,
   CollectOpdDueCommand,
   CONSULTANT_PAYABLE_ROLE,
+  CORPORATE_RECEIVABLE_ROLE,
   CreateOpdBillCommand,
   DOCTOR_FEE_ROLE,
   GetOpdBillQuery,
@@ -33,14 +38,42 @@ import {
   OPD_JOURNAL,
   OPD_RECEIPT_ROLES,
   OPD_RECEIVABLE_ROLE,
+  OPD_SERVICE_INCOME_ROLE,
   OpdBillReadRepository,
   SetOpdPolicyCommand,
+  STAFF_RECEIVABLE_ROLE,
   SuggestVisitQuery,
 } from './opd.messages.js';
 import { HOSPITAL_SETTINGS, localToday, type HospitalSettings } from './patient.handlers.js';
 
 const serialNumber = (kind: string, year: number, serial: number) =>
   `${kind}-${year}-${String(serial).padStart(5, '0')}`;
+
+/** Where what is not paid at the counter is owed: the patient, a corporate client or a staff member. */
+function receivableRole(bill: OpdBill): string {
+  switch (bill.payer.kind) {
+    case 'corporate':
+      return CORPORATE_RECEIVABLE_ROLE;
+    case 'staff':
+      return STAFF_RECEIVABLE_ROLE;
+    case 'patient':
+      return OPD_RECEIVABLE_ROLE;
+  }
+}
+
+/** Each doctor's share on the bill, earned (+) or taken back (−). */
+function shareEntries(bill: OpdBill, kind: 'share' | 'reversal', on: string): DoctorLedgerEntry[] {
+  return bill.lines
+    .filter((line) => line.shareAmount > 0 && line.doctorId !== null)
+    .map((line) => ({
+      doctorId: line.doctorId!,
+      entryOn: on,
+      kind,
+      billId: bill.id,
+      documentNumber: bill.number,
+      amount: kind === 'share' ? line.shareAmount : -line.shareAmount,
+    }));
+}
 
 @Injectable()
 export class OpdDesk {
@@ -53,8 +86,35 @@ export class OpdDesk {
     readonly bills: OpdBillRepository,
     readonly appointments: AppointmentRepository,
     readonly read: OpdBillReadRepository,
+    readonly staff: StaffDirectory,
     @Inject(HOSPITAL_SETTINGS) readonly settings: HospitalSettings,
   ) {}
+
+  /** Who owes the due: the patient, an active corporate client or an active staff member. */
+  async payer(
+    corporateClientId: string | null,
+    staffId: string | null,
+  ): Promise<{ payer: BillPayer } & ({ kind: 'corporate'; client: CorporateClient } | { kind: 'patient' | 'staff' })> {
+    if (corporateClientId) {
+      const client = await this.bills.corporateClient(corporateClientId);
+      if (!client) throw new NotFoundError('corporate_client');
+      if (!client.isActive) throw new DomainError('inactive_client', `${client.name} is not active`);
+      return {
+        kind: 'corporate',
+        client,
+        payer: { kind: 'corporate', clientId: client.id, cash: client.payment === 'cash' },
+      };
+    }
+    if (staffId) {
+      const [member] = await this.staff.findSummaries([staffId]);
+      if (!member) throw new NotFoundError('staff');
+      if (member.status !== 'active') {
+        throw new DomainError('inactive_staff', `${member.fullName} (${member.employeeNo}) is not in service`);
+      }
+      return { kind: 'staff', payer: { kind: 'staff', staffId } };
+    }
+    return { kind: 'patient', payer: { kind: 'patient' } };
+  }
 
   today(): string {
     return localToday(this.clock.now(), this.settings.timeZone);
@@ -148,24 +208,33 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
   async execute({ actor, input }: CreateOpdBillCommand) {
     const { desk } = this;
     await desk.access.authorize(actor.userId, { permissions: [OPD_BILL] });
-    validMoney(input.discount, 'discount');
-    const mayDiscountMore =
-      input.discount > 0 && (await desk.access.isAllowed(actor.userId, { permissions: [OPD_DISCOUNT] }));
+    if (input.discount !== null) validMoney(input.discount, 'discount');
+    if (input.corporateClientId && input.staffId) {
+      throw new DomainError('invalid_payer', 'A bill goes to a corporate client or to a staff member, not both');
+    }
+    const mayDiscountMore = await desk.access.isAllowed(actor.userId, { permissions: [OPD_DISCOUNT] });
     return desk.tx.run(async () => {
       const patient = await desk.appointments.patientContact(input.patientId);
       if (!patient) throw new NotFoundError('patient');
       const today = desk.today();
       const now = desk.clock.now();
-      const doctorIds = input.lines.map((line) => line.doctorId);
-      const doctors = await desk.consultants(doctorIds);
+      const consultations = input.lines.filter((line) => line.serviceId === null);
+      const doctors = await desk.consultants(consultations.map((line) => line.doctorId ?? ''));
+      const givers = await desk.bills.doctors(
+        input.lines.flatMap((line) => (line.serviceId !== null && line.doctorId ? [line.doctorId] : [])),
+      );
+      const services = await desk.bills.services(
+        input.lines.flatMap((line) => (line.serviceId ? [line.serviceId] : [])),
+      );
       if (input.referredById && (await desk.bills.doctors([input.referredById])).size === 0) {
         throw new NotFoundError('referring_doctor');
       }
+      const payer = await desk.payer(input.corporateClientId, input.staffId);
       const appointment = input.appointmentId ? await desk.appointments.findForUpdate(input.appointmentId) : null;
       if (input.appointmentId && !appointment) throw new NotFoundError('appointment');
       if (appointment) {
         appointment.assertBillable();
-        if (!doctorIds.includes(appointment.doctorId)) {
+        if (!consultations.some((line) => line.doctorId === appointment.doctorId)) {
           throw new DomainError('appointment_mismatch', "The appointment's doctor is not on the bill");
         }
         if (appointment.patientId === null) appointment.attach(patient, now);
@@ -176,36 +245,74 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
       const policy = await desk.bills.policy();
       const lines = await Promise.all(
         input.lines.map(async (line) => {
-          const doctor = doctors.get(line.doctorId)!;
-          const visitType =
-            line.visitType ??
-            suggestedVisit(await desk.bills.lastVisitOn(patient.id, doctor.id), today, policy.followUpDays);
+          if (line.serviceId === null) {
+            const doctor = doctors.get(line.doctorId!)!;
+            const visitType =
+              line.visitType ??
+              suggestedVisit(await desk.bills.lastVisitOn(patient.id, doctor.id), today, policy.followUpDays);
+            return {
+              doctorId: doctor.id,
+              visitType,
+              serviceId: null,
+              qty: 1,
+              rate: feeFor(doctor, visitType),
+              sharePercent: doctor.sharePercent ?? policy.defaultSharePercent,
+            };
+          }
+          const service = services.get(line.serviceId);
+          if (!service) throw new NotFoundError('service');
+          if (!service.isActive || !service.isOpd) {
+            throw new DomainError('not_billable', `${service.name} is not billed at the OPD`);
+          }
+          if (line.doctorId) {
+            const giver = givers.get(line.doctorId);
+            if (!giver) throw new NotFoundError('doctor');
+            if (!giver.isActive) throw new DomainError('not_bookable', `${giver.name} is not active`);
+          }
           return {
-            doctorId: doctor.id,
-            visitType,
-            fee: feeFor(doctor, visitType),
-            sharePercent: doctor.sharePercent ?? policy.defaultSharePercent,
+            doctorId: line.doctorId,
+            visitType: null,
+            serviceId: service.id,
+            qty: line.qty,
+            rate: service.rate,
+            sharePercent: service.sharePercent ?? 0,
           };
         }),
       );
+      // A corporate client's own discount is given unless another is asked for, and is not held to the counter's limit.
+      const client = payer.kind === 'corporate' ? payer.client : null;
+      const gross = lines.reduce((total, line) => total + Math.round(line.rate * 100) * line.qty, 0) / 100;
+      const clientDiscount = client ? Math.floor(gross * client.discountPercent) / 100 : 0;
       const bill = OpdBill.create({
         id: randomUUID(),
-        number: await desk.number('OC', today),
+        number: await desk.number(lines.some((line) => line.serviceId !== null) ? 'OS' : 'OC', today),
         patientId: patient.id,
         appointmentId: appointment?.id ?? null,
         billedOn: today,
         referredById: input.referredById,
         lines,
-        discount: input.discount,
-        discountReason: input.discountReason,
-        discountLimitPercent: policy.counterDiscountPercent,
+        payer: payer.payer,
+        discount: input.discount ?? clientDiscount,
+        discountReason:
+          input.discountReason ?? (input.discount === null && clientDiscount > 0 ? `Corporate: ${client!.name}` : null),
+        discountLimitPercent: Math.max(policy.counterDiscountPercent, client?.discountPercent ?? 0),
         mayDiscountMore,
         payment: input.payment,
         by: actor.userId,
         now,
       });
+      if (client?.payment === 'credit' && client.creditLimit !== null) {
+        const owed = await desk.bills.corporateDue(client.id);
+        if (owed + bill.due > client.creditLimit) {
+          throw new DomainError(
+            'credit_limit',
+            `${client.name} owes ${owed.toFixed(2)}; with ${bill.due.toFixed(2)} more it is over its limit of ${client.creditLimit.toFixed(2)}`,
+          );
+        }
+      }
       const header = bill.toSnapshot();
-      const narration = `OPD consultation ${header.number}`;
+      const income = bill.grossByKind;
+      const narration = `OPD bill ${header.number}`;
       const voucher = await desk.post(
         narration,
         today,
@@ -214,9 +321,10 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
           ...(input.payment && header.paid > 0
             ? [{ account: { role: OPD_RECEIPT_ROLES[input.payment.method] }, debit: header.paid, credit: 0, narration }]
             : []),
-          { account: { role: OPD_RECEIVABLE_ROLE }, debit: bill.due, credit: 0, narration },
+          { account: { role: receivableRole(bill) }, debit: bill.due, credit: 0, narration },
           { account: { role: OPD_DISCOUNT_ROLE }, debit: header.discount, credit: 0, narration },
-          { account: { role: OPD_INCOME_ROLE }, debit: 0, credit: header.gross, narration },
+          { account: { role: OPD_INCOME_ROLE }, debit: 0, credit: income.consultations, narration },
+          { account: { role: OPD_SERVICE_INCOME_ROLE }, debit: 0, credit: income.services, narration },
           { account: { role: DOCTOR_FEE_ROLE }, debit: bill.share, credit: 0, narration },
           { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: 0, credit: bill.share, narration },
         ],
@@ -228,22 +336,11 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
         appointment.billed(bill.id, today, now);
         await desk.appointments.update(appointment);
       }
-      await desk.bills.addLedger(
-        bill.lines
-          .filter((line) => line.shareAmount > 0)
-          .map((line) => ({
-            doctorId: line.doctorId,
-            entryOn: today,
-            kind: 'share' as const,
-            billId: bill.id,
-            documentNumber: header.number,
-            amount: line.shareAmount,
-          })),
-      );
+      await desk.bills.addLedger(shareEntries(bill, 'share', today));
       await desk.bills.addUhidUse({
         patientId: patient.id,
         usedOn: today,
-        service: 'opd_consultation',
+        service: income.services > 0 || consultations.length === 0 ? 'opd_service' : 'opd_consultation',
         documentNumber: header.number,
       });
       await desk.record('created', actor, bill.id, {
@@ -277,13 +374,73 @@ export class CollectOpdDueHandler implements ICommandHandler<CollectOpdDueComman
         bill.id,
         [
           { account: { role: OPD_RECEIPT_ROLES[method] }, debit: payment.amount, credit: 0, narration },
-          { account: { role: OPD_RECEIVABLE_ROLE }, debit: 0, credit: payment.amount, narration },
+          { account: { role: receivableRole(bill) }, debit: 0, credit: payment.amount, narration },
         ],
         actor,
       );
       await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
       await desk.record('collected', actor, id, { number, amount: payment.amount, method });
       return { number };
+    });
+  }
+}
+
+/**
+ * Old corporate client collection (diagnostics and pharmacy only; the OPD had none): what a company pays settles its
+ * bills oldest first, on one receipt and one voucher.
+ */
+@CommandHandler(CollectCorporateDueCommand)
+export class CollectCorporateDueHandler implements ICommandHandler<CollectCorporateDueCommand> {
+  constructor(private readonly desk: OpdDesk) {}
+
+  async execute({ actor, clientId, amount, method, reference }: CollectCorporateDueCommand) {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [OPD_BILL] });
+    validMoney(amount, 'amount');
+    if (amount === 0) throw new DomainError('invalid_amount', 'Collect more than nothing');
+    return desk.tx.run(async () => {
+      const client = await desk.bills.corporateClient(clientId);
+      if (!client) throw new NotFoundError('corporate_client');
+      await desk.tx.lock(`hospital:corporate:${clientId}`);
+      const owed = await desk.bills.corporateDue(clientId);
+      if (amount > owed) throw new DomainError('overpayment', `${client.name} owes ${owed.toFixed(2)}`);
+      const today = desk.today();
+      const now = desk.clock.now();
+      const number = await desk.number('OR', today);
+      let left = Math.round(amount * 100);
+      const settled: { bill: OpdBill; amount: number }[] = [];
+      for (const billId of await desk.bills.dueBillIds(clientId)) {
+        if (left === 0) break;
+        const bill = (await desk.bills.findForUpdate(billId))!;
+        const part = Math.min(left, Math.round(bill.due * 100));
+        if (part === 0) continue;
+        bill.collect({ number, method, reference, amount: part / 100, on: today, now });
+        settled.push({ bill, amount: part / 100 });
+        left -= part;
+      }
+      const narration = `${client.name} paid ${number}`;
+      const voucher = await desk.post(
+        narration,
+        today,
+        clientId,
+        [
+          { account: { role: OPD_RECEIPT_ROLES[method] }, debit: amount, credit: 0, narration },
+          { account: { role: CORPORATE_RECEIVABLE_ROLE }, debit: 0, credit: amount, narration },
+        ],
+        actor,
+      );
+      for (const { bill } of settled) await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
+      await desk.audit.record({
+        action: 'hospital.corporate_collected',
+        actorUserId: actor.userId,
+        resourceType: 'corporate_client',
+        resourceId: clientId,
+        metadata: { number, amount, method, bills: settled.length },
+      });
+      return {
+        number,
+        settled: settled.map(({ bill, amount: part }) => ({ billId: bill.id, number: bill.number, amount: part })),
+      };
     });
   }
 }
@@ -308,7 +465,8 @@ export class CancelOpdBillHandler implements ICommandHandler<CancelOpdBillComman
         now: desk.clock.now(),
       });
       const header = bill.toSnapshot();
-      const narration = `Cancelled OPD consultation ${header.number}`;
+      const narration = `Cancelled OPD bill ${header.number}`;
+      const income = bill.grossByKind;
       const voucher = await desk.post(
         narration,
         today,
@@ -320,9 +478,10 @@ export class CancelOpdBillHandler implements ICommandHandler<CancelOpdBillComman
             credit: amount,
             narration,
           })),
-          { account: { role: OPD_RECEIVABLE_ROLE }, debit: 0, credit: dueCleared, narration },
+          { account: { role: receivableRole(bill) }, debit: 0, credit: dueCleared, narration },
           { account: { role: OPD_DISCOUNT_ROLE }, debit: 0, credit: header.discount, narration },
-          { account: { role: OPD_INCOME_ROLE }, debit: header.gross, credit: 0, narration },
+          { account: { role: OPD_INCOME_ROLE }, debit: income.consultations, credit: 0, narration },
+          { account: { role: OPD_SERVICE_INCOME_ROLE }, debit: income.services, credit: 0, narration },
           { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: bill.share, credit: 0, narration },
           { account: { role: DOCTOR_FEE_ROLE }, debit: 0, credit: bill.share, narration },
         ],
@@ -330,18 +489,7 @@ export class CancelOpdBillHandler implements ICommandHandler<CancelOpdBillComman
       );
       bill.cancelPosted(voucher?.number ?? null);
       await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
-      await desk.bills.addLedger(
-        bill.lines
-          .filter((line) => line.shareAmount > 0)
-          .map((line) => ({
-            doctorId: line.doctorId,
-            entryOn: today,
-            kind: 'reversal' as const,
-            billId: bill.id,
-            documentNumber: header.number,
-            amount: -line.shareAmount,
-          })),
-      );
+      await desk.bills.addLedger(shareEntries(bill, 'reversal', today));
       await desk.record('cancelled', actor, id, {
         reason,
         refunded: header.refunded,
@@ -404,6 +552,7 @@ export const OPD_HANDLERS = [
   SetOpdPolicyHandler,
   CreateOpdBillHandler,
   CollectOpdDueHandler,
+  CollectCorporateDueHandler,
   CancelOpdBillHandler,
   GetOpdPolicyHandler,
   SuggestVisitHandler,

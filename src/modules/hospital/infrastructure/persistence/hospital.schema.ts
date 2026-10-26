@@ -17,6 +17,7 @@ import {
   uuid,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
+import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import { districts } from '../../../location/infrastructure/persistence/location.schema.js';
 
@@ -297,8 +298,10 @@ export const opdPolicy = pgTable(
   ],
 );
 
-// Old OPD.PatientRecordConsultancyFees (header) and ConsultancyDetails (lines): a consultation bill of a registered
-// patient, one line per doctor seen, with the doctor's share worked out on each line.
+// Old OPD.PatientRecordConsultancyFees / ConsultancyDetails (consultations) and PatientRecordOPDServices /
+// ServiceDetails (OPD and emergency services): a bill of a registered patient, one line per doctor seen or service
+// given, with the doctor's share worked out on each line. The due is the patient's, a corporate client's (old: the
+// client's name in a ledger description only) or a staff member's (old EmployeeId with UHID 0).
 export const opdBills = pgTable(
   'hospital_opd_bills',
   {
@@ -310,6 +313,10 @@ export const opdBills = pgTable(
     appointmentId: uuid('appointment_id').references((): AnyPgColumn => appointments.id, { onDelete: 'restrict' }),
     billedOn: day('billed_on').notNull(),
     referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    corporateClientId: uuid('corporate_client_id').references((): AnyPgColumn => corporateClients.id, {
+      onDelete: 'restrict',
+    }),
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
     gross: money('gross').notNull(),
     discount: money('discount').notNull(),
     discountReason: text('discount_reason'),
@@ -335,6 +342,9 @@ export const opdBills = pgTable(
     uniqueIndex('hospital_opd_bills_appointment_uq').on(t.appointmentId),
     index('hospital_opd_bills_patient_idx').on(t.patientId),
     index('hospital_opd_bills_billed_idx').on(t.billedOn),
+    index('hospital_opd_bills_corporate_idx').on(t.corporateClientId),
+    index('hospital_opd_bills_staff_idx').on(t.staffId),
+    check('hospital_opd_bills_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
     check(
       'hospital_opd_bills_amounts_ck',
       sql`${t.discount} >= 0 and ${t.discount} <= ${t.gross} and ${t.net} = ${t.gross} - ${t.discount} and ${t.paid} >= 0 and ${t.collected} >= 0 and ${t.paid} + ${t.collected} <= ${t.net}`,
@@ -349,10 +359,15 @@ export const opdBillLines = pgTable(
       .notNull()
       .references(() => opdBills.id, { onDelete: 'cascade' }),
     position: smallint('position').notNull(),
-    doctorId: uuid('doctor_id')
-      .notNull()
-      .references(() => doctors.id, { onDelete: 'restrict' }),
-    visitType: text('visit_type', { enum: VISIT_TYPES }).notNull(),
+    /** A consultation's doctor, or the doctor who gave a service (old ServiceByDoctorId). */
+    doctorId: uuid('doctor_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    /** Set on a consultation. */
+    visitType: text('visit_type', { enum: VISIT_TYPES }),
+    /** Set on a service. */
+    serviceId: uuid('service_id').references((): AnyPgColumn => services.id, { onDelete: 'restrict' }),
+    qty: smallint('qty').notNull().default(1),
+    rate: money('rate').notNull(),
+    /** qty × rate. */
     fee: money('fee').notNull(),
     sharePercent: percent('share_percent').notNull(),
     shareAmount: money('share_amount').notNull(),
@@ -360,9 +375,14 @@ export const opdBillLines = pgTable(
   (t) => [
     primaryKey({ columns: [t.billId, t.position] }),
     index('hospital_opd_bill_lines_doctor_idx').on(t.doctorId),
+    index('hospital_opd_bill_lines_service_idx').on(t.serviceId),
+    check(
+      'hospital_opd_bill_lines_kind_ck',
+      sql`(${t.serviceId} is null and ${t.visitType} is not null and ${t.doctorId} is not null) or (${t.serviceId} is not null and ${t.visitType} is null)`,
+    ),
     check(
       'hospital_opd_bill_lines_amounts_ck',
-      sql`${t.fee} >= 0 and ${t.shareAmount} >= 0 and ${t.shareAmount} <= ${t.fee}`,
+      sql`${t.qty} between 1 and 1000 and ${t.rate} >= 0 and ${t.fee} = round(${t.qty} * ${t.rate}, 2) and ${t.shareAmount} >= 0 and ${t.shareAmount} <= ${t.fee}`,
     ),
   ],
 );
@@ -427,4 +447,75 @@ export const uhidUses = pgTable(
     createdAt: tz('created_at').notNull().defaultNow(),
   },
   (t) => [index('hospital_uhid_uses_patient_idx').on(t.patientId, t.usedOn)],
+);
+
+// Old Hospital.ServiceGroups / ServiceSubGroups / ServiceSubSubGroups, as one tree.
+export const serviceGroups = pgTable(
+  'hospital_service_groups',
+  {
+    id: uuid('id').primaryKey(),
+    parentId: uuid('parent_id').references((): AnyPgColumn => serviceGroups.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_service_groups_name_uq').on(sql`coalesce(${t.parentId}::text, '')`, sql`lower(${t.name})`),
+    check('hospital_service_groups_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Hospital.ServiceExecutingHeads with their ServiceExecutingHeadRates row (one rate, stored as a float there):
+// a service billed at the OPD (dressing, injection, nebulisation, ECG, a procedure) and, later, on the ward.
+export const services = pgTable(
+  'hospital_services',
+  {
+    id: uuid('id').primaryKey(),
+    code: text('code'),
+    name: text('name').notNull(),
+    groupId: uuid('group_id')
+      .notNull()
+      .references(() => serviceGroups.id, { onDelete: 'restrict' }),
+    rate: money('rate').notNull(),
+    /** The share of the doctor who gives the service (old: 40 % in the code); null = no doctor's share. */
+    sharePercent: percent('share_percent'),
+    isOpd: boolean('is_opd').notNull().default(true),
+    isIpd: boolean('is_ipd').notNull().default(false),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_services_code_uq').on(sql`upper(${t.code})`),
+    uniqueIndex('hospital_services_name_uq').on(t.groupId, sql`lower(${t.name})`),
+    check('hospital_services_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+    check('hospital_services_rate_ck', sql`${t.rate} >= 0`),
+    check('hospital_services_share_ck', sql`${t.sharePercent} is null or ${t.sharePercent} between 0 and 100`),
+  ],
+);
+
+// Old Marketing.CorporateClients (IsCash / IsCredit, no limit): companies whose people are billed to them. A cash
+// client pays at the counter; a credit client's bills are due from the company, up to its credit limit if it has one.
+export const corporateClients = pgTable(
+  'hospital_corporate_clients',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    contactPerson: text('contact_person'),
+    contactNo: text('contact_no'),
+    address: text('address'),
+    payment: text('payment', { enum: ['cash', 'credit'] }).notNull(),
+    creditLimit: money('credit_limit'),
+    /** Taken off its people's bills. */
+    discountPercent: percent('discount_percent').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_corporate_clients_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_corporate_clients_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+    check('hospital_corporate_clients_limit_ck', sql`${t.creditLimit} is null or ${t.creditLimit} >= 0`),
+    check('hospital_corporate_clients_discount_ck', sql`${t.discountPercent} between 0 and 100`),
+  ],
 );

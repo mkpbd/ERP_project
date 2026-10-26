@@ -10,4 +10,7 @@ export const HOSPITAL_RECORDS = {
   doctor: 'hospital_doctor',
   doctorSchedule: 'hospital_doctor_schedule',
   doctorClosure: 'hospital_doctor_closure',
+  serviceGroup: 'hospital_service_group',
+  service: 'hospital_service',
+  corporateClient: 'hospital_corporate_client',
 } as const;

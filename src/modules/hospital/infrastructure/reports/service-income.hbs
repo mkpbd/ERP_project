@@ -1,0 +1,29 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Group</th><th>Service</th>
+      <th class="num">Units</th><th class="num">Fees</th><th class="num">Units cancelled</th>
+      <th class="num">Fees cancelled</th><th class="num">Net fees</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{groupName}}</td><td>{{serviceName}}</td>
+      <td class="num">{{qty}}</td><td class="num">{{money fees}}</td><td class="num">{{cancelledQty}}</td>
+      <td class="num">{{money cancelledFees}}</td><td class="num"><b>{{money netFees}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="4">Total</td><td class="num">{{money fees}}</td><td></td>
+      <td class="num">{{money cancelledFees}}</td><td class="num">{{money netFees}}</td>
+    </tr>
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>Services billed in the period; cancellations on their own date.</small></p>
+{{else}}
+<p>No service was billed in this period.</p>
+{{/if}}
+{{/with}}

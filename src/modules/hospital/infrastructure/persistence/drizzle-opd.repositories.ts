@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { aliasedTable, and, asc, count, desc, eq, gte, inArray, lte, max, sql } from 'drizzle-orm';
+import { aliasedTable, and, asc, count, desc, eq, gte, inArray, isNotNull, lte, max, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
 import {
@@ -13,10 +13,13 @@ import { OpdBill } from '../../domain/opd-bill.js';
 import {
   OpdBillRepository,
   type BillableDoctor,
+  type BillableService,
+  type CorporateClient,
   type DoctorLedgerEntry,
   type OpdPolicy,
 } from '../../domain/repositories.js';
 import {
+  corporateClients,
   doctorLedger,
   doctors,
   hospitalSequences,
@@ -25,6 +28,7 @@ import {
   opdPayments,
   opdPolicy,
   patients,
+  services,
   uhidUses,
 } from './hospital.schema.js';
 
@@ -45,6 +49,9 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
         .select({
           doctorId: opdBillLines.doctorId,
           visitType: opdBillLines.visitType,
+          serviceId: opdBillLines.serviceId,
+          qty: opdBillLines.qty,
+          rate: opdBillLines.rate,
           fee: opdBillLines.fee,
           sharePercent: opdBillLines.sharePercent,
           shareAmount: opdBillLines.shareAmount,
@@ -150,13 +157,75 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
     return new Map(rows.map((row) => [row.id, row]));
   }
 
+  async services(ids: readonly string[]): Promise<Map<string, BillableService>> {
+    if (ids.length === 0) return new Map();
+    const rows = await this.context.db
+      .select({
+        id: services.id,
+        name: services.name,
+        rate: services.rate,
+        sharePercent: services.sharePercent,
+        isOpd: services.isOpd,
+        isActive: services.isActive,
+      })
+      .from(services)
+      .where(inArray(services.id, [...new Set(ids)]));
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  async corporateClient(id: string): Promise<CorporateClient | null> {
+    const [row] = await this.context.db
+      .select({
+        id: corporateClients.id,
+        name: corporateClients.name,
+        payment: corporateClients.payment,
+        creditLimit: corporateClients.creditLimit,
+        discountPercent: corporateClients.discountPercent,
+        isActive: corporateClients.isActive,
+      })
+      .from(corporateClients)
+      .where(eq(corporateClients.id, id));
+    return row ?? null;
+  }
+
+  async corporateDue(clientId: string): Promise<number> {
+    const [row] = await this.context.db
+      .select({
+        owed: sql<number>`coalesce(sum(${opdBills.net} - ${opdBills.paid} - ${opdBills.collected}), 0)`.mapWith(Number),
+      })
+      .from(opdBills)
+      .where(and(eq(opdBills.corporateClientId, clientId), eq(opdBills.status, 'billed')));
+    return Math.round((row?.owed ?? 0) * 100) / 100;
+  }
+
+  async dueBillIds(clientId: string): Promise<string[]> {
+    const rows = await this.context.db
+      .select({ id: opdBills.id })
+      .from(opdBills)
+      .where(
+        and(
+          eq(opdBills.corporateClientId, clientId),
+          eq(opdBills.status, 'billed'),
+          sql`${opdBills.net} - ${opdBills.paid} - ${opdBills.collected} > 0`,
+        ),
+      )
+      .orderBy(asc(opdBills.billedOn), asc(opdBills.number));
+    return rows.map((row) => row.id);
+  }
+
   async lastVisitOn(patientId: string, doctorId: string): Promise<string | null> {
     const [row] = await this.context.db
       .select({ on: max(opdBills.billedOn) })
       .from(opdBillLines)
       .innerJoin(opdBills, eq(opdBills.id, opdBillLines.billId))
       .where(
-        and(eq(opdBills.patientId, patientId), eq(opdBillLines.doctorId, doctorId), eq(opdBills.status, 'billed')),
+        and(
+          eq(opdBills.patientId, patientId),
+          eq(opdBillLines.doctorId, doctorId),
+          // Consultations only: a service the doctor gave is not a visit to them.
+          isNotNull(opdBillLines.visitType),
+          eq(opdBills.status, 'billed'),
+        ),
       );
     return row?.on ?? null;
   }
@@ -196,10 +265,14 @@ export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
         collected: opdBills.collected,
         due,
         status: opdBills.status,
+        corporateClientId: opdBills.corporateClientId,
+        corporateClientName: corporateClients.name,
+        staffId: opdBills.staffId,
         version: opdBills.version,
       })
       .from(opdBills)
-      .innerJoin(patients, eq(patients.id, opdBills.patientId));
+      .innerJoin(patients, eq(patients.id, opdBills.patientId))
+      .leftJoin(corporateClients, eq(corporateClients.id, opdBills.corporateClientId));
   }
 
   async list(filter: OpdBillFilter): Promise<Page<OpdBillSummary>> {
@@ -212,6 +285,8 @@ export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
       filter.to ? lte(opdBills.billedOn, filter.to) : undefined,
       filter.status ? eq(opdBills.status, filter.status) : undefined,
       filter.withDue ? and(eq(opdBills.status, 'billed'), sql`${due} > 0`) : undefined,
+      filter.corporateClientId ? eq(opdBills.corporateClientId, filter.corporateClientId) : undefined,
+      filter.staffId ? eq(opdBills.staffId, filter.staffId) : undefined,
     );
     const [rows, [total]] = await Promise.all([
       this.summaries()
@@ -251,6 +326,9 @@ export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
         collected: opdBills.collected,
         due,
         status: opdBills.status,
+        corporateClientId: opdBills.corporateClientId,
+        corporateClientName: corporateClients.name,
+        staffId: opdBills.staffId,
         cancelReason: opdBills.cancelReason,
         cancelledOn: opdBills.cancelledOn,
         refunded: opdBills.refunded,
@@ -263,6 +341,7 @@ export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
       .from(opdBills)
       .innerJoin(patients, eq(patients.id, opdBills.patientId))
       .leftJoin(referrers, eq(referrers.id, opdBills.referredById))
+      .leftJoin(corporateClients, eq(corporateClients.id, opdBills.corporateClientId))
       .where(eq(opdBills.id, id));
     if (!header) return null;
     const [lines, payments] = await Promise.all([
@@ -273,12 +352,17 @@ export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
           doctorName: doctors.name,
           roomNo: doctors.roomNo,
           visitType: opdBillLines.visitType,
+          serviceId: opdBillLines.serviceId,
+          serviceName: services.name,
+          qty: opdBillLines.qty,
+          rate: opdBillLines.rate,
           fee: opdBillLines.fee,
           sharePercent: opdBillLines.sharePercent,
           shareAmount: opdBillLines.shareAmount,
         })
         .from(opdBillLines)
-        .innerJoin(doctors, eq(doctors.id, opdBillLines.doctorId))
+        .leftJoin(doctors, eq(doctors.id, opdBillLines.doctorId))
+        .leftJoin(services, eq(services.id, opdBillLines.serviceId))
         .where(eq(opdBillLines.billId, id))
         .orderBy(asc(opdBillLines.position)),
       this.context.db

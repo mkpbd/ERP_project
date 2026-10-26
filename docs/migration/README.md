@@ -80,8 +80,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 9a | Hospital: patient registration with UHID, duplicate check, age or birth date, photo, patient card with barcode, registration register | **Done** | [09a-hospital-patient-registration.md](09a-hospital-patient-registration.md) |
 | 9b | Hospital: doctors, specialities, chamber schedules and days off, appointments by serial, doctor board, appointment list and slip | **Done** | [09b-hospital-doctors-appointments.md](09b-hospital-doctors-appointments.md) |
 | 9c | Hospital: OPD consultation billing with the doctor's share, discount limit, accounts posting, due collection, cancel and refund, `UHIDUsesRecords`, receipt and collection reports | **Done** | [09c-hospital-opd-billing.md](09c-hospital-opd-billing.md) |
-| 9d | Hospital: OPD and emergency service billing and collections | Next | |
-| 9e | Hospital: admissions, beds and discharge | Planned | |
+| 9d | Hospital: OPD and emergency services (service master with doctor share), corporate clients (credit limit, discount, collections, statement), staff billing, service income | **Done** | [09d-hospital-services-corporate.md](09d-hospital-services-corporate.md) |
+| 9e | Hospital: admissions, beds and discharge | Next | |
 | 9f | Hospital: indoor bill, consultant and IPD patient ledgers, due collection, UHID merge | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |

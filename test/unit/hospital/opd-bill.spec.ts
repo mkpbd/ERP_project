@@ -11,9 +11,10 @@ const bill = (extra: Partial<Parameters<typeof OpdBill.create>[0]> = {}) =>
     billedOn: '2026-10-26',
     referredById: null,
     lines: [
-      { doctorId: 'nusrat', visitType: 'new', fee: 800, sharePercent: 40 },
-      { doctorId: 'kamal', visitType: 'follow_up', fee: 333.33, sharePercent: 33.33 },
+      { doctorId: 'nusrat', visitType: 'new', serviceId: null, qty: 1, rate: 800, sharePercent: 40 },
+      { doctorId: 'kamal', visitType: 'follow_up', serviceId: null, qty: 1, rate: 333.33, sharePercent: 33.33 },
     ],
+    payer: { kind: 'patient' },
     discount: 0,
     discountReason: null,
     discountLimitPercent: 10,
@@ -30,6 +31,33 @@ describe('visit suggestion', () => {
     expect(suggestedVisit('2026-09-26', '2026-10-26', 30)).toBe('follow_up');
     expect(suggestedVisit('2026-09-25', '2026-10-26', 30)).toBe('new');
     expect(suggestedVisit('2026-10-26', '2026-10-26', 0)).toBe('follow_up');
+  });
+});
+
+describe('OpdBill services and payers', () => {
+  const dressing = { doctorId: null, visitType: null, serviceId: 'dressing', qty: 3, rate: 150.5, sharePercent: 0 };
+  const nebulisation = { doctorId: 'kamal', visitType: null, serviceId: 'neb', qty: 2, rate: 200, sharePercent: 25 };
+
+  it('bills services by quantity, with a share only to the doctor who gave one that carries it', () => {
+    const created = bill({ lines: [dressing, nebulisation], payment: null });
+    expect(created.lines.map((line) => [line.fee, line.shareAmount])).toEqual([
+      [451.5, 0],
+      [400, 100],
+    ]);
+    expect(created.grossByKind).toEqual({ consultations: 0, services: 851.5 });
+    expect(() => bill({ lines: [{ ...nebulisation, doctorId: null }] })).toThrow(/give who gave it/);
+    expect(() => bill({ lines: [{ ...dressing, qty: 0 }] })).toThrow(/1 to 1000/);
+    expect(() => bill({ lines: [{ ...dressing, serviceId: null }] })).toThrow(/a doctor and a visit type/);
+  });
+
+  it('keeps who owes the due; a cash client pays in full at the counter', () => {
+    const corporate = bill({ payer: { kind: 'corporate', clientId: 'acme', cash: false }, payment: null });
+    expect(corporate.toSnapshot()).toMatchObject({ corporateClientId: 'acme', staffId: null });
+    expect(corporate.payer).toEqual({ kind: 'corporate', clientId: 'acme', cash: false });
+    expect(corporate.due).toBe(1133.33);
+    expect(() => bill({ payer: { kind: 'corporate', clientId: 'acme', cash: true } })).toThrow(/paid in full/);
+    const staff = bill({ payer: { kind: 'staff', staffId: 's' } });
+    expect(staff.payer).toEqual({ kind: 'staff', staffId: 's' });
   });
 });
 

@@ -1,0 +1,47 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr>
+      <td style="width: 18%">Client</td><td><b>{{client.name}}</b></td>
+      <td style="width: 18%">Pays</td><td>{{#if (eq client.payment "credit")}}On credit{{#if client.creditLimit}}, limit {{money client.creditLimit}}{{/if}}{{else}}In cash{{/if}}</td>
+    </tr>
+    <tr><td>Owed before</td><td class="num">{{money opening}}</td><td>Owed after</td><td class="num"><b>{{money closing}}</b></td></tr>
+  </tbody>
+</table>
+<h3 style="margin: 8px 0 6px">Bills</h3>
+{{#if bills.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Billed on</th><th>Bill</th><th>UHID</th><th>Patient</th><th class="num">Bill</th>
+      <th class="num">Paid at counter</th><th class="num">Charged to client</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each bills}}
+    <tr>
+      <td>{{date billedOn}}</td><td>{{number}}</td><td>{{uhid}}</td><td>{{patientName}}</td>
+      <td class="num">{{money net}}</td><td class="num">{{money paid}}</td><td class="num">{{money charged}}</td><td>{{state}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Charged in the period (bills not cancelled)</td><td class="num">{{money charged}}</td><td></td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>No bill in this period.</p>
+{{/if}}
+<h3 style="margin: 12px 0 6px">Payments</h3>
+{{#if collections.length}}
+<table class="report" style="width: 70%">
+  <thead><tr><th>Paid on</th><th>Receipt</th><th>Against bill</th><th>Method</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+    {{#each collections}}
+    <tr><td>{{date paidOn}}</td><td>{{number}}</td><td>{{billNumber}}</td><td>{{methodLabel}}</td><td class="num">{{money amount}}</td></tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="4">Paid in the period</td><td class="num">{{money collected}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>No payment in this period.</p>
+{{/if}}
+{{/with}}

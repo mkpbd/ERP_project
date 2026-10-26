@@ -18,7 +18,7 @@
   <div class="head">
     <div class="org">{{organization.organizationName}}</div>
     <div class="small">{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
-    <div>OPD consultation {{bill.number}} · {{date bill.billedOn}}</div>
+    <div>OPD bill {{bill.number}} · {{date bill.billedOn}}</div>
     <div class="bars">{{{barcode}}}</div>
   </div>
   <div class="rule"></div>
@@ -27,11 +27,16 @@
     <tr><td>Patient</td><td>{{bill.patientName}} · {{bill.age}}</td></tr>
     {{#if bill.mobileNo}}<tr><td>Mobile</td><td>{{bill.mobileNo}}</td></tr>{{/if}}
     {{#if bill.referredByName}}<tr><td>Referred by</td><td>{{bill.referredByName}}</td></tr>{{/if}}
+    {{#if bill.payerName}}<tr><td>Bill to</td><td><b>{{bill.payerName}}</b></td></tr>{{/if}}
   </table>
   <div class="rule"></div>
   <table>
     {{#each bill.lines}}
+    {{#if serviceName}}
+    <tr><td>{{serviceName}}<br /><span class="small">{{qty}} × {{money rate}}{{#if doctorName}} · by {{doctorName}}{{/if}}</span></td><td class="num">{{money fee}}</td></tr>
+    {{else}}
     <tr><td>{{doctorName}}<br /><span class="small">{{visit}}{{#if roomNo}} · Room {{roomNo}}{{/if}}</span></td><td class="num">{{money fee}}</td></tr>
+    {{/if}}
     {{/each}}
   </table>
   <div class="rule"></div>

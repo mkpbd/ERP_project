@@ -1,7 +1,7 @@
 # Step 9c — Hospital: OPD consultation billing
 
-Status: **done** (2026-10-26). Previous: [step 9b](09b-hospital-doctors-appointments.md) · Next: step 9d (OPD and
-emergency service billing).
+Status: **done** (2026-10-26). Previous: [step 9b](09b-hospital-doctors-appointments.md) · Next: [step 9d](09d-hospital-services-corporate.md)
+(OPD and emergency services, corporate and staff billing).
 
 ## Where the old logic lives
 

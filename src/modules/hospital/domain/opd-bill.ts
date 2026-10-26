@@ -25,14 +25,25 @@ export function suggestedVisit(lastVisitOn: string | null, today: string, follow
   return days <= followUpDays ? 'follow_up' : 'new';
 }
 
+/** A consultation (a doctor and a visit type) or a service (with the doctor who gave it, when it carries a share). */
 export interface BillLine {
-  readonly doctorId: string;
-  readonly visitType: VisitType;
+  readonly doctorId: string | null;
+  readonly visitType: VisitType | null;
+  readonly serviceId: string | null;
+  readonly qty: number;
+  readonly rate: number;
+  /** qty × rate. */
   readonly fee: number;
   readonly sharePercent: number;
   /** The doctor's share of the fee (old: 40 % of the line, hard-coded). */
   readonly shareAmount: number;
 }
+
+/** Who owes what is not paid at the counter. */
+export type BillPayer =
+  | { readonly kind: 'patient' }
+  | { readonly kind: 'corporate'; readonly clientId: string; readonly cash: boolean }
+  | { readonly kind: 'staff'; readonly staffId: string };
 
 export interface BillPayment {
   readonly kind: 'payment' | 'collection' | 'refund';
@@ -52,6 +63,8 @@ export interface OpdBillProps {
   appointmentId: string | null;
   billedOn: string;
   referredById: string | null;
+  corporateClientId: string | null;
+  staffId: string | null;
   lines: BillLine[];
   gross: number;
   discount: number;
@@ -73,8 +86,9 @@ export interface OpdBillProps {
 }
 
 /**
- * Old Consultation Fee page (PatientRecordConsultancyFees, ConsultancyDetails, OPDConsultancyLedger and the 40 %
- * ConsultantGlobalLedger rows, each saved on its own): one bill, saved and posted at once. The discount is limited
+ * Old Consultation Fee and OPD Emergency pages (PatientRecordConsultancyFees / PatientRecordOPDServices, their
+ * details and ledgers and the 40 % ConsultantGlobalLedger rows, each saved on its own): one bill, saved and posted at
+ * once. The discount is limited
  * at the counter; above the limit opd:discount is needed. The doctor's share is the doctor's percentage (or the
  * policy's) of each fee.
  */
@@ -91,7 +105,8 @@ export class OpdBill {
     appointmentId: string | null;
     billedOn: string;
     referredById: string | null;
-    lines: readonly Omit<BillLine, 'shareAmount'>[];
+    lines: readonly Omit<BillLine, 'shareAmount' | 'fee'>[];
+    payer: BillPayer;
     discount: number;
     discountReason: string | null;
     /** The share of the bill a counter may discount, and whether this user may give more. */
@@ -102,14 +117,25 @@ export class OpdBill {
     now: Date;
   }): OpdBill {
     if (params.lines.length === 0 || params.lines.length > MAX_BILL_LINES) {
-      throw new DomainError('invalid_lines', `A bill has 1 to ${MAX_BILL_LINES} consultations`);
+      throw new DomainError('invalid_lines', `A bill has 1 to ${MAX_BILL_LINES} lines`);
     }
     const lines = params.lines.map((line, index) => {
-      validMoney(line.fee, `fee of line ${index + 1}`);
-      if (!(line.sharePercent >= 0 && line.sharePercent <= 100)) {
-        throw new DomainError('invalid_share', `Line ${index + 1}: a share is 0 to 100 %`);
+      const at = `Line ${index + 1}`;
+      if (line.serviceId === null && (line.visitType === null || line.doctorId === null)) {
+        throw new DomainError('invalid_lines', `${at}: a consultation has a doctor and a visit type`);
       }
-      return { ...line, shareAmount: taka(Math.round((paisa(line.fee) * line.sharePercent) / 100)) };
+      if (!Number.isInteger(line.qty) || line.qty < 1 || line.qty > 1000) {
+        throw new DomainError('invalid_quantity', `${at}: the quantity is a whole number from 1 to 1000`);
+      }
+      validMoney(line.rate, `rate of line ${index + 1}`);
+      if (!(line.sharePercent >= 0 && line.sharePercent <= 100)) {
+        throw new DomainError('invalid_share', `${at}: a share is 0 to 100 %`);
+      }
+      if (line.sharePercent > 0 && line.doctorId === null) {
+        throw new DomainError('doctor_needed', `${at}: the service carries a doctor's share; give who gave it`);
+      }
+      const fee = taka(Math.round(paisa(line.rate) * line.qty));
+      return { ...line, fee, shareAmount: taka(Math.round((paisa(fee) * line.sharePercent) / 100)) };
     });
     const gross = taka(lines.reduce((total, line) => total + paisa(line.fee), 0));
     const discount = validMoney(params.discount, 'discount');
@@ -127,6 +153,9 @@ export class OpdBill {
     const paid = params.payment ? validMoney(params.payment.amount, 'payment') : 0;
     if (paid > net)
       throw new DomainError('overpayment', `The bill is ${net.toFixed(2)}; ${paid.toFixed(2)} is too much`);
+    if (params.payer.kind === 'corporate' && params.payer.cash && paid !== net) {
+      throw new DomainError('payment_needed', "A cash client's bill is paid in full at the counter");
+    }
     const payments: BillPayment[] =
       params.payment && paid > 0
         ? [
@@ -148,6 +177,8 @@ export class OpdBill {
         appointmentId: params.appointmentId,
         billedOn: params.billedOn,
         referredById: params.referredById,
+        corporateClientId: params.payer.kind === 'corporate' ? params.payer.clientId : null,
+        staffId: params.payer.kind === 'staff' ? params.payer.staffId : null,
         lines,
         gross,
         discount,
@@ -191,6 +222,21 @@ export class OpdBill {
   }
   get lines(): readonly BillLine[] {
     return this.props.lines;
+  }
+  get payer(): BillPayer {
+    if (this.props.corporateClientId) return { kind: 'corporate', clientId: this.props.corporateClientId, cash: false };
+    if (this.props.staffId) return { kind: 'staff', staffId: this.props.staffId };
+    return { kind: 'patient' };
+  }
+  /** Fees of the consultations and of the services on the bill. */
+  get grossByKind(): { consultations: number; services: number } {
+    const of = (services: boolean) =>
+      taka(
+        this.props.lines
+          .filter((line) => (line.serviceId !== null) === services)
+          .reduce((total, line) => total + paisa(line.fee), 0),
+      );
+    return { consultations: of(false), services: of(true) };
   }
   get share(): number {
     return taka(this.props.lines.reduce((total, line) => total + paisa(line.shareAmount), 0));

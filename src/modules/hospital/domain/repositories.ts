@@ -64,6 +64,25 @@ export interface BillableDoctor extends BookableDoctor {
   readonly sharePercent: number | null;
 }
 
+export interface BillableService {
+  readonly id: string;
+  readonly name: string;
+  readonly rate: number;
+  /** The share of the doctor who gives it; null = none. */
+  readonly sharePercent: number | null;
+  readonly isOpd: boolean;
+  readonly isActive: boolean;
+}
+
+export interface CorporateClient {
+  readonly id: string;
+  readonly name: string;
+  readonly payment: 'cash' | 'credit';
+  readonly creditLimit: number | null;
+  readonly discountPercent: number;
+  readonly isActive: boolean;
+}
+
 export interface DoctorLedgerEntry {
   readonly doctorId: string;
   readonly entryOn: string;
@@ -83,6 +102,12 @@ export abstract class OpdBillRepository {
   abstract policy(): Promise<OpdPolicy>;
   abstract savePolicy(policy: OpdPolicy, by: string, now: Date): Promise<void>;
   abstract doctors(ids: readonly string[]): Promise<Map<string, BillableDoctor>>;
+  abstract services(ids: readonly string[]): Promise<Map<string, BillableService>>;
+  abstract corporateClient(id: string): Promise<CorporateClient | null>;
+  /** What the client owes on bills not cancelled. */
+  abstract corporateDue(clientId: string): Promise<number>;
+  /** The client's bills with something due, oldest first. */
+  abstract dueBillIds(clientId: string): Promise<string[]>;
   /** The last day the patient was billed for this doctor (bills not cancelled). */
   abstract lastVisitOn(patientId: string, doctorId: string): Promise<string | null>;
   abstract addLedger(entries: readonly DoctorLedgerEntry[]): Promise<void>;

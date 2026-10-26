@@ -6,7 +6,15 @@ import {
   type RecordTable,
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
 import { HOSPITAL_RECORDS as R, OPD_MANAGE, OPD_READ } from '../../application/hospital.constants.js';
-import { doctorClosures, doctors, doctorSchedules, specialities } from './hospital.schema.js';
+import {
+  corporateClients,
+  doctorClosures,
+  doctors,
+  doctorSchedules,
+  serviceGroups,
+  services,
+  specialities,
+} from './hospital.schema.js';
 
 const fk = (table: string, column: string, referenced: string) => `${table}_${column}_${referenced}_id_fk`;
 const taken = (code: string, message: string) => ({ code, message });
@@ -60,6 +68,31 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
       },
       unique: { hospital_doctor_closures_day_uq: taken('closure_day_taken', 'The doctor is already off that day') },
       references: { [fk('hospital_doctor_closures', 'doctor_id', 'hospital_doctors')]: R.doctor },
+    }),
+    record(R.serviceGroup, serviceGroups, {
+      orderBy: [serviceGroups.name],
+      filters: { parentId: serviceGroups.parentId },
+      search: [serviceGroups.name],
+      unique: { hospital_service_groups_name_uq: taken('service_group_name_taken', 'This group exists') },
+      references: { [fk('hospital_service_groups', 'parent_id', 'hospital_service_groups')]: R.serviceGroup },
+    }),
+    record(R.service, services, {
+      orderBy: [services.name],
+      filters: { groupId: services.groupId, isOpd: services.isOpd, isIpd: services.isIpd, isActive: services.isActive },
+      search: [services.name, services.code],
+      unique: {
+        hospital_services_code_uq: taken('service_code_taken', 'Another service has this code'),
+        hospital_services_name_uq: taken('service_name_taken', 'The group already has this service'),
+      },
+      references: { [fk('hospital_services', 'group_id', 'hospital_service_groups')]: R.serviceGroup },
+    }),
+    record(R.corporateClient, corporateClients, {
+      orderBy: [corporateClients.name],
+      filters: { payment: corporateClients.payment, isActive: corporateClients.isActive },
+      search: [corporateClients.name, corporateClients.contactPerson],
+      unique: {
+        hospital_corporate_clients_name_uq: taken('corporate_client_name_taken', 'This corporate client exists'),
+      },
     }),
   ];
 }

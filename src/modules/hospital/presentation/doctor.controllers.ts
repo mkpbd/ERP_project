@@ -98,6 +98,94 @@ class ClosureFilterDto extends createZodDto(
 ) {}
 class ClosureResponseDto extends responseDto(closure.response) {}
 
+const serviceGroup = shapes({ parentId: z.uuid().nullable(), name: name(100) }, ['parentId']);
+class CreateServiceGroupDto extends createZodDto(serviceGroup.create) {}
+class UpdateServiceGroupDto extends createZodDto(serviceGroup.update) {}
+class ServiceGroupFilterDto extends createZodDto(z.object({ q: search, parentId: z.uuid().optional() })) {}
+class ServiceGroupResponseDto extends responseDto(serviceGroup.response) {}
+
+const service = shapes(
+  {
+    code: z.string().trim().min(1).max(20).nullable(),
+    name: name(150),
+    groupId: z.uuid(),
+    rate: fee,
+    /** The share of the doctor who gives it; null = no doctor's share (and no doctor needed). */
+    sharePercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
+    isOpd: z.boolean(),
+    isIpd: z.boolean(),
+    isActive: z.boolean(),
+  },
+  ['code', 'sharePercent'],
+  { isOpd: true, isIpd: false, isActive: true },
+);
+class CreateServiceDto extends createZodDto(service.create) {}
+class UpdateServiceDto extends createZodDto(service.update) {}
+class ServiceFilterDto extends createZodDto(
+  z.object({ q: search, groupId: z.uuid().optional(), isOpd: flag, isIpd: flag, isActive: flag }),
+) {}
+class ServiceResponseDto extends responseDto(service.response) {}
+
+const corporateClient = shapes(
+  {
+    name: name(150),
+    contactPerson: optionalText(150),
+    contactNo: optionalText(30),
+    address: optionalText(300),
+    payment: z.enum(['cash', 'credit']),
+    creditLimit: fee.nullable(),
+    discountPercent: z.number().min(0).max(100).multipleOf(0.01),
+    isActive: z.boolean(),
+  },
+  ['contactPerson', 'contactNo', 'address', 'creditLimit'],
+  { payment: 'credit', discountPercent: 0, isActive: true },
+);
+class CreateCorporateClientDto extends createZodDto(corporateClient.create) {}
+class UpdateCorporateClientDto extends createZodDto(corporateClient.update) {}
+class CorporateClientFilterDto extends createZodDto(
+  z.object({ q: search, payment: z.enum(['cash', 'credit']).optional(), isActive: flag }),
+) {}
+class CorporateClientResponseDto extends responseDto(corporateClient.response) {}
+
+/** Old Hospital.ServiceGroups / SubGroups / SubSubGroups as one tree. */
+export const ServiceGroupsController = createRecordController({
+  ...opd,
+  className: 'ServiceGroupsController',
+  path: 'hospital/service-groups',
+  type: R.serviceGroup,
+  label: 'service group',
+  create: CreateServiceGroupDto,
+  update: UpdateServiceGroupDto,
+  response: ServiceGroupResponseDto,
+  filter: ServiceGroupFilterDto,
+});
+
+/** Old /hospital/service-executing: services with their rate and the doctor's share. */
+export const ServicesController = createRecordController({
+  ...opd,
+  className: 'HospitalServicesController',
+  path: 'hospital/services',
+  type: R.service,
+  label: 'service',
+  create: CreateServiceDto,
+  update: UpdateServiceDto,
+  response: ServiceResponseDto,
+  filter: ServiceFilterDto,
+});
+
+/** Old /marketing/corporate-client: cash or credit, with a credit limit and a discount. */
+export const CorporateClientsController = createRecordController({
+  ...opd,
+  className: 'CorporateClientsController',
+  path: 'hospital/corporate-clients',
+  type: R.corporateClient,
+  label: 'corporate client',
+  create: CreateCorporateClientDto,
+  update: UpdateCorporateClientDto,
+  response: CorporateClientResponseDto,
+  filter: CorporateClientFilterDto,
+});
+
 export const SpecialitiesController = createRecordController({
   ...opd,
   className: 'SpecialitiesController',
@@ -153,4 +241,7 @@ export const DOCTOR_CONTROLLERS = [
   DoctorsController,
   DoctorSchedulesController,
   DoctorClosuresController,
+  ServiceGroupsController,
+  ServicesController,
+  CorporateClientsController,
 ];

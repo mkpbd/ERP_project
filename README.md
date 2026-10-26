@@ -184,6 +184,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | OPD consultation bills, due collections, cancelling a bill on its own day | `opd:bill` |
 | a consultation discount above the counter's limit | `opd:discount` |
 | the OPD policy (follow-up days, default doctor share, counter discount limit); cancelling a bill later | `opd:manage` |
+| service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
+| a corporate client's payment against its bills | `opd:bill` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

@@ -267,6 +267,13 @@
       "when": 1793011990261,
       "tag": "0037_hospital_opd_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1793042515843,
+      "tag": "0038_hospital_services_corporate",
+      "breakpoints": true
     }
   ]
 }
