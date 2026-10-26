@@ -175,16 +175,17 @@ type SaleGrouping = (typeof SALE_GROUPINGS)[number];
 
 /**
  * Old sale summaries (Sale Report Summary Date Wise, Outlet / Supplier Wise Sale, Sale Summary With Profit, Product
- * Wise Return Statement): completed sales over a period by day, product, manufacturer or seller — bills, units,
- * gross, discount, net, what customers brought back in the period, net of returns, cost and margin. Unlike the old
- * reports, returns are taken off.
+ * Wise Return Statement): sales over a period by day, product, manufacturer or seller — bills, units, gross,
+ * discount, net, what customers brought back or was cancelled in the period, net of both, cost and margin. Unlike the
+ * old reports, returns are taken off, and a cancellation comes off on its own date instead of erasing the sale.
  */
 export function salesSummaryReport(context: DbContext, users: UserDirectory): ReportDefinition {
   return defineReport({
     key: 'pharmacy.sales-summary',
     title: 'Medicine sales summary',
     group: 'Pharmacy',
-    description: 'Sales by day, product, manufacturer or seller: gross, discount, net, returns, cost and margin.',
+    description:
+      'Sales by day, product, manufacturer or seller: gross, discount, net, returns and cancellations, cost and margin.',
     params: z.strictObject({
       ...period,
       outletId: z.uuid().optional(),
@@ -221,14 +222,40 @@ export function salesSummaryReport(context: DbContext, users: UserDirectory): Re
         .innerJoin(manufacturers, eq(manufacturers.id, brands.manufacturerId))
         .where(
           and(
-            eq(pharmacySales.status, 'completed'),
             gte(pharmacySales.soldOn, params.from),
             lte(pharmacySales.soldOn, params.to),
             params.outletId ? eq(pharmacySales.outletId, params.outletId) : undefined,
           ),
         )
         .groupBy(sql`1`);
-      const back = await context.db
+      // A cancelled sale stays on the day it was made and comes off on the day it was cancelled, so a closed period
+      // never changes.
+      const cancelKey: Record<SaleGrouping, SQL<string | null>> = {
+        ...saleKey,
+        day: sql`${pharmacySales.cancelledOn}`,
+      };
+      const cancelled = await context.db
+        .select({
+          key: cancelKey[params.by],
+          qty: sumOf(pharmacySaleLines.qty),
+          value: sumOf(pharmacySaleLines.total),
+          cost: sumOf(sql`round(${pharmacySaleLines.qty} * ${pharmacySaleLines.unitCost}, 2)`),
+        })
+        .from(pharmacySaleLines)
+        .innerJoin(pharmacySales, eq(pharmacySales.id, pharmacySaleLines.saleId))
+        .innerJoin(products, eq(products.id, pharmacySaleLines.productId))
+        .innerJoin(brands, eq(brands.id, products.brandId))
+        .innerJoin(manufacturers, eq(manufacturers.id, brands.manufacturerId))
+        .where(
+          and(
+            eq(pharmacySales.status, 'cancelled'),
+            gte(pharmacySales.cancelledOn, params.from),
+            lte(pharmacySales.cancelledOn, params.to),
+            params.outletId ? eq(pharmacySales.outletId, params.outletId) : undefined,
+          ),
+        )
+        .groupBy(sql`1`);
+      const returned = await context.db
         .select({
           key: returnKey[params.by],
           qty: sumOf(saleReturnLines.qty),
@@ -249,6 +276,7 @@ export function salesSummaryReport(context: DbContext, users: UserDirectory): Re
           ),
         )
         .groupBy(sql`1`);
+      const back = [...returned, ...cancelled];
       const keys = [...new Set([...sold.map((row) => row.key), ...back.map((row) => row.key)])];
       const named =
         params.by === 'product'
@@ -280,7 +308,16 @@ export function salesSummaryReport(context: DbContext, users: UserDirectory): Re
       type Row = ReturnType<typeof blank>;
       const rows = keys.map((key) => {
         const sale = sold.find((row) => row.key === key);
-        const ret = back.find((row) => row.key === key);
+        const ret = back
+          .filter((row) => row.key === key)
+          .reduce(
+            (total, row) => ({ qty: total.qty + row.qty, value: total.value + row.value, cost: total.cost + row.cost }),
+            {
+              qty: 0,
+              value: 0,
+              cost: 0,
+            },
+          );
         const row: Row & { key: string | null; label: string } = { key, label: labelOf(key), ...blank() };
         row.bills = sale?.bills ?? 0;
         row.qty = sale?.qty ?? 0;
@@ -325,9 +362,9 @@ export function salesSummaryReport(context: DbContext, users: UserDirectory): Re
         { key: 'gross', header: 'Gross', format: 'money' },
         { key: 'discount', header: 'Discount', format: 'money' },
         { key: 'net', header: 'Net', format: 'money' },
-        { key: 'returnedQty', header: 'Units returned', format: 'integer' },
-        { key: 'returned', header: 'Returns', format: 'money' },
-        { key: 'netSales', header: 'Net of returns', format: 'money' },
+        { key: 'returnedQty', header: 'Units returned or cancelled', format: 'integer' },
+        { key: 'returned', header: 'Returned or cancelled', format: 'money' },
+        { key: 'netSales', header: 'Net of returns and cancellations', format: 'money' },
         { key: 'cost', header: 'Cost', format: 'money' },
         { key: 'margin', header: 'Margin', format: 'money' },
         { key: 'marginPercent', header: 'Margin %', format: 'decimal' },

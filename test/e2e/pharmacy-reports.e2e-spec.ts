@@ -203,11 +203,11 @@ async function april() {
     amount: 6.4,
     method: 'cash',
   }).expect(201);
-  // The manager sells 5 Napa for 5.70 and cancels it the same day.
+  // The manager sells 5 Napa for 5.70 and cancels it the next day.
   const own = await sell(admin, [{ productId: napa, qty: 5 }], { tendered: 10 });
   await ph('post', `sales/${own.body.id}/cancel`, admin, {
     version: 1,
-    on: '2026-04-10',
+    on: '2026-04-11',
     reason: 'Wrong patient',
   }).expect(204);
   // Two Napa of the first sale come back on the 12th: 2.28 in cash.
@@ -257,13 +257,17 @@ describe('pharmacy reports', () => {
     );
     expect(rowOf(purchases, 'Beximco Pharma', null)).toEqual(expect.arrayContaining([1, 280, 100, 180, 0]));
 
-    // Bills, units, gross, discount, net, units returned, returns, net of returns, cost, margin, margin %.
+    // Bills, units, gross, discount, net, units and value returned or cancelled, net sales, cost, margin, margin %.
     const byDay = await sheet('pharmacy.sales-summary', april26);
-    expect(rowOf(byDay, '2026-04-10')?.slice(1)).toEqual([3, 22, 36, 1.2, 34.8, 0, 0, 34.8, 24, 10.8, 31.03]);
-    // No margin % on a day of returns alone (the empty last cell is not in the row).
+    // The cancelled sale stays on the 10th and comes off on the 11th, so the 10th never changes.
+    expect(rowOf(byDay, '2026-04-10')?.slice(1)).toEqual([4, 27, 42, 1.5, 40.5, 0, 0, 40.5, 28, 12.5, 30.86]);
+    // No margin % on a day of cancellations or returns alone (the empty last cell is not in the row).
+    expect(rowOf(byDay, '2026-04-11')?.slice(1)).toEqual([0, 0, 0, 0, 0, 5, 5.7, -5.7, -4, -1.7]);
     expect(rowOf(byDay, '2026-04-12')?.slice(1)).toEqual([0, 0, 0, 0, 0, 2, 2.28, -2.28, -1.6, -0.68]);
+    const tenth = await sheet('pharmacy.sales-summary', { from: '2026-04-10', to: '2026-04-10' });
+    expect(rowOf(tenth, '2026-04-10')?.[5]).toBe(40.5);
     const byProduct = await sheet('pharmacy.sales-summary', { ...april26, by: 'product' });
-    expect(rowOf(byProduct, 'Tab. Napa')?.slice(1)).toEqual([2, 20, 24, 1.2, 22.8, 2, 2.28, 20.52, 14.4, 6.12, 29.82]);
+    expect(rowOf(byProduct, 'Tab. Napa')?.slice(1)).toEqual([3, 25, 30, 1.5, 28.5, 7, 7.98, 20.52, 14.4, 6.12, 29.82]);
     expect(rowOf(byProduct, 'Tab. Seclo')?.slice(1)).toEqual([1, 2, 12, 0, 12, 0, 0, 12, 8, 4, 33.33]);
     const bySeller = await sheet('pharmacy.sales-summary', { ...april26, by: 'seller' });
     expect(rowOf(bySeller, 'Seller Sumi')?.[8]).toBe(32.52);

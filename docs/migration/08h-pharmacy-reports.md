@@ -28,18 +28,26 @@ patch scripts instead.
 | `pharmacy.expiry` | Expired products, upcoming expiry, MIS Expired Product Statement | Lots held (one outlet or all) that are expired or expire within `days` (default 90, up to 365) of today: expired, within 30 days, later. Days left, quantity, value at cost and at the lot's sale rate. |
 | `pharmacy.physical-inventory` | Physical Inventory Report | Up to six applied counts side by side. For each: lots and products counted, the stock held at cost, then equal, over, short, written off and expired still on the shelf (lots, value, % of the stock held), the net deviation, and the lots most short (`top`, default 5). A count that is not applied is refused (422 `stock_count_state`). |
 | `pharmacy.purchase-summary` | Pharmacy Purchase Summary, Purchase Summary Date Wise | Posted receives over a period per supplier: receives, amount, discount, VAT, total, paid against them by the end of the period, due, and goods sent back in the period. `detail` lists each receive with its invoice and challan. Filters: outlet, supplier. |
-| `pharmacy.sales-summary` | Sale Report Summary Date Wise, Outlet / Supplier Wise Sale, Sale Summary With Profit, Product Wise Return Statement | Completed sales by `day` (default), `product`, `manufacturer` or `seller`: bills, units, gross, discount, net; units and value brought back in the period; net of returns; cost; margin and margin %. Unlike the old reports, **returns are taken off**. Margin % is shown only when net sales are positive. |
+| `pharmacy.sales-summary` | Sale Report Summary Date Wise, Outlet / Supplier Wise Sale, Sale Summary With Profit, Product Wise Return Statement | Sales by `day` (default), `product`, `manufacturer` or `seller`: bills, units, gross, discount, net; units and value returned or cancelled in the period; net sales; cost; margin and margin %. Unlike the old reports, **returns are taken off**, and **a cancelled sale stays on its sale date and comes off on its cancel date**, so a closed period never changes. Margin % is shown only when net sales are positive. |
 | `pharmacy.cash-counter` | Userwise Collection Summary, cash counter | Per user over a period, by cash, card and mobile wallet: taken on sales and on loyal member dues, less paid back on returns and on cancelled sales, giving **what each counter hands over**. Also sales value, discount, due given and due taken off by returns. Filters: outlet, user. |
 
 ## How the figures are taken
 
 * **Dates:** a movement counts on its own date. A sale counts on the day it was sold, a return on the day it came
-  back, a collection on the day it was collected. A cancelled sale is left out of the sales summary.
+  back, a cancellation on the day it was cancelled, a collection on the day it was collected.
 * **Cash counter:** each amount goes to whoever took or paid it. A sale goes to its seller, a cancellation to whoever
   cancelled it, a return to whoever took it back, and a collection to whoever collected it. A collection that settles
   sales of several outlets counts for each outlet by what it paid on that outlet's sales.
 * **Cost:** units at the cost each lot left at. Returns take their cost back.
 * **Paid against a receive:** the supplier payment lines on it dated up to the end of the period.
+
+## Decisions taken (after the first version of this step)
+
+* The cash counter keeps one "to hand over" line for cash, card and wallet together.
+* A sale cancelled in a later period comes off on its cancel date; the period it was sold in does not change.
+* No separate "expiry outlet" feature: expired stock is moved with an ordinary transfer to an outlet kept for
+  expired medicines, or written off on a stock count.
+* Step 9 is split into 9a, 9b and so on, starting with patient registration and UHID.
 
 ## Not ported
 
@@ -62,7 +70,7 @@ The pharmacy management dashboard comes with the dashboards of a later step.
   * opening stock with an expired lot;
   * a receive of 280 with 100 paid;
   * a cash sale, a card sale and a loyal member's sale with a due collected later;
-  * a manager's sale cancelled the same day;
+  * a manager's sale cancelled the next day;
   * a return.
 
   Every figure is checked from the Excel output, and every PDF is rendered:
@@ -70,8 +78,8 @@ The pharmacy management dashboard comes with the dashboards of a later step.
   * **Stock movement:** Napa 10 + 100 + 7 − 25 = 92 at 72.60; Seclo 48 at 192.00.
   * **Expiry:** the expired lot X and lot A expiring in 20 days; Seclo, expiring in 400 days, is not listed.
   * **Purchase summary:** 280 / 100 / 180.
-  * **Sales by day:** 36.00 gross, 1.20 discount, 34.80 net, 24.00 cost on the 10th; a returns-only day with no
-    margin %.
+  * **Sales by day:** the 10th keeps the later-cancelled sale (42.00 gross, 40.50 net), the 11th takes 5.70 off,
+    the 12th 2.28 of returns with no margin %.
   * **Sales by product:** Napa 20.52 net of returns, 6.12 margin.
   * **Cash counter:** the seller hands over 20.52 in cash and 12.00 by card; the manager's cancelled sale nets to 0.
   * **Physical inventory:** a count with an expired lot written off (7.00, 2.65 %) and one short (1.60, 0.6 %), net

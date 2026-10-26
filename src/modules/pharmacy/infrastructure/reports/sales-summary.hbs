@@ -5,8 +5,8 @@
     <tr>
       <th class="center" rowspan="2" style="width: 24px">#</th>
       <th rowspan="2">{{#if byDay}}Date{{else if (eq by "product")}}Product{{else if (eq by "seller")}}Seller{{else}}Manufacturer{{/if}}</th>
-      <th class="center" colspan="5">Sold</th><th class="center" colspan="2">Returned</th>
-      <th class="num" rowspan="2">Net of returns</th><th class="num" rowspan="2">Cost</th>
+      <th class="center" colspan="5">Sold</th><th class="center" colspan="2">Returned or cancelled</th>
+      <th class="num" rowspan="2">Net sales</th><th class="num" rowspan="2">Cost</th>
       <th class="num" rowspan="2">Margin</th><th class="num" rowspan="2">%</th>
     </tr>
     <tr>
@@ -37,7 +37,7 @@
     </tr>
   </tbody>
 </table>
-<p style="margin: 4px 0 0"><small>Completed sales dated in the period; returns dated in the period, whenever the sale was made. Cost: what the medicines cost the outlet.</small></p>
+<p style="margin: 4px 0 0"><small>Sales dated in the period, cancelled or not; returns and cancellations on their own date, whenever the sale was made. Cost: what the medicines cost the outlet.</small></p>
 {{else}}
 <p>No sale and no return in this period.</p>
 {{/if}}
