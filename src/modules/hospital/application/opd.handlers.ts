@@ -229,7 +229,12 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
       if (input.referredById && (await desk.bills.doctors([input.referredById])).size === 0) {
         throw new NotFoundError('referring_doctor');
       }
-      const payer = await desk.payer(input.corporateClientId, input.staffId);
+      const payer = await desk.payer(
+        input.corporateClientId === undefined && !input.staffId
+          ? patient.corporateClientId
+          : (input.corporateClientId ?? null),
+        input.staffId,
+      );
       const appointment = input.appointmentId ? await desk.appointments.findForUpdate(input.appointmentId) : null;
       if (input.appointmentId && !appointment) throw new NotFoundError('appointment');
       if (appointment) {

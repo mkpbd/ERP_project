@@ -88,18 +88,26 @@ export class DrizzleAppointmentRepository extends AppointmentRepository {
     return new Set(rows.map((row) => row.serial));
   }
 
-  async patientContact(id: string): Promise<{ id: string; fullName: string; mobileNo: string } | null> {
+  async patientContact(
+    id: string,
+  ): Promise<{ id: string; fullName: string; mobileNo: string; corporateClientId: string | null } | null> {
     const [row] = await this.context.db
       .select({
         id: patients.id,
         fullName: patients.fullName,
         mobileNo: patients.mobileNo,
         contactMobileNo: patients.contactMobileNo,
+        corporateClientId: patients.corporateClientId,
       })
       .from(patients)
       .where(and(eq(patients.id, id), eq(patients.isActive, true)));
     if (!row) return null;
-    return { id: row.id, fullName: row.fullName, mobileNo: (row.mobileNo ?? row.contactMobileNo)! };
+    return {
+      id: row.id,
+      fullName: row.fullName,
+      mobileNo: (row.mobileNo ?? row.contactMobileNo)!,
+      corporateClientId: row.corporateClientId,
+    };
   }
 }
 

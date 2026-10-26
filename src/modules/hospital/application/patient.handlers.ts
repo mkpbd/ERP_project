@@ -94,6 +94,9 @@ export class PatientDesk {
   /** The details checked, with a district that exists and an ID document no other active patient holds. */
   async details(input: PatientInput, excludeId?: string): Promise<PatientDetails> {
     const details = patientDetails(input, this.today());
+    if (details.corporateClientId && !(await this.patients.corporateClientActive(details.corporateClientId))) {
+      throw new DomainError('inactive_client', 'The corporate client does not exist or is not active');
+    }
     if (details.districtId && !(await this.locations.districtNames([details.districtId])).has(details.districtId)) {
       throw new NotFoundError('district');
     }

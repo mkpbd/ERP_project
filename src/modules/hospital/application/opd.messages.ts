@@ -110,8 +110,8 @@ export interface BillInput {
     serviceId: string | null;
     qty: number;
   }[];
-  /** Billed to a corporate client or a staff member instead of the patient. */
-  readonly corporateClientId: string | null;
+  /** Billed to a corporate client or a staff member; left out (undefined), the patient's own client, if any. */
+  readonly corporateClientId?: string | null | undefined;
   readonly staffId: string | null;
   /** Left out: the corporate client's discount, if any. */
   readonly discount: number | null;

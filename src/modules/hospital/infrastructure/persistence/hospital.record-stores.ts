@@ -6,7 +6,10 @@ import {
   type RecordTable,
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
 import { HOSPITAL_RECORDS as R, OPD_MANAGE, OPD_READ } from '../../application/hospital.constants.js';
+import { IPD_MANAGE, IPD_READ } from '../../application/ipd.messages.js';
 import {
+  bedCategories,
+  beds,
   corporateClients,
   doctorClosures,
   doctors,
@@ -14,16 +17,23 @@ import {
   serviceGroups,
   services,
   specialities,
+  wards,
 } from './hospital.schema.js';
 
 const fk = (table: string, column: string, referenced: string) => `${table}_${column}_${referenced}_id_fk`;
 const taken = (code: string, message: string) => ({ code, message });
 
 export function hospitalRecordTypes(context: DbContext): RecordType[] {
-  const record = (name: string, table: RecordTable, options: Omit<RecordStoreOptions, 'name'>): RecordType => ({
+  const ipd: [string, string] = [IPD_READ, IPD_MANAGE];
+  const record = (
+    name: string,
+    table: RecordTable,
+    options: Omit<RecordStoreOptions, 'name'>,
+    [readPermission, managePermission] = [OPD_READ, OPD_MANAGE],
+  ): RecordType => ({
     name,
-    readPermission: OPD_READ,
-    managePermission: OPD_MANAGE,
+    readPermission,
+    managePermission,
     store: new DrizzleRecordStore(context, table, { name, ...options }),
   });
 
@@ -94,5 +104,41 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
         hospital_corporate_clients_name_uq: taken('corporate_client_name_taken', 'This corporate client exists'),
       },
     }),
+    record(
+      R.ward,
+      wards,
+      {
+        orderBy: [wards.name],
+        filters: { isActive: wards.isActive },
+        search: [wards.name, wards.floor],
+        unique: { hospital_wards_name_uq: taken('ward_name_taken', 'This ward exists') },
+      },
+      ipd,
+    ),
+    record(
+      R.bedCategory,
+      bedCategories,
+      {
+        orderBy: [bedCategories.name],
+        search: [bedCategories.name],
+        unique: { hospital_bed_categories_name_uq: taken('bed_category_name_taken', 'This bed category exists') },
+      },
+      ipd,
+    ),
+    record(
+      R.bed,
+      beds,
+      {
+        orderBy: [beds.wardId, beds.displayOrder, beds.code],
+        filters: { wardId: beds.wardId, categoryId: beds.categoryId, status: beds.status, isActive: beds.isActive },
+        search: [beds.code],
+        unique: { hospital_beds_code_uq: taken('bed_code_taken', 'Another bed has this code') },
+        references: {
+          [fk('hospital_beds', 'ward_id', 'hospital_wards')]: R.ward,
+          [fk('hospital_beds', 'category_id', 'hospital_bed_categories')]: R.bedCategory,
+        },
+      },
+      ipd,
+    ),
   ];
 }

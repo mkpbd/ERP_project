@@ -13,4 +13,7 @@ export const HOSPITAL_RECORDS = {
   serviceGroup: 'hospital_service_group',
   service: 'hospital_service',
   corporateClient: 'hospital_corporate_client',
+  ward: 'hospital_ward',
+  bedCategory: 'hospital_bed_category',
+  bed: 'hospital_bed',
 } as const;

@@ -1,4 +1,5 @@
 import type { StoredFile } from '../../../shared/domain/uploads.js';
+import type { Admission } from './admission.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
 import type { OpdBill } from './opd-bill.js';
 import type { IdType, Patient } from './patient.js';
@@ -27,6 +28,7 @@ export abstract class PatientRepository {
   }): Promise<PatientMatch[]>;
   /** The UHID of the active patient holding this ID document, if any. */
   abstract holderOf(idType: IdType, idNo: string, excludeId?: string): Promise<number | null>;
+  abstract corporateClientActive(id: string): Promise<boolean>;
   abstract savePhoto(patientId: string, photo: StoredFile, by: string, now: Date): Promise<void>;
   abstract removePhoto(patientId: string): Promise<boolean>;
 }
@@ -50,7 +52,9 @@ export abstract class AppointmentRepository {
   /** Serials booked (not cancelled) with the doctor that day. */
   abstract takenSerials(doctorId: string, date: string): Promise<Set<number>>;
   /** An active patient's name and the number to reach them on (their own mobile, else their contact's). */
-  abstract patientContact(id: string): Promise<{ id: string; fullName: string; mobileNo: string } | null>;
+  abstract patientContact(
+    id: string,
+  ): Promise<{ id: string; fullName: string; mobileNo: string; corporateClientId: string | null } | null>;
 }
 
 export interface OpdPolicy {
@@ -117,4 +121,28 @@ export abstract class OpdBillRepository {
     service: string;
     documentNumber: string;
   }): Promise<void>;
+}
+
+export type BedStatus = 'available' | 'occupied' | 'housekeeping' | 'out_of_order';
+
+export interface AdmissionBed {
+  readonly id: string;
+  readonly code: string;
+  readonly status: BedStatus;
+  readonly isActive: boolean;
+  /** The bed's own rate, else its category's. */
+  readonly dailyRate: number;
+  readonly admissionFee: number;
+}
+
+export abstract class AdmissionRepository {
+  abstract findForUpdate(id: string): Promise<Admission | null>;
+  abstract insert(admission: Admission): Promise<void>;
+  /** Saves the header and replaces the bed stays and doctors. */
+  abstract update(admission: Admission): Promise<void>;
+  /** The patient's admission that is still open, if any. */
+  abstract activeOf(patientId: string): Promise<string | null>;
+  /** The bed, locked for the change. */
+  abstract bedForUpdate(id: string): Promise<AdmissionBed | null>;
+  abstract setBedStatus(id: string, status: BedStatus): Promise<void>;
 }

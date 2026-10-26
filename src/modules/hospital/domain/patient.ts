@@ -145,6 +145,8 @@ export interface PatientDetails {
   contactAddress: string | null;
   specialAlert: string | null;
   confidential: boolean;
+  /** The company the patient's bills go to by default. */
+  corporateClientId: string | null;
 }
 
 /** What the counter sends: a date of birth, or an age to work one out from. */
@@ -204,6 +206,7 @@ export function patientDetails(input: PatientInput, today: string): PatientDetai
     contactAddress: text(input.contactAddress, 300, "contact person's address"),
     specialAlert: text(input.specialAlert, 300, 'special alert'),
     confidential: input.confidential,
+    corporateClientId: input.corporateClientId,
   };
 }
 

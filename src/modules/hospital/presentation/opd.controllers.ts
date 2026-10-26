@@ -63,7 +63,8 @@ class CreateOpdBillDto extends createZodDto(
       )
       .min(1)
       .max(10),
-    corporateClientId: z.uuid().nullable().default(null),
+    /** Left out: the patient's own corporate client, if any; null: the patient pays. */
+    corporateClientId: z.uuid().nullable().optional(),
     staffId: z.uuid().nullable().default(null),
     discount: money.nullable().default(null),
     discountReason: z.string().trim().max(200).nullable().default(null),

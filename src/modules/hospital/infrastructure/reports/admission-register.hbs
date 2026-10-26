@@ -1,0 +1,27 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Admission</th><th>Admitted</th><th>UHID</th><th>Patient</th>
+      <th>Bed · ward</th><th>Consultant</th><th>Discharged</th><th>How</th><th class="num">Nights</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{number}}</td><td>{{datetime admittedAt}}</td><td>{{uhid}}</td>
+      <td>{{patientName}}</td><td>{{bedCode}}{{#if wardName}} · {{wardName}}{{/if}}</td><td>{{doctorName}}</td>
+      <td>{{#if dischargedAt}}{{datetime dischargedAt}}{{/if}}</td><td>{{how}}</td>
+      <td class="num">{{nights}}</td><td>{{state}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="11">{{rows.length}} admissions · {{admitted}} still in · {{discharged}} discharged · {{cancelled}} cancelled</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No admission in this period.</p>
+{{/if}}
+{{/with}}

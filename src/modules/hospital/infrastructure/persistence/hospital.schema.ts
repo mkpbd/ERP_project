@@ -86,6 +86,10 @@ export const patients = pgTable(
     contactAddress: text('contact_address'),
     specialAlert: text('special_alert'),
     confidential: boolean('confidential').notNull().default(false),
+    /** The company the patient's bills go to by default (old RegRecord.CompanyId). */
+    corporateClientId: uuid('corporate_client_id').references((): AnyPgColumn => corporateClients.id, {
+      onDelete: 'restrict',
+    }),
     registeredOn: day('registered_on').notNull(),
     registeredBy: uuid('registered_by').references(() => users.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
@@ -517,5 +521,175 @@ export const corporateClients = pgTable(
     check('hospital_corporate_clients_name_ck', sql`char_length(${t.name}) between 1 and 150`),
     check('hospital_corporate_clients_limit_ck', sql`${t.creditLimit} is null or ${t.creditLimit} >= 0`),
     check('hospital_corporate_clients_discount_ck', sql`${t.discountPercent} between 0 and 100`),
+  ],
+);
+
+// Old Floors + HDepartments as places (the old system had no ward entity: a ward was floor, department and cabin
+// type together).
+export const wards = pgTable(
+  'hospital_wards',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    floor: text('floor'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_wards_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_wards_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Hospital.CabinTypes (general ward, cabin, ICU, HDU, CCU, NICU …): the admission fee and the usual daily rate.
+export const bedCategories = pgTable(
+  'hospital_bed_categories',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    admissionFee: money('admission_fee').notNull().default(0),
+    dailyRate: money('daily_rate').notNull().default(0),
+    /** ICU, HDU, CCU, NICU …: a day moved out of one is charged at the bed moved to (step 9f). */
+    isIntensive: boolean('is_intensive').notNull().default(false),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_bed_categories_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_bed_categories_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+    check('hospital_bed_categories_amounts_ck', sql`${t.admissionFee} >= 0 and ${t.dailyRate} >= 0`),
+  ],
+);
+
+// Old Hospital.Cabins (Status 1 free, 2 occupied, 3 housekeeping — never set): one bed or cabin.
+export const beds = pgTable(
+  'hospital_beds',
+  {
+    id: uuid('id').primaryKey(),
+    code: text('code').notNull(),
+    wardId: uuid('ward_id')
+      .notNull()
+      .references(() => wards.id, { onDelete: 'restrict' }),
+    categoryId: uuid('category_id')
+      .notNull()
+      .references(() => bedCategories.id, { onDelete: 'restrict' }),
+    /** The bed's own daily rate (old Cabin.Rent); null takes the category's. */
+    dailyRate: money('daily_rate'),
+    /** Set by admissions, transfers and discharges; out of order and ready again by hand. */
+    status: text('status', { enum: ['available', 'occupied', 'housekeeping', 'out_of_order'] })
+      .notNull()
+      .default('available'),
+    displayOrder: smallint('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_beds_code_uq').on(sql`upper(${t.code})`),
+    index('hospital_beds_ward_idx').on(t.wardId),
+    check('hospital_beds_code_ck', sql`char_length(${t.code}) between 1 and 20`),
+    check('hospital_beds_rate_ck', sql`${t.dailyRate} is null or ${t.dailyRate} >= 0`),
+  ],
+);
+
+// Old Hospital.IPDPatientRecords: a stay in the hospital, from admission to discharge. The old record had no reason,
+// no discharge type and no guard against a second admission of the same patient.
+export const admissions = pgTable(
+  'hospital_admissions',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    admittedAt: tz('admitted_at').notNull(),
+    kind: text('kind', { enum: ['emergency', 'elective'] }).notNull(),
+    reason: text('reason'),
+    referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
+    /** The bed category's admission fee when admitted (billed in step 9f). */
+    admissionFee: money('admission_fee').notNull(),
+    status: text('status', { enum: ['admitted', 'discharged', 'cancelled'] }).notNull(),
+    dischargedAt: tz('discharged_at'),
+    dischargeType: text('discharge_type', { enum: ['normal', 'lama', 'referred', 'absconded', 'death'] }),
+    dischargeNote: text('discharge_note'),
+    cancelReason: text('cancel_reason'),
+    admittedBy: uuid('admitted_by').references(() => users.id, { onDelete: 'set null' }),
+    closedBy: uuid('closed_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_admissions_number_uq').on(t.number),
+    // One stay at a time per patient.
+    uniqueIndex('hospital_admissions_active_uq')
+      .on(t.patientId)
+      .where(sql`${t.status} = 'admitted'`),
+    index('hospital_admissions_admitted_idx').on(t.admittedAt),
+    check('hospital_admissions_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
+    check(
+      'hospital_admissions_discharge_ck',
+      sql`(${t.status} = 'discharged') = (${t.dischargedAt} is not null and ${t.dischargeType} is not null)`,
+    ),
+  ],
+);
+
+// Old Hospital.IPDCabinAllocationRecords (PAB / RAT / RAD / EC rows): each bed an admission had, from when to when,
+// at the rate of the time.
+export const bedStays = pgTable(
+  'hospital_bed_stays',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'cascade' }),
+    bedId: uuid('bed_id')
+      .notNull()
+      .references(() => beds.id, { onDelete: 'restrict' }),
+    fromAt: tz('from_at').notNull(),
+    toAt: tz('to_at'),
+    dailyRate: money('daily_rate').notNull(),
+    reason: text('reason'),
+    movedBy: uuid('moved_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    // A bed has one patient, a patient one bed.
+    uniqueIndex('hospital_bed_stays_bed_uq')
+      .on(t.bedId)
+      .where(sql`${t.toAt} is null`),
+    uniqueIndex('hospital_bed_stays_admission_uq')
+      .on(t.admissionId)
+      .where(sql`${t.toAt} is null`),
+    index('hospital_bed_stays_admission_idx').on(t.admissionId),
+    check('hospital_bed_stays_period_ck', sql`${t.toAt} is null or ${t.toAt} >= ${t.fromAt}`),
+  ],
+);
+
+// Old AssignedDoctorId / AdditionalDoctorIds (a CSV) and AssignedDoctorRecords: who looks after the patient, and when.
+export const admissionDoctors = pgTable(
+  'hospital_admission_doctors',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'cascade' }),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    role: text('role', { enum: ['primary', 'additional'] }).notNull(),
+    fromAt: tz('from_at').notNull(),
+    toAt: tz('to_at'),
+  },
+  (t) => [
+    uniqueIndex('hospital_admission_doctors_primary_uq')
+      .on(t.admissionId)
+      .where(sql`${t.role} = 'primary' and ${t.toAt} is null`),
+    uniqueIndex('hospital_admission_doctors_current_uq')
+      .on(t.admissionId, t.doctorId)
+      .where(sql`${t.toAt} is null`),
+    index('hospital_admission_doctors_doctor_idx').on(t.doctorId),
   ],
 );

@@ -9,12 +9,30 @@ import { ReportRegistry } from '../../shared/application/reports.js';
 import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
+import { IPD_HANDLERS } from './application/ipd.handlers.js';
+import { AdmissionReadRepository } from './application/ipd.messages.js';
 import { OPD_HANDLERS } from './application/opd.handlers.js';
 import { OpdBillReadRepository } from './application/opd.messages.js';
 import { AppointmentReadRepository } from './application/appointment.messages.js';
 import { HOSPITAL_SETTINGS, PATIENT_HANDLERS } from './application/patient.handlers.js';
 import { PatientReadRepository } from './application/patient.messages.js';
-import { AppointmentRepository, OpdBillRepository, PatientRepository } from './domain/repositories.js';
+import {
+  AdmissionRepository,
+  AppointmentRepository,
+  OpdBillRepository,
+  PatientRepository,
+} from './domain/repositories.js';
+import {
+  DrizzleAdmissionReadRepository,
+  DrizzleAdmissionRepository,
+} from './infrastructure/persistence/drizzle-ipd.repositories.js';
+import {
+  admissionFormReport,
+  admissionRegisterReport,
+  bedOccupancyReport,
+  inpatientCensusReport,
+} from './infrastructure/reports/ipd.reports.js';
+import { IPD_CONTROLLERS } from './presentation/ipd.controllers.js';
 import {
   DrizzleOpdBillReadRepository,
   DrizzleOpdBillRepository,
@@ -45,20 +63,30 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
  * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
- * emergency services, corporate clients and staff billing (step 9d). Admissions follow in later steps.
+ * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e). The
+ * indoor bill follows in step 9f.
  */
 @Module({
-  controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS, ...OPD_CONTROLLERS],
+  controllers: [
+    ...PATIENT_CONTROLLERS,
+    ...DOCTOR_CONTROLLERS,
+    ...APPOINTMENT_CONTROLLERS,
+    ...OPD_CONTROLLERS,
+    ...IPD_CONTROLLERS,
+  ],
   providers: [
     ...PATIENT_HANDLERS,
     ...APPOINTMENT_HANDLERS,
     ...OPD_HANDLERS,
+    ...IPD_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
     { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
     { provide: AppointmentReadRepository, useClass: DrizzleAppointmentReadRepository },
     { provide: OpdBillRepository, useClass: DrizzleOpdBillRepository },
     { provide: OpdBillReadRepository, useClass: DrizzleOpdBillReadRepository },
+    { provide: AdmissionRepository, useClass: DrizzleAdmissionRepository },
+    { provide: AdmissionReadRepository, useClass: DrizzleAdmissionReadRepository },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -78,6 +106,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly bills: OpdBillReadRepository,
     private readonly users: UserDirectory,
     private readonly staff: StaffDirectory,
+    private readonly admissions: AdmissionReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -91,5 +120,9 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(doctorConsultationsReport(this.context));
     this.reports.register(corporateStatementReport(this.context));
     this.reports.register(serviceIncomeReport(this.context));
+    this.reports.register(admissionFormReport(this.admissions, this.organization));
+    this.reports.register(inpatientCensusReport(this.admissions));
+    this.reports.register(admissionRegisterReport(this.admissions));
+    this.reports.register(bedOccupancyReport(this.context));
   }
 }

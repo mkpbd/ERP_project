@@ -43,6 +43,7 @@ const input = (extra: Partial<PatientInput> = {}): PatientInput => ({
   contactAddress: null,
   specialAlert: null,
   confidential: false,
+  corporateClientId: null,
   ...extra,
 });
 

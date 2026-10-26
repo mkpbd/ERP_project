@@ -186,6 +186,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | the OPD policy (follow-up days, default doctor share, counter discount limit); cancelling a bill later | `opd:manage` |
 | service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
 | a corporate client's payment against its bills | `opd:bill` |
+| `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
+| admitting, moving beds, changing doctors, discharging; making a bed ready | `ipd:admit` |
+| wards, bed categories and beds; cancelling an admission; taking a bed out of order | `ipd:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

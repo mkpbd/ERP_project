@@ -1,0 +1,14 @@
+{{#with data}}
+<table class="report">
+  <thead>
+    <tr><th>Category</th><th class="num">Beds</th><th class="num">Bed-nights</th><th class="num">Nights used</th><th class="num">Occupancy %</th></tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr><td>{{name}}</td><td class="num">{{beds}}</td><td class="num">{{available}}</td><td class="num">{{used}}</td><td class="num">{{rate}}</td></tr>
+    {{/each}}
+    <tr class="group-row"><td>Total</td><td class="num">{{beds}}</td><td class="num">{{available}}</td><td class="num">{{used}}</td><td class="num">{{rate}}</td></tr>
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>{{days}} days. A stay uses the nights from the day it began to the day it ended; a stay still open runs to today.</small></p>
+{{/with}}

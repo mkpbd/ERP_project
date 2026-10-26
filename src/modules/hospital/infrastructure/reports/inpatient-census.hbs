@@ -1,0 +1,31 @@
+{{#with data}}
+<p style="margin: 0 0 8px">
+  <b>{{counts.occupied}}</b> occupied · <b>{{counts.available}}</b> free · {{counts.housekeeping}} in housekeeping ·
+  {{counts.out_of_order}} out of order
+</p>
+{{#each wards}}
+<table class="report" style="margin-bottom: 10px; page-break-inside: avoid">
+  <thead>
+    <tr><th colspan="8" style="text-align: left">{{name}}{{#if floor}} · {{floor}}{{/if}} — {{occupied}} of {{beds.length}} beds occupied</th></tr>
+    <tr>
+      <th style="width: 60px">Bed</th><th>Category</th><th>Status</th><th>Admission</th><th>Patient</th>
+      <th>Since</th><th class="num">Nights</th><th>Consultant</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each beds}}
+    <tr>
+      <td><b>{{code}}</b></td><td>{{categoryName}}</td><td>{{state}}</td>
+      <td>{{admission.number}}</td>
+      <td>{{#if admission}}{{admission.patientName}} <small>({{admission.uhid}})</small>{{/if}}</td>
+      <td>{{#if admission}}{{datetime admission.since}}{{/if}}</td>
+      <td class="num">{{nights}}</td>
+      <td>{{admission.doctorName}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No ward has beds.</p>
+{{/each}}
+{{/with}}

@@ -55,6 +55,7 @@ export interface PatientView extends PatientSummary {
   readonly contactRelation: string | null;
   readonly contactAddress: string | null;
   readonly specialAlert: string | null;
+  readonly corporateClientId: string | null;
   readonly registeredBy: string | null;
   readonly inactiveReason: string | null;
   readonly hasPhoto: boolean;

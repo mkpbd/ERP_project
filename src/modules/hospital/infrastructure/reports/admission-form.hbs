@@ -1,0 +1,24 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 22%">Admission no</td><td><b>{{admission.number}}</b></td><td style="width: 18%">Admitted</td><td>{{datetime admission.admittedAt}}</td></tr>
+    <tr><td>UHID</td><td><b>{{admission.uhidLabel}}</b></td><td>Admission</td><td>{{#if (eq admission.kind "emergency")}}Emergency{{else}}Elective{{/if}}</td></tr>
+    <tr><td>Patient</td><td>{{admission.patientName}}</td><td>Age · sex</td><td>{{admission.age}} · {{admission.sex}}</td></tr>
+    <tr><td>Mobile</td><td>{{admission.mobileNo}}</td><td>Bed</td><td>{{admission.firstBed}}</td></tr>
+    <tr><td>Consultant</td><td>{{admission.consultant}}</td><td>Also seen by</td><td>{{admission.additional}}</td></tr>
+    <tr><td>Referred by</td><td>{{admission.referredByName}}</td><td>Bill to</td><td>{{#if admission.corporateClientName}}{{admission.corporateClientName}}{{else if admission.staffId}}Staff{{else}}Patient{{/if}}</td></tr>
+    <tr><td>Reason for admission</td><td colspan="3">{{admission.reason}}</td></tr>
+  </tbody>
+</table>
+<p style="margin: 14px 0 6px"><b>Consent</b></p>
+<p style="text-align: justify; line-height: 1.5">
+  I acknowledge that I have been admitted to {{organization}} of my own will (or that of my guardian), that the
+  doctors and staff may examine and treat me as they judge necessary, and that I will be told of any operation or
+  procedure that needs my separate consent. I accept responsibility for the charges of my stay and treatment and
+  will settle them before I leave, and I allow the hospital to share my medical information with those caring for
+  me and with whoever pays my bill.
+</p>
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Patient or guardian</td><td>Relation</td><td>Admitting officer</td></tr>
+</table>
+{{/with}}

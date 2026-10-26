@@ -93,6 +93,8 @@ const patientShape = {
   contactAddress: optional(300),
   specialAlert: optional(300),
   confidential: z.boolean().default(false),
+  /** The company the patient's bills go to by default. */
+  corporateClientId: z.uuid().nullable().default(null),
 };
 
 class RegisterPatientDto extends createZodDto(
@@ -176,6 +178,7 @@ class PatientResponseDto extends responseDto({
   contactRelation: z.string().nullable(),
   contactAddress: z.string().nullable(),
   specialAlert: z.string().nullable(),
+  corporateClientId: z.uuid().nullable(),
   registeredBy: z.uuid().nullable(),
   inactiveReason: z.string().nullable(),
   hasPhoto: z.boolean(),

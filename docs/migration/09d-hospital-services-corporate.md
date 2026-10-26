@@ -1,7 +1,7 @@
 # Step 9d — Hospital: OPD and emergency services, corporate clients, staff billing
 
-Status: **done** (2026-10-27). Previous: [step 9c](09c-hospital-opd-billing.md) · Next: step 9e (admissions,
-beds and discharge).
+Status: **done** (2026-10-27). Previous: [step 9c](09c-hospital-opd-billing.md) · Next: [step 9e](09e-hospital-admissions.md)
+(admissions, beds and discharge).
 
 ## Where the old logic lives
 
@@ -96,6 +96,13 @@ These are left out:
 * **VAT, service charge and poor fund.** These master flags were never applied in the old system.
 * **Rx procedure indents.** Pre-filling a bill from the Rx module's suggestions comes with the Rx step.
 * **"Edit service by".** Correcting the doctor on a billed line means cancelling and billing again.
+
+## Decisions taken (after the first version of this step)
+
+* No second share model: the per-service doctor's share is enough; the old procedure-weight split is not ported.
+* A wrong doctor on a billed line is corrected by cancelling and billing again; there is no "edit service by".
+* A patient may carry a default corporate client, put on their bills (added with step 9e).
+* The staff receivable is recovered by a monthly payroll deduction, in a payroll step after 9f.
 
 ## Verification
 

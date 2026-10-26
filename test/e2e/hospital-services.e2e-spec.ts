@@ -264,6 +264,32 @@ describe('OPD and emergency services', () => {
     );
     const cashCo = await create('hospital/corporate-clients', { name: 'CashCo', payment: 'cash' }, manager);
 
+    // A patient of a company is billed to it unless the counter says the patient pays.
+    const employee = (
+      await api('post', 'patients', cashier, {
+        fullName: 'Selim Reza',
+        sex: 'male',
+        dateOfBirth: '1985-03-03',
+        mobileNo: '01911000000',
+        corporateClientId: cashCo,
+      }).expect(201)
+    ).body.id as string;
+    const byDefault = await api('post', 'opd-bills', cashier, {
+      patientId: employee,
+      lines: [{ serviceId: dressing }],
+      payment: { method: 'cash', amount: 150.5 },
+    }).expect(201);
+    expect((await api('get', `opd-bills/${byDefault.body.id}`, cashier).expect(200)).body.corporateClientName).toBe(
+      'CashCo',
+    );
+    const ownPocket = await api('post', 'opd-bills', cashier, {
+      patientId: employee,
+      corporateClientId: null,
+      lines: [{ serviceId: dressing }],
+    }).expect(201);
+    expect((await api('get', `opd-bills/${ownPocket.body.id}`, cashier).expect(200)).body.corporateClientId).toBeNull();
+    await api('post', `opd-bills/${ownPocket.body.id}/cancel`, cashier, { version: 1, reason: 'Test' }).expect(200);
+
     // 600 + 150.50 less Acme's 10 %, all owed by Acme.
     const first = await api('post', 'opd-bills', cashier, {
       patientId: patient,

@@ -12,7 +12,7 @@ import {
 } from '../../application/patient.messages.js';
 import { Patient, type IdType } from '../../domain/patient.js';
 import { PatientRepository, type PatientMatch } from '../../domain/repositories.js';
-import { hospitalSequences, patientPhotos, patients } from './hospital.schema.js';
+import { corporateClients, hospitalSequences, patientPhotos, patients } from './hospital.schema.js';
 
 const UHID_KIND = 'uhid';
 
@@ -91,6 +91,14 @@ export class DrizzlePatientRepository extends PatientRepository {
       )
       .limit(1);
     return row?.uhid ?? null;
+  }
+
+  async corporateClientActive(id: string): Promise<boolean> {
+    const [row] = await this.context.db
+      .select({ isActive: corporateClients.isActive })
+      .from(corporateClients)
+      .where(eq(corporateClients.id, id));
+    return row?.isActive ?? false;
   }
 
   async savePhoto(patientId: string, photo: StoredFile, by: string, now: Date): Promise<void> {
