@@ -1,0 +1,44 @@
+{{#with data}}
+{{#if groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th>{{#unless outlet}}<th>Outlet</th>{{/unless}}
+      <th>Product</th><th>Manufacturer</th><th>Batch</th><th>Expiry</th><th class="num">Days left</th>
+      <th class="num">Quantity</th><th class="num">Value at cost</th><th class="num">Value at sale rate</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    <tr class="group-row"><td colspan="{{#if @root.data.outlet}}9{{else}}10{{/if}}">{{label}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>{{#unless @root.data.outlet}}<td>{{outletName}}</td>{{/unless}}
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{manufacturerName}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{#if (eq daysLeft 0)}}today{{else}}{{daysLeft}}{{/if}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{money value}}</td>
+      <td class="num">{{money saleValue}}</td>
+    </tr>
+    {{/each}}
+    <tr>
+      <td colspan="{{#if @root.data.outlet}}7{{else}}8{{/if}}" class="num"><i>{{label}} total</i></td>
+      <td class="num"><i>{{money value}}</i></td><td class="num"><i>{{money saleValue}}</i></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="{{#if outlet}}7{{else}}8{{/if}}">Total</td>
+      <td class="num">{{money value}}</td><td class="num">{{money saleValue}}</td>
+    </tr>
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Issued by</td><td>Received by</td><td>Pharmacy in-charge</td></tr>
+</table>
+{{else}}
+<p>No lot held is expired or expires within these days.</p>
+{{/if}}
+{{/with}}

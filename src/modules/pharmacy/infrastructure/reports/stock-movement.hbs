@@ -1,0 +1,49 @@
+{{#with data}}
+{{#if groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" rowspan="2" style="width: 24px">#</th><th rowspan="2">Product</th>
+      <th class="num" rowspan="2">Opening</th>
+      <th class="center" colspan="4">In</th><th class="center" colspan="4">Out</th>
+      <th class="num" rowspan="2">Closing</th>
+      <th class="num" rowspan="2">Opening value</th><th class="num" rowspan="2">Closing value</th>
+    </tr>
+    <tr>
+      <th class="num">Purchased</th><th class="num">Transfer in</th><th class="num">Customer returns</th>
+      <th class="num">Count +</th>
+      <th class="num">Sold</th><th class="num">Transfer out</th><th class="num">Supplier returns</th>
+      <th class="num">Count −</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    <tr class="group-row"><td colspan="14">{{name}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td class="num">{{opening.qty}}</td>
+      <td class="num">{{purchased}}</td><td class="num">{{transferIn}}</td>
+      <td class="num">{{customerReturns}}</td><td class="num">{{countGain}}</td>
+      <td class="num">{{sold}}</td><td class="num">{{transferOut}}</td>
+      <td class="num">{{supplierReturns}}</td><td class="num">{{countLoss}}</td>
+      <td class="num"><b>{{closing.qty}}</b></td>
+      <td class="num">{{money opening.value}}</td><td class="num">{{money closing.value}}</td>
+    </tr>
+    {{/each}}
+    <tr>
+      <td colspan="12" class="num"><i>{{name}} total</i></td>
+      <td class="num"><i>{{money opening}}</i></td><td class="num"><i>{{money closing}}</i></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="12">Total value at cost</td>
+      <td class="num">{{money opening}}</td><td class="num">{{money closing}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No stock and no movement in this period.</p>
+{{/if}}
+{{/with}}

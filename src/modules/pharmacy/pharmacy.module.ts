@@ -1,5 +1,7 @@
 import { Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
+import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
+import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { CATALOGUE_HANDLERS, CatalogueReadRepository } from './application/catalogue.handlers.js';
@@ -78,6 +80,17 @@ import { returnReceiptReport } from './infrastructure/reports/return.reports.js'
 import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
 import { countResultReport, countSheetReport } from './infrastructure/reports/count.reports.js';
 import { COUNT_CONTROLLERS } from './presentation/count.controllers.js';
+import {
+  expiryReport,
+  physicalInventoryReport,
+  productLedgerReport,
+  stockMovementReport,
+} from './infrastructure/reports/stock-analysis.reports.js';
+import {
+  cashCounterReport,
+  purchaseSummaryReport,
+  salesSummaryReport,
+} from './infrastructure/reports/trade-analysis.reports.js';
 
 /**
  * Pharmacy: the medicine catalogue (generic groups and generics, formations, strengths, units, manufacturers,
@@ -85,7 +98,7 @@ import { COUNT_CONTROLLERS } from './presentation/count.controllers.js';
  * receives into outlets by lot, opening stock, the outlet movement ledger and posting purchases (step 8b);
  * supplier payments over receives and supplier returns settled by replacements (step 8c); outlet indents and
  * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e);
- * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g).
+ * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g); stock, trade and cash counter reports (step 8h).
  */
 @Module({
   controllers: [
@@ -141,6 +154,8 @@ export class PharmacyModule implements OnModuleInit {
     private readonly sales: SaleReadRepository,
     private readonly returns: ReturnReadRepository,
     private readonly counts: CountReadRepository,
+    private readonly supplierDirectory: SupplierDirectory,
+    private readonly users: UserDirectory,
   ) {}
 
   onModuleInit(): void {
@@ -157,5 +172,12 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(returnReceiptReport(this.returns));
     this.reports.register(countSheetReport(this.counts));
     this.reports.register(countResultReport(this.counts));
+    this.reports.register(productLedgerReport(this.context));
+    this.reports.register(stockMovementReport(this.context));
+    this.reports.register(expiryReport(this.context));
+    this.reports.register(physicalInventoryReport(this.context));
+    this.reports.register(purchaseSummaryReport(this.context, this.supplierDirectory));
+    this.reports.register(salesSummaryReport(this.context, this.users));
+    this.reports.register(cashCounterReport(this.context, this.users));
   }
 }

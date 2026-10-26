@@ -1,0 +1,39 @@
+{{#with data}}
+{{#if people.length}}
+{{#each people}}
+<table class="report" style="margin-bottom: 12px; page-break-inside: avoid">
+  <thead>
+    <tr><th colspan="5" style="text-align: left">{{name}}</th></tr>
+    <tr><th style="width: 44%"></th><th class="num" style="width: 14%">Cash</th><th class="num" style="width: 14%">Card</th><th class="num" style="width: 14%">Mobile wallet</th><th class="num" style="width: 14%">Total</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Taken on sales ({{bills}} bills)</td><td class="num">{{money sales.cash}}</td><td class="num">{{money sales.card}}</td><td class="num">{{money sales.mobile}}</td><td class="num">{{money sales.total}}</td></tr>
+    <tr><td>Member dues collected ({{collectionCount}})</td><td class="num">{{money collections.cash}}</td><td class="num">{{money collections.card}}</td><td class="num">{{money collections.mobile}}</td><td class="num">{{money collections.total}}</td></tr>
+    <tr><td>Paid back on returns ({{returnCount}})</td><td class="num">{{money returns.cash}}</td><td class="num">{{money returns.card}}</td><td class="num">{{money returns.mobile}}</td><td class="num">{{money returns.total}}</td></tr>
+    <tr><td>Paid back on cancelled sales ({{cancelledBills}})</td><td class="num">{{money cancels.cash}}</td><td class="num">{{money cancels.card}}</td><td class="num">{{money cancels.mobile}}</td><td class="num">{{money cancels.total}}</td></tr>
+    <tr class="group-row"><td>To hand over</td><td class="num">{{money net.cash}}</td><td class="num">{{money net.card}}</td><td class="num">{{money net.mobile}}</td><td class="num">{{money net.total}}</td></tr>
+    <tr><td colspan="5"><small>Sales value {{money salesTotal}} · discount {{money discount}} · due given {{money dueGiven}} · due taken off by returns {{money dueReduced}}</small></td></tr>
+  </tbody>
+</table>
+{{/each}}
+<table class="report" style="page-break-inside: avoid">
+  <thead>
+    <tr><th colspan="5" style="text-align: left">All users</th></tr>
+    <tr><th style="width: 44%"></th><th class="num" style="width: 14%">Cash</th><th class="num" style="width: 14%">Card</th><th class="num" style="width: 14%">Mobile wallet</th><th class="num" style="width: 14%">Total</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Taken on sales ({{total.bills}} bills)</td><td class="num">{{money total.sales.cash}}</td><td class="num">{{money total.sales.card}}</td><td class="num">{{money total.sales.mobile}}</td><td class="num">{{money total.sales.total}}</td></tr>
+    <tr><td>Member dues collected</td><td class="num">{{money total.collections.cash}}</td><td class="num">{{money total.collections.card}}</td><td class="num">{{money total.collections.mobile}}</td><td class="num">{{money total.collections.total}}</td></tr>
+    <tr><td>Paid back on returns</td><td class="num">{{money total.returns.cash}}</td><td class="num">{{money total.returns.card}}</td><td class="num">{{money total.returns.mobile}}</td><td class="num">{{money total.returns.total}}</td></tr>
+    <tr><td>Paid back on cancelled sales</td><td class="num">{{money total.cancels.cash}}</td><td class="num">{{money total.cancels.card}}</td><td class="num">{{money total.cancels.mobile}}</td><td class="num">{{money total.cancels.total}}</td></tr>
+    <tr class="group-row"><td>To hand over</td><td class="num">{{money total.net.cash}}</td><td class="num">{{money total.net.card}}</td><td class="num">{{money total.net.mobile}}</td><td class="num">{{money total.net.total}}</td></tr>
+    <tr><td colspan="5"><small>Sales value {{money total.salesTotal}} · discount {{money total.discount}} · due given {{money total.dueGiven}} · due taken off by returns {{money total.dueReduced}}</small></td></tr>
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Handed over by</td><td>Received by</td><td>Accounts</td></tr>
+</table>
+{{else}}
+<p>Nothing was taken or paid back in this period.</p>
+{{/if}}
+{{/with}}

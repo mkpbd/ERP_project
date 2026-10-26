@@ -1,0 +1,55 @@
+{{#with data}}
+{{#if groups.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Supplier</th>
+      {{#if detail}}<th>Received on</th><th>Receive</th><th>Supplier invoice</th><th>Outlet</th>{{else}}<th class="num">Receives</th>{{/if}}
+      <th class="num">Amount</th><th class="num">Discount</th><th class="num">VAT</th><th class="num">Total</th>
+      <th class="num">Paid</th><th class="num">Due</th><th class="num">Returned</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    {{#if @root.data.detail}}
+    <tr class="group-row"><td colspan="13">{{supplierName}}</td></tr>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td></td>
+      <td>{{date receivedOn}}</td><td>{{number}}</td>
+      <td>{{supplierInvoiceNo}}{{#if challanNo}} · {{challanNo}}{{/if}}</td><td>{{outletName}}</td>
+      <td class="num">{{money amount}}</td><td class="num">{{money discount}}</td><td class="num">{{money vat}}</td>
+      <td class="num">{{money total}}</td><td class="num">{{money paid}}</td><td class="num">{{money due}}</td><td></td>
+    </tr>
+    {{/each}}
+    <tr>
+      <td colspan="6" class="num"><i>{{supplierName}} · {{receives}} receives</i></td>
+      <td class="num"><i>{{money amount}}</i></td><td class="num"><i>{{money discount}}</i></td>
+      <td class="num"><i>{{money vat}}</i></td><td class="num"><i>{{money total}}</i></td>
+      <td class="num"><i>{{money paid}}</i></td><td class="num"><i>{{money due}}</i></td>
+      <td class="num"><i>{{money returned}}</i></td>
+    </tr>
+    {{else}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{supplierName}}</td><td class="num">{{receives}}</td>
+      <td class="num">{{money amount}}</td><td class="num">{{money discount}}</td><td class="num">{{money vat}}</td>
+      <td class="num">{{money total}}</td><td class="num">{{money paid}}</td><td class="num">{{money due}}</td>
+      <td class="num">{{money returned}}</td>
+    </tr>
+    {{/if}}
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="{{#if detail}}6{{else}}2{{/if}}">Total</td>
+      {{#unless detail}}<td class="num">{{totals.receives}}</td>{{/unless}}
+      <td class="num">{{money totals.amount}}</td><td class="num">{{money totals.discount}}</td>
+      <td class="num">{{money totals.vat}}</td><td class="num">{{money totals.total}}</td>
+      <td class="num">{{money totals.paid}}</td><td class="num">{{money totals.due}}</td>
+      <td class="num">{{money totals.returned}}</td>
+    </tr>
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>Paid: paid against these receives by the end of the period. Returned: goods sent back to the supplier in the period, at cost.</small></p>
+{{else}}
+<p>No receive was posted in this period.</p>
+{{/if}}
+{{/with}}

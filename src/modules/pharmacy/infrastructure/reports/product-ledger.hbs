@@ -1,0 +1,64 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr>
+      <td style="width: 14%">Product</td><td><b>{{product.displayName}}</b> · {{product.genericName}}</td>
+      <td style="width: 14%">Manufacturer</td><td>{{product.manufacturerName}}</td>
+    </tr>
+    <tr>
+      <td>Outlet</td><td>{{outlet}}</td>
+      <td>Unit</td><td>{{product.unitName}}</td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th>Date</th><th>Document</th><th>Particulars</th><th>Batch</th><th>Expiry</th>
+      <th class="num">In</th><th class="num">Out</th><th class="num">Balance</th>
+      <th class="num">Unit cost</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr class="group-row">
+      <td colspan="7">Opening stock</td><td class="num">{{opening.qty}}</td><td></td><td class="num">{{money opening.value}}</td>
+    </tr>
+    {{#each rows}}
+    <tr>
+      <td>{{date movedOn}}</td>
+      <td>{{documentNumber}}</td>
+      <td>{{particulars}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{inQty}}</td>
+      <td class="num">{{outQty}}</td>
+      <td class="num">{{balance}}</td>
+      <td class="num">{{unitCost}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="5">Total in · out</td>
+      <td class="num">{{totals.in.qty}}</td><td class="num">{{totals.out.qty}}</td><td></td><td></td><td></td>
+    </tr>
+    <tr class="group-row">
+      <td colspan="7">Closing stock</td><td class="num">{{totals.closing.qty}}</td><td></td>
+      <td class="num">{{money totals.closing.value}}</td>
+    </tr>
+  </tbody>
+</table>
+
+{{#if byKind.length}}
+<h3 style="margin: 14px 0 6px">In the period, by kind of movement</h3>
+<table class="report" style="width: 55%">
+  <thead>
+    <tr><th>Kind</th><th class="num">Quantity</th><th class="num">Value at cost</th></tr>
+  </thead>
+  <tbody>
+    {{#each byKind}}
+    <tr><td>{{kind}}</td><td class="num">{{qty}}</td><td class="num">{{money value}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

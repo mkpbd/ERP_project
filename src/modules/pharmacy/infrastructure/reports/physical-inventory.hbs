@@ -1,0 +1,54 @@
+{{#with data}}
+<table class="report">
+  <thead>
+    <tr>
+      <th rowspan="2">Figure</th>
+      {{#each counts}}<th class="center" colspan="3">{{number}}<br /><small>{{outletName}} · {{date countDate}}</small></th>{{/each}}
+    </tr>
+    <tr>
+      {{#each counts}}<th class="num">Items</th><th class="num">Value</th><th class="num">%</th>{{/each}}
+    </tr>
+  </thead>
+  <tbody>
+    {{#each metrics}}
+    <tr>
+      <td>{{label}}</td>
+      {{#each cells}}
+      <td class="num">{{items}}</td>
+      <td class="num">{{#if value}}{{money value}}{{/if}}</td>
+      <td class="num">{{#if percent}}{{percent}}{{/if}}</td>
+      {{/each}}
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>% of the stock held at cost. Items are lots.</small></p>
+
+{{#if top}}
+{{#each tops}}
+{{#if rows.length}}
+<h3 style="margin: 14px 0 6px">Most short — {{number}} ({{outletName}})</h3>
+<table class="report" style="width: 75%">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th>
+      <th class="num">System</th><th class="num">Counted</th><th class="num">Difference</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{displayName}}</td><td>{{batchNo}}</td><td>{{date expiryDate}}</td>
+      <td class="num">{{system}}</td><td class="num">{{counted}}</td><td class="num"><b>{{adjusted}}</b></td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/each}}
+{{/if}}
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Prepared by</td><td>Pharmacy in-charge</td><td>Accounts</td><td>Approved by</td></tr>
+</table>
+{{/with}}

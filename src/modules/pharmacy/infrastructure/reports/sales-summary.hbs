@@ -1,0 +1,44 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" rowspan="2" style="width: 24px">#</th>
+      <th rowspan="2">{{#if byDay}}Date{{else if (eq by "product")}}Product{{else if (eq by "seller")}}Seller{{else}}Manufacturer{{/if}}</th>
+      <th class="center" colspan="5">Sold</th><th class="center" colspan="2">Returned</th>
+      <th class="num" rowspan="2">Net of returns</th><th class="num" rowspan="2">Cost</th>
+      <th class="num" rowspan="2">Margin</th><th class="num" rowspan="2">%</th>
+    </tr>
+    <tr>
+      <th class="num">Bills</th><th class="num">Units</th><th class="num">Gross</th><th class="num">Discount</th>
+      <th class="num">Net</th><th class="num">Units</th><th class="num">Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{#if @root.data.byDay}}{{date label}}{{else}}{{label}}{{/if}}</td>
+      <td class="num">{{bills}}</td><td class="num">{{qty}}</td>
+      <td class="num">{{money gross}}</td><td class="num">{{money discount}}</td><td class="num">{{money net}}</td>
+      <td class="num">{{returnedQty}}</td><td class="num">{{money returned}}</td>
+      <td class="num"><b>{{money netSales}}</b></td><td class="num">{{money cost}}</td>
+      <td class="num">{{money margin}}</td><td class="num">{{marginPercent}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="2">Total</td>
+      <td class="num">{{#if byDay}}{{totals.bills}}{{/if}}</td><td class="num">{{totals.qty}}</td>
+      <td class="num">{{money totals.gross}}</td><td class="num">{{money totals.discount}}</td>
+      <td class="num">{{money totals.net}}</td><td class="num">{{totals.returnedQty}}</td>
+      <td class="num">{{money totals.returned}}</td><td class="num">{{money totals.netSales}}</td>
+      <td class="num">{{money totals.cost}}</td><td class="num">{{money totals.margin}}</td>
+      <td class="num">{{totals.marginPercent}}</td>
+    </tr>
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>Completed sales dated in the period; returns dated in the period, whenever the sale was made. Cost: what the medicines cost the outlet.</small></p>
+{{else}}
+<p>No sale and no return in this period.</p>
+{{/if}}
+{{/with}}

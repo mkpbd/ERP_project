@@ -75,9 +75,9 @@ Order follows dependencies: later modules reference earlier ones.
 | 8e | Pharmacy: counter sales with discount rules, loyal members, dues and collections, cancellations, receipt | **Done** | [08e-pharmacy-counter-sales.md](08e-pharmacy-counter-sales.md) |
 | 8f | Pharmacy: returns from customers within the return period (refund off the due first, then cash), return receipt | **Done** | [08f-pharmacy-returns.md](08f-pharmacy-returns.md) |
 | 8g | Pharmacy: physical inventory — stock counts lot by lot, applied against the ledger as of the count date, count sheet and result | **Done** | [08g-pharmacy-stock-counts.md](08g-pharmacy-stock-counts.md) |
-| 8h | Pharmacy: reports (product ledger, stock, purchase, sale, cash counter, physical inventory summary) | Next | |
+| 8h | Pharmacy: reports — product ledger, stock movement, expiry, physical inventory summary, purchase and sales summaries, cash counter | **Done** | [08h-pharmacy-reports.md](08h-pharmacy-reports.md) |
 | 8i | Pharmacy: indoor patients (indents, IPD sales and returns, dues) — after the admissions of step 9 | Planned | |
-| 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |
+| 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Next | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

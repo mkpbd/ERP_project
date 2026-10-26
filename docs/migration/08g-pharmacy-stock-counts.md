@@ -1,6 +1,6 @@
 # Step 8g — Pharmacy: physical inventory (stock counts)
 
-Status: **done** (2026-10-26). Previous: [step 8f](08f-pharmacy-returns.md) · Next: step 8h (pharmacy reports).
+Status: **done** (2026-10-26). Previous: [step 8f](08f-pharmacy-returns.md) · Next: [step 8h](08h-pharmacy-reports.md) (pharmacy reports).
 
 ## Where the old logic lives
 
