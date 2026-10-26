@@ -1,0 +1,2 @@
+ALTER TABLE "pharmacy_stock_count_lines" ADD COLUMN "write_off" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "pharmacy_stock_counts" ADD COLUMN "written_off_value" numeric(14, 2) DEFAULT 0 NOT NULL;

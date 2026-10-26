@@ -102,6 +102,7 @@ beforeEach(async () => {
     ['discount', '5', 'debit', '5102', 'Sales discount', 'pharmacy_sales_discount'],
     ['cogs', '5', 'debit', '5101', 'Cost of medicines sold', 'pharmacy_cogs'],
     ['loss', '5', 'debit', '5104', 'Stock count loss', 'pharmacy_count_loss'],
+    ['damage', '5', 'debit', '5103', 'Expired and damaged medicines', 'pharmacy_damage_loss'],
   ] as const) {
     gl[key] = await glAccount(nature, balance, code, name);
     await create('accounts/gl-roles', { role: glRole, glAccountId: gl[key] });
@@ -165,7 +166,7 @@ describe('pharmacy stock counts', () => {
     expect([early.status, early.body.code]).toEqual([422, 'uncounted_lines']);
     await ph('post', `stock-counts/${opened.body.id}/counts`, counter, {
       version: 2,
-      counts: [{ lotId: a, qty: 0, note: 'Expired, sent for disposal' }],
+      counts: [{ lotId: a, qty: 0, note: 'Expired, sent for disposal', writeOff: true }],
     }).expect(204);
     // A lot on the shelf the ledger never had.
     const found = await ph('post', `stock-counts/${opened.body.id}/lots`, counter, {
@@ -197,15 +198,22 @@ describe('pharmacy stock counts', () => {
 
     expect((await ph('post', `stock-counts/${opened.body.id}/apply`, counter, { version: 4 })).status).toBe(403);
     const applied = await ph('post', `stock-counts/${opened.body.id}/apply`, admin, { version: 4 }).expect(200);
-    // Lot B: 95 counted against 97 held then (not the 100 it was opened with): 2 short at 0.85; lot A 50 at 0.80
-    // short; lot C 10 over at 0.90.
-    expect(applied.body).toMatchObject({ shortage: 41.7, excess: 9, voucherNumber: expect.stringMatching(/^JV-/) });
+    // Lot B: 95 counted against 97 held then (not the 100 it was opened with): 2 short at 0.85; lot A (expired) 50 at
+    // 0.80 written off; lot C 10 over at 0.90.
+    expect(applied.body).toMatchObject({
+      shortage: 1.7,
+      writtenOff: 40,
+      excess: 9,
+      voucherNumber: expect.stringMatching(/^JV-/),
+    });
+    expect((await view()).writtenOffValue).toBe(40);
     expect(await lotsOf(napa)).toEqual([
       ['B', 95],
       ['C', 10],
     ]);
     expect(await lotsOf(seclo)).toEqual([['S', 20]]);
-    expect(await closing('loss')).toBe(41.7);
+    expect(await closing('loss')).toBe(1.7);
+    expect(await closing('damage')).toBe(40);
     expect(await closing('gain')).toBe(-9);
     expect((await ph('post', `stock-counts/${opened.body.id}/apply`, admin, { version: 5 })).body.code).toBe(
       'stock_count_state',

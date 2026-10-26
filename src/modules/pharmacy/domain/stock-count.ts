@@ -10,6 +10,8 @@ export interface CountLine {
   readonly countedQty: number | null;
   readonly unitCost: number;
   readonly note: string | null;
+  /** Missing units are written off as expired or damaged (damage loss), not a count loss. */
+  readonly writeOff: boolean;
   readonly appliedSystemQty: number | null;
   readonly adjustedQty: number | null;
 }
@@ -23,6 +25,7 @@ export interface CountProps {
   status: CountStatus;
   shortageValue: number;
   excessValue: number;
+  writtenOffValue: number;
   voucherNumber: string | null;
   cancelReason: string | null;
   createdBy: string | null;
@@ -82,6 +85,7 @@ export class StockCount {
       status: 'counting',
       shortageValue: 0,
       excessValue: 0,
+      writtenOffValue: 0,
       voucherNumber: null,
       cancelReason: null,
       createdBy: params.createdBy,
@@ -94,6 +98,7 @@ export class StockCount {
         countedQty: null,
         unitCost: lot.unitCost,
         note: null,
+        writeOff: false,
         appliedSystemQty: null,
         adjustedQty: null,
       })),
@@ -126,8 +131,11 @@ export class StockCount {
     return this.props.lines;
   }
 
-  /** What was counted (lot → units, with an optional note); a count may be corrected until applied. */
-  record(counts: readonly { lotId: string; qty: number; note?: string | null }[], now: Date): void {
+  /**
+   * What was counted (lot → units, with an optional note, and whether what is missing is written off as expired or
+   * damaged); a count may be corrected until applied.
+   */
+  record(counts: readonly { lotId: string; qty: number; note?: string | null; writeOff?: boolean }[], now: Date): void {
     this.assertCounting('counted');
     for (const [index, count] of counts.entries()) {
       const at = `Count ${index + 1}`;
@@ -143,6 +151,7 @@ export class StockCount {
         ...line,
         countedQty: count.qty,
         note: count.note === undefined ? line.note : text(count.note, 300, 'note', 'Count'),
+        writeOff: count.writeOff ?? line.writeOff,
       };
     });
     this.touch(now);
@@ -165,6 +174,7 @@ export class StockCount {
       countedQty: validCount(lot.countedQty, 'Count'),
       unitCost: lot.unitCost,
       note: null,
+      writeOff: false,
       appliedSystemQty: null,
       adjustedQty: null,
     });
@@ -173,7 +183,8 @@ export class StockCount {
 
   /**
    * Applies the count against the ledger as of the count date now (\`balances\`: lot → units). Every line must be
-   * counted. Whoever opened the count does not apply it. Returns the moves and their values.
+   * counted. Whoever opened the count does not apply it. Returns the moves and their values: shortage (count loss),
+   * written off (units missing from lots marked as expired or damaged) and excess.
    */
   apply(params: { balances: ReadonlyMap<string, number>; by: string; now: Date }) {
     this.assertCounting('applied');
@@ -184,6 +195,7 @@ export class StockCount {
     if (uncounted > 0) throw new DomainError('uncounted_lines', `${uncounted} lots are not counted yet`);
     const adjustments: Adjustment[] = [];
     let shortage = 0;
+    let writtenOff = 0;
     let excess = 0;
     this.props.lines = this.props.lines.map((line) => {
       const held = params.balances.get(line.lotId) ?? 0;
@@ -191,18 +203,20 @@ export class StockCount {
       if (qty !== 0) {
         adjustments.push({ productId: line.productId, lotId: line.lotId, qty, unitCost: line.unitCost });
         const value = paisa(Math.abs(qty) * line.unitCost);
-        if (qty < 0) shortage += value;
-        else excess += value;
+        if (qty > 0) excess += value;
+        else if (line.writeOff) writtenOff += value;
+        else shortage += value;
       }
       return { ...line, appliedSystemQty: held, adjustedQty: qty };
     });
     this.props.shortageValue = taka(shortage);
     this.props.excessValue = taka(excess);
+    this.props.writtenOffValue = taka(writtenOff);
     this.props.status = 'applied';
     this.props.appliedBy = params.by;
     this.props.appliedAt = params.now;
     this.touch(params.now);
-    return { adjustments, shortage: taka(shortage), excess: taka(excess) };
+    return { adjustments, shortage: taka(shortage), writtenOff: taka(writtenOff), excess: taka(excess) };
   }
 
   applied(voucherNumber: string | null): void {

@@ -23,7 +23,7 @@ describe('StockCount', () => {
     count.record(
       [
         { lotId: 'b', qty: 95 },
-        { lotId: 'a', qty: 0, note: 'Expired, binned' },
+        { lotId: 'a', qty: 0, note: 'Expired, binned', writeOff: true },
       ],
       now,
     );
@@ -42,13 +42,14 @@ describe('StockCount', () => {
       { productId: 'napa', lotId: 'a', qty: -50, unitCost: 0.8 },
       { productId: 'napa', lotId: 'c', qty: 10, unitCost: 0.9 },
     ]);
-    expect([result.shortage, result.excess]).toEqual([41.7, 9]);
+    // Lot a is written off (damage loss), not short.
+    expect([result.shortage, result.writtenOff, result.excess]).toEqual([1.7, 40, 9]);
     expect(count.lines.map((line) => [line.appliedSystemQty, line.adjustedQty])).toEqual([
       [97, -2],
       [50, -50],
       [0, 10],
     ]);
-    expect(count.lines[1]!.note).toBe('Expired, binned');
+    expect(count.lines[1]).toMatchObject({ note: 'Expired, binned', writeOff: true });
     expect(count.status).toBe('applied');
   });
 

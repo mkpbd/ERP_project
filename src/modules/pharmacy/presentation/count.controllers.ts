@@ -42,6 +42,7 @@ class PharmacyRecordCountsDto extends createZodDto(
           lotId: ref,
           qty: z.int().min(0).max(10_000_000),
           note: z.string().trim().max(300).nullable().optional(),
+          writeOff: z.boolean().optional(),
         }),
       )
       .min(1)
@@ -69,6 +70,7 @@ class PharmacyCountListQueryDto extends createZodDto(
 class PharmacyOpenedCountResponseDto extends responseDto({ id: z.uuid(), number: z.string(), lines: z.int() }) {}
 class PharmacyAppliedCountResponseDto extends responseDto({
   shortage: z.number(),
+  writtenOff: z.number(),
   excess: z.number(),
   voucherNumber: z.string().nullable(),
 }) {}
@@ -83,6 +85,7 @@ const summaryShape = {
   countedLines: z.int(),
   shortageValue: z.number(),
   excessValue: z.number(),
+  writtenOffValue: z.number(),
   version: z.int(),
 };
 class PharmacyCountPageResponseDto extends responseDto({
@@ -112,6 +115,7 @@ class PharmacyCountResponseDto extends responseDto({
       countedQty: z.int().nullable(),
       unitCost: z.number(),
       note: z.string().nullable(),
+      writeOff: z.boolean(),
       appliedSystemQty: z.int().nullable(),
       adjustedQty: z.int().nullable(),
       adjustedValue: z.number().nullable(),

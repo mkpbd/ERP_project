@@ -33,10 +33,11 @@
       <td class="num">{{#if difference}}<b>{{difference}}</b>{{else}}{{difference}}{{/if}}</td>
       <td class="num">{{unitCost}}</td>
       <td class="num">{{#if differenceValue}}{{money differenceValue}}{{/if}}</td>
-      <td>{{note}}</td>
+      <td>{{#if writeOff}}<b>written off</b> {{/if}}{{note}}</td>
     </tr>
     {{/each}}
-    <tr class="group-row"><td colspan="8">Short</td><td class="num">{{money short}}</td><td></td></tr>
+    <tr class="group-row"><td colspan="8">Short (count loss)</td><td class="num">{{money short}}</td><td></td></tr>
+    <tr class="group-row"><td colspan="8">Written off, expired or damaged (damage loss)</td><td class="num">{{money writtenOff}}</td><td></td></tr>
     <tr class="group-row"><td colspan="8">Over</td><td class="num">{{money over}}</td><td></td></tr>
     <tr class="group-row"><td colspan="8">Expired stock on hand (at cost)</td><td class="num">{{money expiredValue}}</td><td></td></tr>
   </tbody>

@@ -146,6 +146,7 @@ export class DrizzleCountReadRepository extends CountReadRepository {
         countedLines: counted.mapWith(Number),
         shortageValue: stockCounts.shortageValue,
         excessValue: stockCounts.excessValue,
+        writtenOffValue: stockCounts.writtenOffValue,
         note: stockCounts.note,
         voucherNumber: stockCounts.voucherNumber,
         cancelReason: stockCounts.cancelReason,
@@ -194,6 +195,7 @@ export class DrizzleCountReadRepository extends CountReadRepository {
         countedQty: stockCountLines.countedQty,
         unitCost: stockCountLines.unitCost,
         note: stockCountLines.note,
+        writeOff: stockCountLines.writeOff,
         appliedSystemQty: stockCountLines.appliedSystemQty,
         adjustedQty: stockCountLines.adjustedQty,
       })

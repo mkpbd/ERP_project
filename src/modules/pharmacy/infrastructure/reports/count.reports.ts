@@ -32,7 +32,7 @@ export function countResultReport(read: CountReadRepository): ReportDefinition {
     title: 'Stock count result',
     group: 'Pharmacy',
     description:
-      'Each lot counted against the ledger as of the count date: short, over or equal, at cost, with totals.',
+      'Each lot counted against the ledger as of the count date: short, written off, over or equal, at cost, with totals.',
     params: z.strictObject({ id: z.uuid(), differencesOnly: z.boolean().default(false) }),
     async load(params) {
       const count = await read.getCount(params.id);
@@ -53,7 +53,8 @@ export function countResultReport(read: CountReadRepository): ReportDefinition {
       return {
         count,
         lines: shown,
-        short: sum((line) => Math.min(0, line.differenceValue ?? 0)),
+        short: sum((line) => (line.writeOff ? 0 : Math.min(0, line.differenceValue ?? 0))),
+        writtenOff: sum((line) => (line.writeOff ? Math.min(0, line.differenceValue ?? 0) : 0)),
         over: sum((line) => Math.max(0, line.differenceValue ?? 0)),
         expiredValue: sum((line) => (line.expired ? (line.countedQty ?? line.system) * line.unitCost : 0)),
       };
@@ -72,9 +73,10 @@ export function countResultReport(read: CountReadRepository): ReportDefinition {
         { key: 'difference', header: 'Difference', format: 'integer' },
         { key: 'unitCost', header: 'Unit cost', format: 'decimal' },
         { key: 'differenceValue', header: 'Difference value', format: 'money' },
+        { key: 'writtenOff', header: 'Written off', width: 12 },
         { key: 'note', header: 'Note', width: 24 },
       ],
-      rows: data.lines.map((line) => ({ ...line })),
+      rows: data.lines.map((line) => ({ ...line, writtenOff: line.writeOff ? 'yes' : '' })),
     }),
   });
 }

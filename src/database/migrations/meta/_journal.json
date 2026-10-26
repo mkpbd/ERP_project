@@ -232,6 +232,13 @@
       "when": 1792998127343,
       "tag": "0032_pharmacy_stock_counts",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1792999991401,
+      "tag": "0033_pharmacy_count_write_off",
+      "breakpoints": true
     }
   ]
 }

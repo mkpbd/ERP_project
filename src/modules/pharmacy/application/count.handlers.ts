@@ -19,6 +19,7 @@ import {
 } from './count.messages.js';
 import { PHARMACY_COUNT, PHARMACY_MANAGE, PHARMACY_READ } from './pharmacy.constants.js';
 import { PHARMACY_INVENTORY_ROLE, PharmacyDesk, PURCHASE_JOURNAL } from './purchase.handlers.js';
+import { PHARMACY_DAMAGE_ROLE } from './return.handlers.js';
 
 /** GL roles of stock count deviations. */
 export const PHARMACY_COUNT_LOSS_ROLE = 'pharmacy_count_loss';
@@ -126,7 +127,8 @@ export class AddCountLotHandler implements ICommandHandler<AddCountLotCommand> {
 /**
  * Old ApplyStockAudit / UpdateStockOnAudit, made atomic: the products counted are locked; each lot moves by the count
  * less the ledger as of the count date (movements dated the count date, into that lot, at its cost); shortage
- * Dr pharmacy count loss / Cr pharmacy inventory, excess Dr pharmacy inventory / Cr pharmacy count gain.
+ * Dr pharmacy count loss / Cr pharmacy inventory, units written off (expired or damaged) Dr pharmacy damage loss /
+ * Cr pharmacy inventory, excess Dr pharmacy inventory / Cr pharmacy count gain.
  */
 @CommandHandler(ApplyCountCommand)
 export class ApplyCountHandler implements ICommandHandler<ApplyCountCommand> {
@@ -145,13 +147,23 @@ export class ApplyCountHandler implements ICommandHandler<ApplyCountCommand> {
         count.lines.map((line) => line.lotId),
         count.countDate,
       );
-      const { adjustments, shortage, excess } = count.apply({ balances, by: actor.userId, now: desk.clock.now() });
+      const { adjustments, shortage, writtenOff, excess } = count.apply({
+        balances,
+        by: actor.userId,
+        now: desk.clock.now(),
+      });
       const narration = `Stock count ${count.number}`;
       const lines: LedgerPostingLine[] = [
         ...(shortage > 0
           ? [
               { account: { role: PHARMACY_COUNT_LOSS_ROLE }, debit: shortage, credit: 0, narration },
               { account: { role: PHARMACY_INVENTORY_ROLE }, debit: 0, credit: shortage, narration },
+            ]
+          : []),
+        ...(writtenOff > 0
+          ? [
+              { account: { role: PHARMACY_DAMAGE_ROLE }, debit: writtenOff, credit: 0, narration },
+              { account: { role: PHARMACY_INVENTORY_ROLE }, debit: 0, credit: writtenOff, narration },
             ]
           : []),
         ...(excess > 0
@@ -186,8 +198,13 @@ export class ApplyCountHandler implements ICommandHandler<ApplyCountCommand> {
       await desk.ledger.add(movements);
       count.applied(voucher?.number ?? null);
       await counts.update(count);
-      await desk.record('stock_count', 'applied', actor, id, { shortage, excess, voucher: voucher?.number ?? null });
-      return { shortage, excess, voucherNumber: voucher?.number ?? null };
+      await desk.record('stock_count', 'applied', actor, id, {
+        shortage,
+        writtenOff,
+        excess,
+        voucher: voucher?.number ?? null,
+      });
+      return { shortage, writtenOff, excess, voucherNumber: voucher?.number ?? null };
     });
   }
 }

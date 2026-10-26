@@ -20,6 +20,7 @@ export interface CountSummary {
   readonly countedLines: number;
   readonly shortageValue: number;
   readonly excessValue: number;
+  readonly writtenOffValue: number;
   readonly version: number;
 }
 
@@ -33,6 +34,7 @@ export interface CountLineView extends ProductRef {
   readonly countedQty: number | null;
   readonly unitCost: number;
   readonly note: string | null;
+  readonly writeOff: boolean;
   readonly appliedSystemQty: number | null;
   readonly adjustedQty: number | null;
   /** Adjusted units at cost (− short, + over). */
@@ -72,7 +74,7 @@ export class RecordCountsCommand extends Command<void> {
     readonly actor: Actor,
     readonly id: string,
     readonly version: number,
-    readonly counts: readonly { lotId: string; qty: number; note?: string | null }[],
+    readonly counts: readonly { lotId: string; qty: number; note?: string | null; writeOff?: boolean }[],
   ) {
     super();
   }
@@ -97,7 +99,12 @@ export class AddCountLotCommand extends Command<void> {
   }
 }
 
-export class ApplyCountCommand extends Command<{ shortage: number; excess: number; voucherNumber: string | null }> {
+export class ApplyCountCommand extends Command<{
+  shortage: number;
+  writtenOff: number;
+  excess: number;
+  voucherNumber: string | null;
+}> {
   constructor(
     readonly actor: Actor,
     readonly id: string,

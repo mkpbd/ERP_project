@@ -986,6 +986,8 @@ export const stockCounts = pgTable(
     status: text('status', { enum: ['counting', 'applied', 'cancelled'] }).notNull(),
     shortageValue: money('shortage_value').notNull().default(0),
     excessValue: money('excess_value').notNull().default(0),
+    /** Missing units of lots written off as expired or damaged (to damage loss, not count loss). */
+    writtenOffValue: money('written_off_value').notNull().default(0),
     voucherNumber: text('voucher_number'),
     cancelReason: text('cancel_reason'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -1018,6 +1020,8 @@ export const stockCountLines = pgTable(
     /** What a unit of the lot costs at the outlet (or the cost given for a lot the outlet never held). */
     unitCost: unitCost('unit_cost').notNull(),
     note: text('note'),
+    /** What is missing of the lot is written off as expired or damaged. */
+    writeOff: boolean('write_off').notNull().default(false),
     /** Set when applied: the ledger as of the count date then, and the units moved to match the count. */
     appliedSystemQty: integer('applied_system_qty'),
     adjustedQty: integer('adjusted_qty'),
