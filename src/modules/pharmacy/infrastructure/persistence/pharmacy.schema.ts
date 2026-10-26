@@ -225,7 +225,14 @@ export const pharmacyLots = pgTable(
   ],
 );
 
-export const PHARMACY_MOVEMENT_KINDS = ['opening', 'receive', 'supplier_return', 'replacement'] as const;
+export const PHARMACY_MOVEMENT_KINDS = [
+  'opening',
+  'receive',
+  'supplier_return',
+  'replacement',
+  'transfer_out',
+  'transfer_in',
+] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
 // StockFlows, written by separate commits).
@@ -255,7 +262,10 @@ export const pharmacyMovements = pgTable(
     index('pharmacy_movements_lot_idx').on(t.lotId),
     index('pharmacy_movements_document_idx').on(t.documentId),
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
-    check('pharmacy_movements_kind_ck', sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement')`),
+    check(
+      'pharmacy_movements_kind_ck',
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in')`,
+    ),
   ],
 );
 
@@ -551,5 +561,122 @@ export const supplierReturnSettlements = pgTable(
   (t) => [
     index('pharmacy_supplier_return_settlements_return_idx').on(t.returnId),
     check('pharmacy_supplier_return_settlements_ck', sql`${t.qty} > 0 and ${t.value} >= 0`),
+  ],
+);
+
+// Old Pharmacy.OutletIndents / OutletIndetDetails: an outlet asks another (usually the central store) for stock.
+export const outletIndents = pgTable(
+  'pharmacy_outlet_indents',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    /** The outlet that needs the stock (old FromOutletId). */
+    requestingOutletId: uuid('requesting_outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    /** The outlet asked to send it (old ToOutletId). */
+    supplyingOutletId: uuid('supplying_outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    indentDate: day('indent_date').notNull(),
+    urgent: boolean('urgent').notNull().default(false),
+    note: text('note'),
+    status: text('status', {
+      enum: ['open', 'partly_transferred', 'transferred', 'closed', 'cancelled'],
+    }).notNull(),
+    closeReason: text('close_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_outlet_indents_number_uq').on(t.number),
+    index('pharmacy_outlet_indents_supplying_idx').on(t.supplyingOutletId, t.status),
+    check(
+      'pharmacy_outlet_indents_status_ck',
+      sql`${t.status} in ('open', 'partly_transferred', 'transferred', 'closed', 'cancelled')`,
+    ),
+    check('pharmacy_outlet_indents_outlets_ck', sql`${t.requestingOutletId} <> ${t.supplyingOutletId}`),
+  ],
+);
+
+export const outletIndentLines = pgTable(
+  'pharmacy_outlet_indent_lines',
+  {
+    indentId: uuid('indent_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    transferredQty: integer('transferred_qty').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.indentId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_outlet_indent_lines_fk',
+      columns: [t.indentId],
+      foreignColumns: [outletIndents.id],
+    }).onDelete('cascade'),
+    uniqueIndex('pharmacy_outlet_indent_lines_product_uq').on(t.indentId, t.productId),
+    check('pharmacy_outlet_indent_lines_qty_ck', sql`${t.qty} > 0 and ${t.transferredQty} between 0 and ${t.qty}`),
+  ],
+);
+
+// Old Pharmacy.StockTransfers / StockTransferDetails and the accept side (a receive of type OutletRequisition):
+// stock sent from one outlet to another, in transit until the receiving outlet accepts it.
+export const outletTransfers = pgTable(
+  'pharmacy_transfers',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    indentId: uuid('indent_id').references(() => outletIndents.id, { onDelete: 'restrict' }),
+    fromOutletId: uuid('from_outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    toOutletId: uuid('to_outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    transferDate: day('transfer_date').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['in_transit', 'accepted', 'rejected'] }).notNull(),
+    decidedOn: day('decided_on'),
+    decidedBy: uuid('decided_by').references(() => users.id, { onDelete: 'set null' }),
+    rejectReason: text('reject_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_transfers_number_uq').on(t.number),
+    index('pharmacy_transfers_to_idx').on(t.toOutletId, t.status),
+    index('pharmacy_transfers_indent_idx').on(t.indentId),
+    check('pharmacy_transfers_status_ck', sql`${t.status} in ('in_transit', 'accepted', 'rejected')`),
+    check('pharmacy_transfers_outlets_ck', sql`${t.fromOutletId} <> ${t.toOutletId}`),
+  ],
+);
+
+export const outletTransferLines = pgTable(
+  'pharmacy_transfer_lines',
+  {
+    transferId: uuid('transfer_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.transferId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_transfer_lines_fk',
+      columns: [t.transferId],
+      foreignColumns: [outletTransfers.id],
+    }).onDelete('cascade'),
+    check('pharmacy_transfer_lines_qty_ck', sql`${t.qty} > 0 and ${t.unitCost} >= 0`),
   ],
 );

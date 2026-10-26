@@ -1,0 +1,36 @@
+{{#with data.transfer}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Transfer no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date transferDate}}</td></tr>
+    <tr><td>From</td><td><b>{{fromOutletName}}</b></td><td>To</td><td><b>{{toOutletName}}</b></td></tr>
+    <tr>
+      <td>Indent</td><td>{{indentNumber}}</td>
+      <td>State</td>
+      <td>{{#if (eq status "in_transit")}}In transit{{else}}{{#if (eq status "accepted")}}Accepted{{else}}Rejected{{/if}} on {{date decidedOn}}{{/if}}{{#if rejectReason}} — {{rejectReason}}{{/if}}</td>
+    </tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Value</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{qty}}{{#if unitName}} {{unitName}}{{/if}}</td>
+      <td class="num">{{unitCost}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Total</td><td class="num">{{money value}}</td></tr>
+  </tbody>
+</table>
+{{#if note}}<p>Note: {{note}}</p>{{/if}}
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Sent by</td><td>Carried by</td><td>Received by</td></tr>
+</table>
+{{/with}}

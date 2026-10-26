@@ -71,8 +71,9 @@ Order follows dependencies: later modules reference earlier ones.
 | 8a | Pharmacy: medicine catalogue (generics, formations, strengths, units, manufacturers, brands, products), outlets, outlet users, reorder levels, price list | **Done** | [08a-pharmacy-catalogue.md](08a-pharmacy-catalogue.md) |
 | 8b | Pharmacy: purchase orders, stock receives by lot with posting to the supplier ledger, opening stock, outlet movement ledger, stock and stock card | **Done** | [08b-pharmacy-purchase-stock.md](08b-pharmacy-purchase-stock.md) |
 | 8c | Pharmacy: supplier payments over receives, supplier returns settled by replacements; bonus units and sale price on receives | **Done** | [08c-pharmacy-supplier-payments-returns.md](08c-pharmacy-supplier-payments-returns.md) |
-| 8d | Pharmacy: outlet indents and transfers | Next | |
-| 8e–8i | Pharmacy: counter sales, patient returns, indoor patients, physical inventory, reports | Planned | |
+| 8d | Pharmacy: outlet indents, transfers between outlets (first expiring first, in transit until accepted or rejected) | **Done** | [08d-pharmacy-outlet-transfers.md](08d-pharmacy-outlet-transfers.md) |
+| 8e | Pharmacy: counter sales (invoices, discounts, loyal members, dues, cancellations) | Next | |
+| 8f–8i | Pharmacy: patient returns, indoor patients, physical inventory, reports | Planned | |
 | 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |

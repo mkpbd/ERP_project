@@ -190,6 +190,13 @@
       "when": 1792987783465,
       "tag": "0026_pharmacy_supplier_payments_returns",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792990422605,
+      "tag": "0027_pharmacy_outlet_transfers",
+      "breakpoints": true
     }
   ]
 }

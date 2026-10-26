@@ -1,7 +1,8 @@
 # Step 8c — Pharmacy: supplier payments and supplier returns
 
-Status: **done** (2026-10-26). Previous: [step 8b](08b-pharmacy-purchase-stock.md) · Next: step 8d (outlet indents
-and transfers).
+Status: **done** (2026-10-26). Previous: [step 8b](08b-pharmacy-purchase-stock.md) · Next: [step 8d](08d-pharmacy-outlet-transfers.md) (outlet indents
+and transfers). The questions below were answered there: bank shown as "Bank" and the reference, the rest of a
+closed return set off against payments, returns not tied to receives.
 
 ## Where the old logic lives
 

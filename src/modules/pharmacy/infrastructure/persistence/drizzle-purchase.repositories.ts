@@ -8,6 +8,7 @@ import {
   uniqueViolationConstraint,
 } from '../../../../shared/infrastructure/persistence/pg-errors.js';
 import { SupplierDirectory } from '../../../../shared/application/contracts/supplier-directory.js';
+import type { LotBalance } from '../../domain/allocation.js';
 import { PharmacyOrder } from '../../domain/purchase-order.js';
 import { PharmacyReceive } from '../../domain/receive.js';
 import {
@@ -144,6 +145,36 @@ export class DrizzlePharmacyLedger extends PharmacyLedger {
       .where(and(eq(pharmacyMovements.outletId, outletId), inArray(pharmacyMovements.lotId, [...new Set(lotIds)])))
       .groupBy(pharmacyMovements.lotId);
     return new Map(rows.map((row) => [row.lotId, row.qty]));
+  }
+
+  async stockLots(outletId: string, productIds: readonly string[]): Promise<Map<string, LotBalance[]>> {
+    const lots = new Map<string, LotBalance[]>();
+    if (productIds.length === 0) return lots;
+    const rows = await this.context.db
+      .select({
+        productId: pharmacyMovements.productId,
+        lotId: pharmacyMovements.lotId,
+        batchNo: pharmacyLots.batchNo,
+        expiryDate: pharmacyLots.expiryDate,
+        saleRate: pharmacyLots.saleRate,
+        qty: sql<number>`sum(${pharmacyMovements.qty})`.mapWith(Number),
+        value: sql<number>`sum(${pharmacyMovements.qty} * ${pharmacyMovements.unitCost})`.mapWith(Number),
+      })
+      .from(pharmacyMovements)
+      .innerJoin(pharmacyLots, eq(pharmacyLots.id, pharmacyMovements.lotId))
+      .where(
+        and(eq(pharmacyMovements.outletId, outletId), inArray(pharmacyMovements.productId, [...new Set(productIds)])),
+      )
+      .groupBy(
+        pharmacyMovements.productId,
+        pharmacyMovements.lotId,
+        pharmacyLots.batchNo,
+        pharmacyLots.expiryDate,
+        pharmacyLots.saleRate,
+      )
+      .having(sql`sum(${pharmacyMovements.qty}) > 0`);
+    for (const { productId, ...lot } of rows) lots.set(productId, [...(lots.get(productId) ?? []), lot]);
+    return lots;
   }
 
   async lotCosts(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>> {

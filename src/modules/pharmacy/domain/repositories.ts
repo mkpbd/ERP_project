@@ -1,4 +1,7 @@
+import type { LotBalance } from './allocation.js';
+import type { OutletIndent } from './outlet-indent.js';
 import type { PharmacyOrder } from './purchase-order.js';
+import type { OutletTransfer } from './transfer.js';
 import type { PharmacyReceive } from './receive.js';
 import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
 import type { SupplierReturn } from './supplier-return.js';
@@ -7,7 +10,7 @@ export abstract class PharmacySequences {
   abstract next(kind: string, year: number): Promise<number>;
 }
 
-export type MovementKind = 'opening' | 'receive' | 'supplier_return' | 'replacement';
+export type MovementKind = 'opening' | 'receive' | 'supplier_return' | 'replacement' | 'transfer_out' | 'transfer_in';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -31,6 +34,8 @@ export abstract class PharmacyLedger {
   abstract lotFacts(lotIds: readonly string[]): Promise<Map<string, { productId: string; expiryDate: string }>>;
   /** Units of each lot at an outlet. */
   abstract balances(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>>;
+  /** Every lot of these products at the outlet with units in it (product → lots). */
+  abstract stockLots(outletId: string, productIds: readonly string[]): Promise<Map<string, LotBalance[]>>;
   /** What a unit of the lot cost at the outlet: the weighted average of what came in (4 decimals). */
   abstract lotCosts(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>>;
 }
@@ -127,4 +132,16 @@ export abstract class SupplierReturnRepository {
   abstract update(supplierReturn: SupplierReturn): Promise<void>;
   abstract delete(id: string): Promise<void>;
   abstract addSettlements(settlements: readonly SettlementRecord[]): Promise<void>;
+}
+
+export abstract class IndentRepository {
+  abstract findForUpdate(id: string): Promise<OutletIndent | null>;
+  abstract insert(indent: OutletIndent): Promise<void>;
+  abstract update(indent: OutletIndent): Promise<void>;
+}
+
+export abstract class TransferRepository {
+  abstract findForUpdate(id: string): Promise<OutletTransfer | null>;
+  abstract insert(transfer: OutletTransfer): Promise<void>;
+  abstract update(transfer: OutletTransfer): Promise<void>;
 }

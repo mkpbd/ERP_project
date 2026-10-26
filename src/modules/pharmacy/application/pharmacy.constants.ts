@@ -24,3 +24,5 @@ export const PHARMACY_PURCHASE = 'pharmacy:purchase';
 export const PHARMACY_RECEIVE = 'pharmacy:receive';
 /** Paying suppliers for posted receives. */
 export const PHARMACY_PAYMENT = 'pharmacy:payment';
+/** Raising outlet indents, sending transfers and accepting them, at the outlets one works at. */
+export const PHARMACY_TRANSFER = 'pharmacy:transfer';
