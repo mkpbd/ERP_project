@@ -67,6 +67,9 @@ class Organization extends OrganizationProfile {
   reportHeader() {
     return Promise.resolve(HEADER);
   }
+  patientIdPrefix() {
+    return Promise.resolve('');
+  }
 }
 
 let registry: ReportRegistry;

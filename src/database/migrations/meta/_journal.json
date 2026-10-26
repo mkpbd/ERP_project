@@ -246,6 +246,13 @@
       "when": 1793003835137,
       "tag": "0034_hospital_patients",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1793006339985,
+      "tag": "0035_hospital_patient_contact_phone",
+      "breakpoints": true
     }
   ]
 }

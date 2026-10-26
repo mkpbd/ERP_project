@@ -4,6 +4,7 @@ import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler 
 import type { Actor } from '../../../shared/application/actor.js';
 import { AccessControl } from '../../../shared/application/contracts/access-control.js';
 import { LocationDirectory } from '../../../shared/application/contracts/location-directory.js';
+import { OrganizationProfile } from '../../../shared/application/contracts/organization-profile.js';
 import { AuditTrail } from '../../../shared/application/ports/audit-trail.js';
 import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
@@ -15,6 +16,7 @@ import {
   parseUhid,
   Patient,
   patientDetails,
+  uhidLabel,
   uhidOf,
   type PatientDetails,
   type PatientInput,
@@ -59,6 +61,7 @@ export class PatientDesk {
     readonly patients: PatientRepository,
     readonly read: PatientReadRepository,
     readonly locations: LocationDirectory,
+    readonly organization: OrganizationProfile,
     @Inject(HOSPITAL_SETTINGS) readonly settings: HospitalSettings,
   ) {}
 
@@ -122,7 +125,8 @@ export class RegisterPatientHandler implements ICommandHandler<RegisterPatientCo
     return desk.tx.run(async () => {
       const details = await desk.details(input);
       if (!allowDuplicate) {
-        const matches = await desk.patients.possibleDuplicates(details);
+        const phone = (details.mobileNo ?? details.contactMobileNo)!;
+        const matches = await desk.patients.possibleDuplicates({ ...details, phone });
         if (matches.length > 0) {
           throw new ConflictError(
             'possible_duplicate',
@@ -246,7 +250,15 @@ export class ListPatientsHandler implements IQueryHandler<ListPatientsQuery> {
     await desk.access.authorize(actor.userId, { permissions: [PATIENT_READ] });
     const page = await desk.read.list({ ...filter, uhid: filter.q ? parseUhid(filter.q) : null });
     const today = desk.today();
-    return { ...page, items: page.items.map((item) => ({ ...item, age: ageOn(item.dateOfBirth, today) })) };
+    const prefix = await desk.organization.patientIdPrefix();
+    return {
+      ...page,
+      items: page.items.map((item) => ({
+        ...item,
+        age: ageOn(item.dateOfBirth, today),
+        uhidLabel: uhidLabel(prefix, item.uhid),
+      })),
+    };
   }
 }
 
@@ -256,7 +268,12 @@ async function shown(desk: PatientDesk, id: string | null) {
   const districtName = patient.districtId
     ? ((await desk.locations.districtNames([patient.districtId])).get(patient.districtId) ?? null)
     : null;
-  return { ...patient, districtName, age: ageOn(patient.dateOfBirth, desk.today()) };
+  return {
+    ...patient,
+    districtName,
+    age: ageOn(patient.dateOfBirth, desk.today()),
+    uhidLabel: uhidLabel(await desk.organization.patientIdPrefix(), patient.uhid),
+  };
 }
 
 @QueryHandler(GetPatientQuery)
@@ -287,7 +304,7 @@ export class FindPatientMatchesHandler implements IQueryHandler<FindPatientMatch
 
   async execute({ actor, mobileNo, fullName, dateOfBirth }: FindPatientMatchesQuery) {
     await this.desk.access.authorize(actor.userId, { permissions: [PATIENT_READ] });
-    return this.desk.patients.possibleDuplicates({ mobileNo: normalMobile(mobileNo), fullName, dateOfBirth });
+    return this.desk.patients.possibleDuplicates({ phone: normalMobile(mobileNo), fullName, dateOfBirth });
   }
 }
 

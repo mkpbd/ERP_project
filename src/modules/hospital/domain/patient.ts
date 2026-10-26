@@ -26,6 +26,9 @@ export function uhidOf(year: number, serial: number): number {
   return (year % 100) * SERIALS_PER_YEAR + serial;
 }
 
+/** A UHID as printed: the organization's prefix (old InvPrefix, e.g. FKH) and the number. */
+export const uhidLabel = (prefix: string, uhid: number) => `${prefix}${uhid}`;
+
 /** A UHID as typed, with or without a prefix (the old cards printed FKH26000001). */
 export function parseUhid(value: string): number | null {
   const digits = value.trim().replace(/^[A-Za-z]+[-\s]?/, '');
@@ -124,7 +127,8 @@ export interface PatientDetails {
   fatherName: string | null;
   motherName: string | null;
   spouseName: string | null;
-  mobileNo: string;
+  /** Null for a newborn or an emergency patient without one: then the contact person's mobile is needed. */
+  mobileNo: string | null;
   email: string | null;
   idType: IdType | null;
   idNo: string | null;
@@ -166,6 +170,10 @@ export function patientDetails(input: PatientInput, today: string): PatientDetai
     throw new DomainError('invalid_id_document', 'A national ID number has 10, 13 or 17 digits');
   }
   const contactMobileNo = input.contactMobileNo ? normalMobile(input.contactMobileNo, 'contact mobile number') : null;
+  const mobileNo = input.mobileNo ? normalMobile(input.mobileNo) : null;
+  if (mobileNo === null && contactMobileNo === null) {
+    throw new DomainError('mobile_needed', "Give the patient's mobile number or the contact person's");
+  }
   return {
     title: text(input.title, 20, 'title'),
     fullName,
@@ -179,7 +187,7 @@ export function patientDetails(input: PatientInput, today: string): PatientDetai
     fatherName: text(input.fatherName, 150, "father's name"),
     motherName: text(input.motherName, 150, "mother's name"),
     spouseName: text(input.spouseName, 150, "spouse's name"),
-    mobileNo: normalMobile(input.mobileNo),
+    mobileNo,
     email: text(input.email, 254, 'email')?.toLowerCase() ?? null,
     idType: input.idType,
     idNo,

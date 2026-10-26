@@ -25,7 +25,8 @@ export interface PatientSummary {
   readonly sex: Sex;
   readonly dateOfBirth: string;
   readonly birthEstimated: boolean;
-  readonly mobileNo: string;
+  readonly mobileNo: string | null;
+  readonly contactMobileNo: string | null;
   readonly registeredOn: string;
   readonly confidential: boolean;
   readonly isActive: boolean;
@@ -52,7 +53,6 @@ export interface PatientView extends PatientSummary {
   readonly districtName: string | null;
   readonly contactName: string | null;
   readonly contactRelation: string | null;
-  readonly contactMobileNo: string | null;
   readonly contactAddress: string | null;
   readonly specialAlert: string | null;
   readonly registeredBy: string | null;
@@ -61,8 +61,8 @@ export interface PatientView extends PatientSummary {
   readonly version: number;
 }
 
-/** A patient as shown: with the age today. */
-export type WithAge<T> = T & { readonly age: Age };
+/** A patient as shown: with the age today and the UHID as printed (with the organization's prefix). */
+export type WithAge<T> = T & { readonly age: Age; readonly uhidLabel: string };
 
 export abstract class PatientReadRepository {
   abstract list(filter: PatientFilter & { uhid: number | null }): Promise<Page<PatientSummary>>;

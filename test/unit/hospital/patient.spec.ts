@@ -7,6 +7,7 @@ import {
   Patient,
   patientDetails,
   uhidOf,
+  uhidLabel,
   type PatientInput,
 } from '../../../src/modules/hospital/domain/patient.js';
 
@@ -54,6 +55,8 @@ describe('UHID', () => {
     expect(parseUhid(' 26000001 ')).toBe(26_000_001);
     expect(parseUhid('Karim')).toBeNull();
     expect(parseUhid('01711000000')).toBeNull();
+    expect(uhidLabel('FKH', 26_000_001)).toBe('FKH26000001');
+    expect(uhidLabel('', 26_000_001)).toBe('26000001');
   });
 });
 
@@ -101,6 +104,14 @@ describe('patient details', () => {
     expect(patientDetails(input({ idType: 'nid', idNo: '1234567890' }), today).idNo).toBe('1234567890');
     expect(patientDetails(input({ idType: 'passport', idNo: 'bx0123456' }), today).idNo).toBe('BX0123456');
     expect(() => patientDetails(input({ contactMobileNo: '12' }), today)).toThrow(/contact mobile/);
+  });
+
+  it("needs the patient's mobile or, for a newborn or an emergency, the contact person's", () => {
+    expect(() => patientDetails(input({ mobileNo: null }), today)).toThrow(/mobile number or the contact/);
+    expect(patientDetails(input({ mobileNo: null, contactMobileNo: '01811 000000' }), today)).toMatchObject({
+      mobileNo: null,
+      contactMobileNo: '01811000000',
+    });
   });
 });
 

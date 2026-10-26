@@ -131,6 +131,10 @@ const generalSettingsFields = {
   addTechnologistSignatureOnReport: z.boolean(),
   integratedAccountsEnabled: z.boolean(),
   stockEntryGrandTotalDisabled: z.boolean(),
+  uhidPrefix: z
+    .string()
+    .regex(/^[A-Z]{1,6}$/, 'Expected 1 to 6 capital letters, such as FKH')
+    .nullable(),
 };
 export class UpdateGeneralSettingsDto extends createZodDto(updateSchema(generalSettingsFields)) {}
 export class GeneralSettingsResponseDto extends responseDto(generalSettingsFields) {}

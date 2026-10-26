@@ -158,6 +158,53 @@ describe('hospital patients', () => {
     expect((await hp('get', '/uhid/12', reader)).status).toBe(404);
   });
 
+  it('prints the UHID with the organization prefix and registers a newborn on the contact mobile', async () => {
+    const mother = await hp('post', '', clerk, {
+      ...karim,
+      title: 'Mrs',
+      fullName: 'Rahima Begum',
+      sex: 'female',
+      mobileNo: '01811000000',
+    }).expect(201);
+    expect((await hp('get', `/${mother.body.id}`, reader).expect(200)).body.uhidLabel).toBe(String(uhid(1)));
+    await request(http)
+      .patch('/api/v1/admin/settings/general')
+      .set(bearer(admin))
+      .send({ uhidPrefix: 'FKH' })
+      .expect(200);
+    expect((await hp('get', `/${mother.body.id}`, reader).expect(200)).body.uhidLabel).toBe(`FKH${uhid(1)}`);
+    expect((await hp('get', '?q=rahima', reader).expect(200)).body.items[0].uhidLabel).toBe(`FKH${uhid(1)}`);
+
+    // A newborn has no mobile: the mother's number as the contact is enough; neither is refused.
+    const newborn = {
+      ...karim,
+      title: null,
+      fullName: 'Baby of Rahima',
+      dateOfBirth: today,
+      mobileNo: null,
+      contactName: 'Rahima Begum',
+      contactRelation: 'Mother',
+      contactMobileNo: '01811000000',
+    };
+    const none = await hp('post', '', clerk, { ...newborn, contactMobileNo: null });
+    expect([none.status, none.body.code]).toEqual([422, 'mobile_needed']);
+    const baby = await hp('post', '', clerk, newborn).expect(201);
+    expect((await hp('get', `/${baby.body.id}`, reader).expect(200)).body).toMatchObject({
+      mobileNo: null,
+      contactMobileNo: '01811000000',
+      uhidLabel: `FKH${uhid(2)}`,
+    });
+    // The same baby again on the same phone is a likely duplicate; the contact number finds both.
+    expect((await hp('post', '', clerk, newborn)).body.code).toBe('possible_duplicate');
+    expect((await hp('get', '?q=01811000000', reader).expect(200)).body.total).toBe(2);
+
+    await request(http)
+      .post('/api/v1/reports/hospital.patient-card/render')
+      .set(bearer(admin))
+      .send({ format: 'pdf', params: { id: baby.body.id } })
+      .expect(200);
+  });
+
   it('changes details by version, takes a record out of use and back, and keeps a photo', async () => {
     const first = await hp('post', '', clerk, karim).expect(201);
     const id = first.body.id as string;

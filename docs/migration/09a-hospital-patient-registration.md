@@ -42,8 +42,10 @@ What the old registration did, and what changes:
   restarts each year and the year keeps numbers unique. The year has room for 999,999 patients.
 * **Counter:** `hospital_sequences`, incremented under the row lock of an upsert. Five counters registering at once
   get five different numbers; the e2e test checks this.
-* **Search accepts prefixes:** a UHID typed with the old card prefix (`FKH26000001`) is found by searches and by
-  `GET uhid/:uhid`.
+* **Prefix:** the database keeps the bare number. The prefix comes from the general setting `uhidPrefix` (the old
+  `InvPrefix`, e.g. `FKH`, 1–6 capital letters, through `OrganizationProfile.patientIdPrefix`). Views carry it as
+  `uhidLabel` (`FKH26000001`), as do the card, the barcode and the register.
+* **Search accepts prefixes:** a UHID typed with a prefix is found by searches and by `GET uhid/:uhid`.
 
 ## The patient record (`hospital_patients`)
 
@@ -56,7 +58,8 @@ What the old registration did, and what changes:
   * A birth date in the future is refused.
   * A patient is at most 130 years old.
 * **Mobile:** a Bangladesh mobile number. `+880` / `880`, spaces and dashes are dropped. Anything else is 422
-  `invalid_mobile`.
+  `invalid_mobile`. A newborn or an emergency patient may have none when the contact person's mobile is given;
+  with neither, 422 `mobile_needed`. Searches by mobile also look at contact mobiles.
 * **Email:** optional.
 * **ID document:** `nid`, `passport`, `driving_licence` or `birth_certificate`, with its number.
   * Both are given, or neither.
@@ -75,8 +78,8 @@ What the old registration did, and what changes:
 
 ## Rules
 
-* **Possible duplicates.** A patient is not registered when an active patient has the same mobile and the same name
-  or date of birth. The refusal is 409 `possible_duplicate` and names the UHIDs. `allowDuplicate: true` registers
+* **Possible duplicates.** A patient is not registered when an active patient reached on the same phone (their own
+  mobile, or else the contact's, against either of the other's) has the same name or date of birth. The refusal is 409 `possible_duplicate` and names the UHIDs. `allowDuplicate: true` registers
   anyway, when the counter has made sure it is someone else (for example a child on a parent's mobile). The audit
   log records that choice. `GET matches` lets the page check before it submits.
 * **Changes** replace all the details by `version` (409 `stale_patient`). The UHID never changes.
@@ -99,15 +102,25 @@ What the old registration did, and what changes:
 
 * `hospital.patient-card` — an ID-card-size card (85.6 × 54 mm). It shows the organization, the name (Bangla
   works), sex, age, blood group, date of birth, mobile, the special alert, the photo and the **UHID as a Code 39
-  barcode** for counter scanners. The old card had a QR code of the details; see the open question.
+  barcode** for counter scanners, plus a **QR code** of the UHID, name, sex, date of birth and phone, as the old
+  card had. The QR code is drawn with the `qrcode` package.
 * `hospital.patient-register` — patients registered over a period: UHID, name, sex, age, mobile, district and
   status, with counts by sex. PDF and Excel.
+
+## Decisions taken (after the first version of this step; migration `0035_hospital_patient_contact_phone`)
+
+* The UHID is printed with the organization's prefix from the general settings.
+* The card has a QR code as well as the barcode.
+* The patient's own mobile is optional when the contact person's is given.
+* Merging two UHIDs of the same person comes with step 9e, once visits and bills exist; until then the duplicate is
+  taken out of use.
+* Registration stays free, as in the old system.
 
 ## Verification
 
 * `npm run typecheck`, `npm run lint`, `npm run format:check`, architecture test: clean
-* Migration `0034_hospital_patients`: 3 tables
-* `npm test`: 305 passed. The new `test/unit/hospital/patient.spec.ts` covers:
+* Migrations `0034_hospital_patients` (3 tables) and `0035_hospital_patient_contact_phone`
+* `npm test`: 306 passed. The new `test/unit/hospital/patient.spec.ts` covers:
   * UHID format and parsing;
   * mobile numbers;
   * age in years, months and days, and the birth date from an age, including month ends and carries;
@@ -115,8 +128,8 @@ What the old registration did, and what changes:
   * the future and 130-year limits;
   * ID documents;
   * the patient life cycle.
-* `npm run test:int`: 16 passed (migration count 35, new tables)
-* `npm run test:e2e`: 118 passed. The new `test/e2e/hospital-patients.e2e-spec.ts` covers:
+* `npm run test:int`: 16 passed (migration count 36, new tables)
+* `npm run test:e2e`: 119 passed. The new `test/e2e/hospital-patients.e2e-spec.ts` covers:
   * registration refused without the permission;
   * UHIDs 1 and 2;
   * a duplicate refused, named in the refusal, and found by `matches`;
@@ -130,6 +143,8 @@ What the old registration did, and what changes:
   * deactivation refused to a clerk, then done by a manager: hidden from search and locked against changes, then
     reactivated;
   * photo upload, view and removal;
-  * the card PDF and the register Excel.
+  * the card PDF and the register Excel;
+  * the prefix setting shown as `uhidLabel`;
+  * a newborn registered on the contact mobile, refused with neither, found by it, and refused again as a duplicate.
 * Card and register checked visually (Bangla name, barcode, photo, alert)
 * Dev server restarted; readiness 200

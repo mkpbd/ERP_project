@@ -20,6 +20,8 @@ export const GENERAL_SETTINGS_DEFAULTS = {
   addTechnologistSignatureOnReport: false,
   integratedAccountsEnabled: false,
   stockEntryGrandTotalDisabled: false,
+  /** Old AppConstant.InvPrefix ("FKH"): printed before UHIDs on cards and lists; the number is stored without it. */
+  uhidPrefix: null as string | null,
 };
 export type GeneralSettings = typeof GENERAL_SETTINGS_DEFAULTS;
 

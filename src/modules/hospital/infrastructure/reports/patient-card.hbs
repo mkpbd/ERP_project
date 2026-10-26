@@ -12,6 +12,8 @@
   .card .bars svg { width: 100%; height: 100%; display: block; }
   .card .uhid { font-weight: 800; font-size: 9pt; letter-spacing: 0.6pt; }
   .card .alert { color: #b00; font-weight: 700; }
+  .card .qr { width: 15mm; height: 15mm; margin-left: auto; align-self: flex-end; }
+  .card .qr svg { width: 100%; height: 100%; display: block; }
 </style>
 {{#with data}}
 <div class="card">
@@ -27,11 +29,12 @@
     <div>
       <div class="name">{{#if patient.title}}{{patient.title}} {{/if}}{{patient.fullName}}</div>
       <div>{{patient.sex}} · {{patient.age}}{{#if patient.bloodGroup}} · Blood {{patient.bloodGroup}}{{/if}}</div>
-      <div>Born {{date patient.dateOfBirth}}{{#if patient.birthEstimated}} (est.){{/if}} · {{patient.mobileNo}}</div>
+      <div>Born {{date patient.dateOfBirth}}{{#if patient.birthEstimated}} (est.){{/if}}{{#if patient.phone}} · {{patient.phone}}{{#if patient.phoneIsContact}} (contact){{/if}}{{/if}}</div>
       {{#if patient.specialAlert}}<div class="alert">{{patient.specialAlert}}</div>{{/if}}
       <div class="bars">{{{barcode}}}</div>
-      <div class="uhid">UHID {{patient.uhid}}</div>
+      <div class="uhid">UHID {{patient.uhidLabel}}</div>
     </div>
+    <div class="qr">{{{qr}}}</div>
   </div>
   <div class="what">Issued {{date issuedOn}} · bring this card to every visit</div>
 </div>

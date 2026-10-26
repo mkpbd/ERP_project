@@ -49,7 +49,7 @@ export class DrizzlePatientRepository extends PatientRepository {
   }
 
   async possibleDuplicates(params: {
-    mobileNo: string;
+    phone: string;
     fullName: string;
     dateOfBirth: string | null;
     excludeId?: string;
@@ -62,12 +62,13 @@ export class DrizzlePatientRepository extends PatientRepository {
         fullName: patients.fullName,
         dateOfBirth: patients.dateOfBirth,
         mobileNo: patients.mobileNo,
+        contactMobileNo: patients.contactMobileNo,
       })
       .from(patients)
       .where(
         and(
           eq(patients.isActive, true),
-          eq(patients.mobileNo, params.mobileNo),
+          or(eq(patients.mobileNo, params.phone), eq(patients.contactMobileNo, params.phone)),
           params.dateOfBirth ? or(sameName, eq(patients.dateOfBirth, params.dateOfBirth)) : sameName,
           params.excludeId ? ne(patients.id, params.excludeId) : undefined,
         ),
@@ -118,6 +119,7 @@ const summaryColumns = {
   dateOfBirth: patients.dateOfBirth,
   birthEstimated: patients.birthEstimated,
   mobileNo: patients.mobileNo,
+  contactMobileNo: patients.contactMobileNo,
   registeredOn: patients.registeredOn,
   confidential: patients.confidential,
   isActive: patients.isActive,
@@ -135,7 +137,9 @@ export class DrizzlePatientReadRepository extends PatientReadRepository {
     const search = q
       ? or(
           filter.uhid !== null ? eq(patients.uhid, filter.uhid) : undefined,
-          mobile && /^\d{4,11}$/.test(mobile) ? sql`${patients.mobileNo} like ${`${mobile}%`}` : undefined,
+          mobile && /^\d{4,11}$/.test(mobile)
+            ? or(sql`${patients.mobileNo} like ${`${mobile}%`}`, sql`${patients.contactMobileNo} like ${`${mobile}%`}`)
+            : undefined,
           ilike(patients.fullName, `%${escapeLike(q)}%`),
         )
       : undefined;

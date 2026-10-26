@@ -6,7 +6,8 @@ export interface PatientMatch {
   readonly uhid: number;
   readonly fullName: string;
   readonly dateOfBirth: string;
-  readonly mobileNo: string;
+  readonly mobileNo: string | null;
+  readonly contactMobileNo: string | null;
 }
 
 export abstract class PatientRepository {
@@ -15,9 +16,9 @@ export abstract class PatientRepository {
   abstract update(patient: Patient): Promise<void>;
   /** The next serial of the year, counted under a row lock (never handed out twice). */
   abstract nextSerial(year: number): Promise<number>;
-  /** Active patients on the same mobile number with the same name or date of birth. */
+  /** Active patients reached on the same phone (their own or their contact's) with the same name or birth date. */
   abstract possibleDuplicates(params: {
-    mobileNo: string;
+    phone: string;
     fullName: string;
     dateOfBirth: string | null;
     excludeId?: string;

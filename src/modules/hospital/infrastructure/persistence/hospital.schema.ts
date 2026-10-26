@@ -60,7 +60,8 @@ export const patients = pgTable(
     fatherName: text('father_name'),
     motherName: text('mother_name'),
     spouseName: text('spouse_name'),
-    mobileNo: text('mobile_no').notNull(),
+    /** Null when the patient has none (a newborn, an emergency); the contact's mobile is then required. */
+    mobileNo: text('mobile_no'),
     email: text('email'),
     idType: text('id_type', { enum: ID_TYPES }),
     idNo: text('id_no'),
@@ -89,6 +90,7 @@ export const patients = pgTable(
   (t) => [
     uniqueIndex('hospital_patients_uhid_uq').on(t.uhid),
     index('hospital_patients_mobile_idx').on(t.mobileNo),
+    index('hospital_patients_contact_mobile_idx').on(t.contactMobileNo),
     index('hospital_patients_name_idx').on(sql`lower(${t.fullName})`),
     index('hospital_patients_registered_idx').on(t.registeredOn),
     // One active record per ID document; a deactivated duplicate may keep it.
@@ -96,7 +98,8 @@ export const patients = pgTable(
       .on(t.idType, t.idNo)
       .where(sql`${t.isActive} and ${t.idNo} is not null`),
     check('hospital_patients_uhid_ck', sql`${t.uhid} > 0`),
-    check('hospital_patients_mobile_ck', sql`${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
+    check('hospital_patients_mobile_ck', sql`${t.mobileNo} is null or ${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
+    check('hospital_patients_phone_ck', sql`${t.mobileNo} is not null or ${t.contactMobileNo} is not null`),
     check('hospital_patients_name_ck', sql`char_length(${t.fullName}) between 1 and 150`),
     check('hospital_patients_id_ck', sql`(${t.idType} is null) = (${t.idNo} is null)`),
     check('hospital_patients_inactive_ck', sql`${t.isActive} or ${t.inactiveReason} is not null`),

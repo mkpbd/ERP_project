@@ -2,6 +2,7 @@ import { Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
+import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { HOSPITAL_SETTINGS, PATIENT_HANDLERS } from './application/patient.handlers.js';
 import { PatientReadRepository } from './application/patient.messages.js';
@@ -35,10 +36,11 @@ export class HospitalModule implements OnModuleInit {
     private readonly reports: ReportRegistry,
     private readonly read: PatientReadRepository,
     private readonly locations: LocationDirectory,
+    private readonly organization: OrganizationProfile,
   ) {}
 
   onModuleInit(): void {
-    this.reports.register(patientCardReport(this.read));
-    this.reports.register(patientRegisterReport(this.read, this.locations));
+    this.reports.register(patientCardReport(this.read, this.organization));
+    this.reports.register(patientRegisterReport(this.read, this.locations, this.organization));
   }
 }
