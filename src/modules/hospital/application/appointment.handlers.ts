@@ -8,8 +8,9 @@ import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { Appointment, chooseSerial, feeFor, slotTime, weekdayOf } from '../domain/appointment.js';
+import { suggestedVisit } from '../domain/opd-bill.js';
 import { normalMobile } from '../domain/patient.js';
-import { AppointmentRepository } from '../domain/repositories.js';
+import { AppointmentRepository, OpdBillRepository } from '../domain/repositories.js';
 import {
   AppointmentReadRepository,
   BookAppointmentCommand,
@@ -29,6 +30,7 @@ export class AppointmentDesk {
     readonly audit: AuditTrail,
     readonly clock: Clock,
     readonly appointments: AppointmentRepository,
+    readonly bills: OpdBillRepository,
     readonly read: AppointmentReadRepository,
     @Inject(HOSPITAL_SETTINGS) readonly settings: HospitalSettings,
   ) {}
@@ -94,18 +96,25 @@ export class BookAppointmentHandler implements ICommandHandler<BookAppointmentCo
       await desk.tx.lock(`hospital:appointments:${doctor.id}:${input.appointmentDate}`);
       const taken = await desk.appointments.takenSerials(doctor.id, input.appointmentDate);
       const serial = chooseSerial(sitting, taken, input.serial);
+      const visitType =
+        input.visitType ??
+        suggestedVisit(
+          patient ? await desk.bills.lastVisitOn(patient.id, doctor.id) : null,
+          input.appointmentDate,
+          (await desk.bills.policy()).followUpDays,
+        );
       const appointment = Appointment.book({
         id: randomUUID(),
         doctorId: doctor.id,
         appointmentDate: input.appointmentDate,
         serial,
         slotTime: slotTime(sitting, serial),
-        visitType: input.visitType,
+        visitType,
         patientId: patient?.id ?? null,
         patientName: patient?.fullName ?? input.patientName!,
         mobileNo: patient?.mobileNo ?? normalMobile(input.mobileNo!),
         referredById: input.referredById,
-        fee: feeFor(doctor, input.visitType),
+        fee: feeFor(doctor, visitType),
         remarks: input.remarks,
         bookedBy: actor.userId,
         today: desk.today(),

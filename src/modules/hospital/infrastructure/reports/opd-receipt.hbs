@@ -1,0 +1,51 @@
+<style>
+  /* An 80 mm roll: 70 mm of print inside the 5 mm margins. */
+  .receipt { width: 70mm; font-size: 8pt; line-height: 1.3; }
+  .receipt .head { text-align: center; margin-bottom: 1.5mm; }
+  .receipt .head .org { font-weight: 700; font-size: 10pt; }
+  .receipt .bars { width: 60mm; height: 9mm; margin: 1mm auto 0; }
+  .receipt .bars svg { width: 100%; height: 100%; display: block; }
+  .receipt .rule { border-top: 0.2mm dashed #000; margin: 1.5mm 0; }
+  .receipt table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .receipt td { padding: 0.4mm 0; vertical-align: top; }
+  .receipt .num { text-align: right; white-space: nowrap; }
+  .receipt .small { font-size: 6.5pt; color: #333; }
+  .receipt .total td { font-weight: 700; }
+  .receipt .stamp { text-align: center; font-weight: 800; font-size: 13pt; letter-spacing: 2pt; border: 0.4mm solid #000; margin: 1.5mm 8mm; }
+</style>
+{{#with data}}
+<div class="receipt">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div class="small">{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div>OPD consultation {{bill.number}} · {{date bill.billedOn}}</div>
+    <div class="bars">{{{barcode}}}</div>
+  </div>
+  <div class="rule"></div>
+  <table>
+    <tr><td>UHID</td><td>{{bill.uhidLabel}}</td></tr>
+    <tr><td>Patient</td><td>{{bill.patientName}} · {{bill.age}}</td></tr>
+    {{#if bill.mobileNo}}<tr><td>Mobile</td><td>{{bill.mobileNo}}</td></tr>{{/if}}
+    {{#if bill.referredByName}}<tr><td>Referred by</td><td>{{bill.referredByName}}</td></tr>{{/if}}
+  </table>
+  <div class="rule"></div>
+  <table>
+    {{#each bill.lines}}
+    <tr><td>{{doctorName}}<br /><span class="small">{{visit}}{{#if roomNo}} · Room {{roomNo}}{{/if}}</span></td><td class="num">{{money fee}}</td></tr>
+    {{/each}}
+  </table>
+  <div class="rule"></div>
+  <table>
+    <tr><td>Total</td><td class="num">{{money bill.gross}}</td></tr>
+    {{#if bill.discount}}<tr><td>Discount{{#if bill.discountReason}} <span class="small">({{bill.discountReason}})</span>{{/if}}</td><td class="num">{{money bill.discount}}</td></tr>{{/if}}
+    <tr class="total"><td>Payable</td><td class="num">{{money bill.net}}</td></tr>
+    {{#each bill.payments}}
+    <tr><td class="small">{{#if (eq kind "refund")}}Paid back{{else if (eq kind "collection")}}Collected {{number}}{{else}}Paid{{/if}} · {{methodLabel}}{{#if reference}} ({{reference}}){{/if}} · {{date paidOn}}</td><td class="num">{{money amount}}</td></tr>
+    {{/each}}
+    {{#if bill.due}}<tr class="total"><td>Due</td><td class="num">{{money bill.due}}</td></tr>{{/if}}
+  </table>
+  <div class="stamp">{{bill.stamp}}</div>
+  {{#if bill.cancelReason}}<div class="small">Cancelled {{date bill.cancelledOn}}: {{bill.cancelReason}}</div>{{/if}}
+  <div class="small" style="text-align: center">{{amountInWords bill.net}} · printed by {{printedBy}}</div>
+</div>
+{{/with}}

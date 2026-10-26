@@ -181,6 +181,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET` doctors, specialities, schedules, days off, appointments and the doctor board | `opd:read` |
 | doctors, specialities, chamber schedules and days off | `opd:manage` |
 | booking appointments; arrival, no-show, cancellation, attaching the patient | `opd:book` |
+| OPD consultation bills, due collections, cancelling a bill on its own day | `opd:bill` |
+| a consultation discount above the counter's limit | `opd:discount` |
+| the OPD policy (follow-up days, default doctor share, counter discount limit); cancelling a bill later | `opd:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

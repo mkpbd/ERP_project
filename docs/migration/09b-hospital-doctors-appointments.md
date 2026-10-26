@@ -1,7 +1,7 @@
 # Step 9b — Hospital: doctors, chamber schedules and appointments
 
-Status: **done** (2026-10-26). Previous: [step 9a](09a-hospital-patient-registration.md) · Next: step 9c (OPD
-consultation billing, the doctor's share and collections).
+Status: **done** (2026-10-26). Previous: [step 9a](09a-hospital-patient-registration.md) · Next: [step 9c](09c-hospital-opd-billing.md)
+(OPD consultation billing).
 
 The OPD part of step 9 is in two pieces. This step has the doctors, schedules and appointment books, with no money.
 Step 9c bills the consultation.

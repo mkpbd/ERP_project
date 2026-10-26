@@ -6,11 +6,24 @@ import { OrganizationProfile } from '../../shared/application/contracts/organiza
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
+import { OPD_HANDLERS } from './application/opd.handlers.js';
+import { OpdBillReadRepository } from './application/opd.messages.js';
 import { AppointmentReadRepository } from './application/appointment.messages.js';
 import { HOSPITAL_SETTINGS, PATIENT_HANDLERS } from './application/patient.handlers.js';
 import { PatientReadRepository } from './application/patient.messages.js';
-import { AppointmentRepository, PatientRepository } from './domain/repositories.js';
+import { AppointmentRepository, OpdBillRepository, PatientRepository } from './domain/repositories.js';
+import {
+  DrizzleOpdBillReadRepository,
+  DrizzleOpdBillRepository,
+} from './infrastructure/persistence/drizzle-opd.repositories.js';
+import {
+  doctorConsultationsReport,
+  opdCollectionReport,
+  opdReceiptReport,
+} from './infrastructure/reports/opd.reports.js';
+import { OPD_CONTROLLERS } from './presentation/opd.controllers.js';
 import {
   DrizzleAppointmentReadRepository,
   DrizzleAppointmentRepository,
@@ -28,17 +41,20 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
- * chamber schedules and appointments (step 9b). Consultation billing and admissions follow in later steps.
+ * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c). Consultation billing and admissions follow in later steps.
  */
 @Module({
-  controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS],
+  controllers: [...PATIENT_CONTROLLERS, ...DOCTOR_CONTROLLERS, ...APPOINTMENT_CONTROLLERS, ...OPD_CONTROLLERS],
   providers: [
     ...PATIENT_HANDLERS,
     ...APPOINTMENT_HANDLERS,
+    ...OPD_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
     { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
     { provide: AppointmentReadRepository, useClass: DrizzleAppointmentReadRepository },
+    { provide: OpdBillRepository, useClass: DrizzleOpdBillRepository },
+    { provide: OpdBillReadRepository, useClass: DrizzleOpdBillReadRepository },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -55,6 +71,8 @@ export class HospitalModule implements OnModuleInit {
     private readonly locations: LocationDirectory,
     private readonly organization: OrganizationProfile,
     private readonly appointments: AppointmentReadRepository,
+    private readonly bills: OpdBillReadRepository,
+    private readonly users: UserDirectory,
   ) {}
 
   onModuleInit(): void {
@@ -63,5 +81,8 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(patientRegisterReport(this.read, this.locations, this.organization));
     this.reports.register(doctorAppointmentsReport(this.appointments, this.organization));
     this.reports.register(appointmentSlipReport(this.appointments, this.organization));
+    this.reports.register(opdReceiptReport(this.bills, this.organization));
+    this.reports.register(opdCollectionReport(this.context, this.users));
+    this.reports.register(doctorConsultationsReport(this.context));
   }
 }

@@ -1,0 +1,44 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th rowspan="2" class="center" style="width: 24px">#</th><th rowspan="2">Doctor</th>
+      <th class="center" colspan="4">Visits</th><th rowspan="2" class="num">Fees</th>
+      <th class="center" colspan="2">Cancelled</th><th rowspan="2" class="num">Net fees</th>
+      <th class="center" colspan="3">Doctor's share</th>
+    </tr>
+    <tr>
+      <th class="num">First</th><th class="num">New</th><th class="num">Follow-up</th><th class="num">Report</th>
+      <th class="num">Visits</th><th class="num">Fees</th>
+      <th class="num">Earned</th><th class="num">Taken back</th><th class="num">Net</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{doctorName}}</td>
+      <td class="num">{{first}}</td><td class="num">{{new}}</td><td class="num">{{follow_up}}</td><td class="num">{{report}}</td>
+      <td class="num">{{money fees}}</td>
+      <td class="num">{{cancelledVisits}}</td><td class="num">{{money cancelledFees}}</td>
+      <td class="num"><b>{{money netFees}}</b></td>
+      <td class="num">{{money shareEarned}}</td><td class="num">{{money shareReversed}}</td>
+      <td class="num"><b>{{money netShare}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="2">Total</td>
+      <td class="num">{{total.first}}</td><td class="num">{{total.new}}</td><td class="num">{{total.follow_up}}</td><td class="num">{{total.report}}</td>
+      <td class="num">{{money total.fees}}</td>
+      <td class="num">{{total.cancelledVisits}}</td><td class="num">{{money total.cancelledFees}}</td>
+      <td class="num">{{money total.netFees}}</td>
+      <td class="num">{{money total.shareEarned}}</td><td class="num">{{money total.shareReversed}}</td>
+      <td class="num">{{money total.netShare}}</td>
+    </tr>
+  </tbody>
+</table>
+<p style="margin: 4px 0 0"><small>Visits billed in the period; cancellations and shares taken back on their own date.</small></p>
+{{else}}
+<p>No consultation in this period.</p>
+{{/if}}
+{{/with}}

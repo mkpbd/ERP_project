@@ -34,7 +34,7 @@ class BookAppointmentDto extends createZodDto(
   z.strictObject({
     doctorId: z.uuid(),
     appointmentDate: day,
-    visitType: z.enum(VISIT_TYPES).default('new'),
+    visitType: z.enum(VISIT_TYPES).nullable().default(null),
     serial: z.int().min(1).max(500).nullable().default(null),
     patientId: z.uuid().nullable().default(null),
     patientName: z.string().trim().min(1).max(150).nullable().default(null),

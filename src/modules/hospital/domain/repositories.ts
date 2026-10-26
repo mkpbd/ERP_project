@@ -1,5 +1,6 @@
 import type { StoredFile } from '../../../shared/domain/uploads.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
+import type { OpdBill } from './opd-bill.js';
 import type { IdType, Patient } from './patient.js';
 
 export interface PatientMatch {
@@ -50,4 +51,45 @@ export abstract class AppointmentRepository {
   abstract takenSerials(doctorId: string, date: string): Promise<Set<number>>;
   /** An active patient's name and the number to reach them on (their own mobile, else their contact's). */
   abstract patientContact(id: string): Promise<{ id: string; fullName: string; mobileNo: string } | null>;
+}
+
+export interface OpdPolicy {
+  readonly followUpDays: number;
+  readonly defaultSharePercent: number;
+  readonly counterDiscountPercent: number;
+}
+
+/** A doctor as billed: fees, own share (null = the policy's) and whether they see patients here. */
+export interface BillableDoctor extends BookableDoctor {
+  readonly sharePercent: number | null;
+}
+
+export interface DoctorLedgerEntry {
+  readonly doctorId: string;
+  readonly entryOn: string;
+  readonly kind: 'share' | 'reversal';
+  readonly billId: string;
+  readonly documentNumber: string;
+  readonly amount: number;
+}
+
+export abstract class OpdBillRepository {
+  abstract findForUpdate(id: string): Promise<OpdBill | null>;
+  /** Saves the bill, its lines and its payment. */
+  abstract insert(bill: OpdBill, by: string): Promise<void>;
+  /** Saves the header and the payments not saved yet, on the voucher they were posted with. */
+  abstract update(bill: OpdBill, by: string, voucherNumber: string | null): Promise<void>;
+  abstract nextSerial(kind: string, year: number): Promise<number>;
+  abstract policy(): Promise<OpdPolicy>;
+  abstract savePolicy(policy: OpdPolicy, by: string, now: Date): Promise<void>;
+  abstract doctors(ids: readonly string[]): Promise<Map<string, BillableDoctor>>;
+  /** The last day the patient was billed for this doctor (bills not cancelled). */
+  abstract lastVisitOn(patientId: string, doctorId: string): Promise<string | null>;
+  abstract addLedger(entries: readonly DoctorLedgerEntry[]): Promise<void>;
+  abstract addUhidUse(use: {
+    patientId: string;
+    usedOn: string;
+    service: string;
+    documentNumber: string;
+  }): Promise<void>;
 }

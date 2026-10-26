@@ -50,10 +50,12 @@ const doctor = shapes(
     newVisitFee: fee,
     followUpFee: fee,
     reportFee: fee,
+    /** The doctor's share of their fees; null takes the OPD policy's default. */
+    sharePercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
     userId: z.uuid().nullable(),
     isActive: z.boolean(),
   },
-  ['code', 'degrees', 'specialityId', 'phone', 'roomNo', 'userId'],
+  ['code', 'degrees', 'specialityId', 'phone', 'roomNo', 'sharePercent', 'userId'],
   { isConsultant: false, firstVisitFee: 0, newVisitFee: 0, followUpFee: 0, reportFee: 0, isActive: true },
 );
 class CreateDoctorDto extends createZodDto(doctor.create) {}

@@ -63,7 +63,8 @@ export abstract class AppointmentReadRepository {
 export interface BookingInput {
   readonly doctorId: string;
   readonly appointmentDate: string;
-  readonly visitType: VisitType;
+  /** Left out: a follow-up when the patient saw the doctor within the policy's days, else new. */
+  readonly visitType: VisitType | null;
   /** A serial asked for; null takes the first free one. */
   readonly serial: number | null;
   readonly patientId: string | null;

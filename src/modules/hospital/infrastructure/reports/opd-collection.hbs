@@ -1,0 +1,42 @@
+{{#with data}}
+{{#if people.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th rowspan="2">User</th><th rowspan="2" class="num">Bills</th>
+      <th class="center" colspan="3">At billing</th><th class="center" colspan="3">Dues collected</th>
+      <th class="center" colspan="3">Paid back</th><th class="center" colspan="4">To hand over</th>
+    </tr>
+    <tr>
+      <th class="num">Cash</th><th class="num">Card</th><th class="num">Wallet</th>
+      <th class="num">Cash</th><th class="num">Card</th><th class="num">Wallet</th>
+      <th class="num">Cash</th><th class="num">Card</th><th class="num">Wallet</th>
+      <th class="num">Cash</th><th class="num">Card</th><th class="num">Wallet</th><th class="num">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each people}}
+    <tr>
+      <td>{{name}}</td><td class="num">{{bills}}</td>
+      <td class="num">{{money payment.cash}}</td><td class="num">{{money payment.card}}</td><td class="num">{{money payment.mobile}}</td>
+      <td class="num">{{money collection.cash}}</td><td class="num">{{money collection.card}}</td><td class="num">{{money collection.mobile}}</td>
+      <td class="num">{{money refund.cash}}</td><td class="num">{{money refund.card}}</td><td class="num">{{money refund.mobile}}</td>
+      <td class="num"><b>{{money net.cash}}</b></td><td class="num">{{money net.card}}</td><td class="num">{{money net.mobile}}</td><td class="num"><b>{{money net.total}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td>Total</td><td class="num">{{total.bills}}</td>
+      <td class="num">{{money total.payment.cash}}</td><td class="num">{{money total.payment.card}}</td><td class="num">{{money total.payment.mobile}}</td>
+      <td class="num">{{money total.collection.cash}}</td><td class="num">{{money total.collection.card}}</td><td class="num">{{money total.collection.mobile}}</td>
+      <td class="num">{{money total.refund.cash}}</td><td class="num">{{money total.refund.card}}</td><td class="num">{{money total.refund.mobile}}</td>
+      <td class="num">{{money total.net.cash}}</td><td class="num">{{money total.net.card}}</td><td class="num">{{money total.net.mobile}}</td><td class="num">{{money total.net.total}}</td>
+    </tr>
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Handed over by</td><td>Received by</td><td>Accounts</td></tr>
+</table>
+{{else}}
+<p>Nothing was taken or paid back in this period.</p>
+{{/if}}
+{{/with}}

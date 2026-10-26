@@ -15,6 +15,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import { districts } from '../../../location/infrastructure/persistence/location.schema.js';
@@ -26,6 +27,7 @@ const SEXES = ['male', 'female', 'other'] as const;
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] as const;
 const MARITAL_STATUSES = ['single', 'married', 'widowed', 'divorced', 'separated'] as const;
 const ID_TYPES = ['nid', 'passport', 'driving_licence', 'birth_certificate'] as const;
+const percent = (name: string) => numeric(name, { precision: 5, scale: 2, mode: 'number' });
 const money = (name: string) => numeric(name, { precision: 12, scale: 2, mode: 'number' });
 const VISIT_TYPES = ['first', 'new', 'follow_up', 'report'] as const;
 const APPOINTMENT_STATUSES = ['booked', 'arrived', 'no_show', 'cancelled'] as const;
@@ -163,6 +165,8 @@ export const doctors = pgTable(
     newVisitFee: money('new_visit_fee').notNull().default(0),
     followUpFee: money('follow_up_fee').notNull().default(0),
     reportFee: money('report_fee').notNull().default(0),
+    /** The doctor's share of their fees; null takes the OPD policy's default. */
+    sharePercent: percent('share_percent'),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: tz('created_at').notNull().defaultNow(),
@@ -172,6 +176,7 @@ export const doctors = pgTable(
     uniqueIndex('hospital_doctors_code_uq').on(sql`upper(${t.code})`),
     uniqueIndex('hospital_doctors_user_uq').on(t.userId),
     index('hospital_doctors_name_idx').on(sql`lower(${t.name})`),
+    check('hospital_doctors_share_ck', sql`${t.sharePercent} is null or ${t.sharePercent} between 0 and 100`),
     check('hospital_doctors_name_ck', sql`char_length(${t.name}) between 1 and 150`),
     check(
       'hospital_doctors_fees_ck',
@@ -246,6 +251,8 @@ export const appointments = pgTable(
     fee: money('fee').notNull(),
     status: text('status', { enum: APPOINTMENT_STATUSES }).notNull(),
     statusReason: text('status_reason'),
+    /** The consultation bill it was billed on (once). */
+    billId: uuid('bill_id').references((): AnyPgColumn => opdBills.id, { onDelete: 'restrict' }),
     remarks: text('remarks'),
     bookedBy: uuid('booked_by').references(() => users.id, { onDelete: 'set null' }),
     version: integer('version').notNull(),
@@ -263,4 +270,161 @@ export const appointments = pgTable(
     check('hospital_appointments_mobile_ck', sql`${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
     check('hospital_appointments_fee_ck', sql`${t.fee} >= 0`),
   ],
+);
+
+// OPD rules in one row (the old page had none: the visit type was picked by hand, the doctor's share was 40 % in the
+// code and any discount was allowed).
+export const opdPolicy = pgTable(
+  'hospital_opd_policy',
+  {
+    id: smallint('id').primaryKey(),
+    /** A visit to the same doctor within these days is a follow-up. */
+    followUpDays: smallint('follow_up_days').notNull(),
+    /** The doctor's share of a fee when the doctor has none of their own. */
+    defaultSharePercent: percent('default_share_percent').notNull(),
+    /** The discount a counter may give without opd:discount, as a share of the bill. */
+    counterDiscountPercent: percent('counter_discount_percent').notNull(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    check('hospital_opd_policy_single_ck', sql`${t.id} = 1`),
+    check('hospital_opd_policy_days_ck', sql`${t.followUpDays} between 0 and 365`),
+    check(
+      'hospital_opd_policy_percent_ck',
+      sql`${t.defaultSharePercent} between 0 and 100 and ${t.counterDiscountPercent} between 0 and 100`,
+    ),
+  ],
+);
+
+// Old OPD.PatientRecordConsultancyFees (header) and ConsultancyDetails (lines): a consultation bill of a registered
+// patient, one line per doctor seen, with the doctor's share worked out on each line.
+export const opdBills = pgTable(
+  'hospital_opd_bills',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    appointmentId: uuid('appointment_id').references((): AnyPgColumn => appointments.id, { onDelete: 'restrict' }),
+    billedOn: day('billed_on').notNull(),
+    referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    gross: money('gross').notNull(),
+    discount: money('discount').notNull(),
+    discountReason: text('discount_reason'),
+    net: money('net').notNull(),
+    /** Paid at billing. */
+    paid: money('paid').notNull(),
+    /** Collected later against the due. */
+    collected: money('collected').notNull().default(0),
+    status: text('status', { enum: ['billed', 'cancelled'] }).notNull(),
+    cancelReason: text('cancel_reason'),
+    cancelledOn: day('cancelled_on'),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    refunded: money('refunded').notNull().default(0),
+    voucherNumber: text('voucher_number'),
+    cancelVoucherNumber: text('cancel_voucher_number'),
+    billedBy: uuid('billed_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_opd_bills_number_uq').on(t.number),
+    uniqueIndex('hospital_opd_bills_appointment_uq').on(t.appointmentId),
+    index('hospital_opd_bills_patient_idx').on(t.patientId),
+    index('hospital_opd_bills_billed_idx').on(t.billedOn),
+    check(
+      'hospital_opd_bills_amounts_ck',
+      sql`${t.discount} >= 0 and ${t.discount} <= ${t.gross} and ${t.net} = ${t.gross} - ${t.discount} and ${t.paid} >= 0 and ${t.collected} >= 0 and ${t.paid} + ${t.collected} <= ${t.net}`,
+    ),
+  ],
+);
+
+export const opdBillLines = pgTable(
+  'hospital_opd_bill_lines',
+  {
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => opdBills.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    visitType: text('visit_type', { enum: VISIT_TYPES }).notNull(),
+    fee: money('fee').notNull(),
+    sharePercent: percent('share_percent').notNull(),
+    shareAmount: money('share_amount').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.billId, t.position] }),
+    index('hospital_opd_bill_lines_doctor_idx').on(t.doctorId),
+    check(
+      'hospital_opd_bill_lines_amounts_ck',
+      sql`${t.fee} >= 0 and ${t.shareAmount} >= 0 and ${t.shareAmount} <= ${t.fee}`,
+    ),
+  ],
+);
+
+// Old OPDConsultancyLedger payment rows (Payment, DueCollection, Refund): money in and out of a bill, by method.
+export const opdPayments = pgTable(
+  'hospital_opd_payments',
+  {
+    id: uuid('id').primaryKey(),
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => opdBills.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: ['payment', 'collection', 'refund'] }).notNull(),
+    /** Receipt number of a collection. */
+    number: text('number'),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    amount: money('amount').notNull(),
+    paidOn: day('paid_on').notNull(),
+    receivedBy: uuid('received_by').references(() => users.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('hospital_opd_payments_bill_idx').on(t.billId),
+    index('hospital_opd_payments_paid_idx').on(t.paidOn),
+    check('hospital_opd_payments_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// Old Account.ConsultantGlobalLedgers for OPD (written against the bill line id instead of the doctor, at a hard-coded
+// 40 %, and never reversed): each doctor's share as it is earned and taken back.
+export const doctorLedger = pgTable(
+  'hospital_doctor_ledger',
+  {
+    id: uuid('id').primaryKey(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    entryOn: day('entry_on').notNull(),
+    kind: text('kind', { enum: ['share', 'reversal'] }).notNull(),
+    billId: uuid('bill_id').references(() => opdBills.id, { onDelete: 'restrict' }),
+    documentNumber: text('document_number').notNull(),
+    /** Earned (+) or taken back (−). */
+    amount: money('amount').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('hospital_doctor_ledger_doctor_idx').on(t.doctorId, t.entryOn)],
+);
+
+// Old Admin.UHIDUsesRecords: each time a UHID is used by a service (the visit log behind the UHID dashboard).
+export const uhidUses = pgTable(
+  'hospital_uhid_uses',
+  {
+    id: uuid('id').primaryKey(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    usedOn: day('used_on').notNull(),
+    service: text('service').notNull(),
+    documentNumber: text('document_number').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [index('hospital_uhid_uses_patient_idx').on(t.patientId, t.usedOn)],
 );

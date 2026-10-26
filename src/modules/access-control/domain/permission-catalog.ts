@@ -75,6 +75,8 @@ export const PERMISSION_CATALOG = [
   { key: 'pharmacy:count', description: 'Open, count and cancel stock counts at the outlets you work at' },
   { key: 'opd:read', description: 'See doctors, their chamber schedules and the appointment books' },
   { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
+  { key: 'opd:bill', description: 'Bill consultations, collect their dues and cancel bills on their own day' },
+  { key: 'opd:discount', description: "Give a consultation discount above the counter's limit" },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },
   { key: 'patient:register', description: 'Register patients, give UHIDs and change their details and photos' },

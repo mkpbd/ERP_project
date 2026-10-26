@@ -77,6 +77,7 @@ export interface AppointmentProps {
   fee: number;
   status: AppointmentStatus;
   statusReason: string | null;
+  billId: string | null;
   remarks: string | null;
   bookedBy: string | null;
   version: number;
@@ -91,7 +92,7 @@ export class Appointment {
   static book(
     params: Omit<
       AppointmentProps,
-      'status' | 'statusReason' | 'version' | 'createdAt' | 'updatedAt' | 'patientName' | 'remarks'
+      'status' | 'statusReason' | 'billId' | 'version' | 'createdAt' | 'updatedAt' | 'patientName' | 'remarks'
     > & { patientName: string; remarks: string | null; today: string; now: Date },
   ): Appointment {
     if (params.appointmentDate < params.today) {
@@ -106,6 +107,7 @@ export class Appointment {
       remarks: text(params.remarks, 300, 'remarks'),
       status: 'booked',
       statusReason: null,
+      billId: null,
       version: 1,
       createdAt: now,
       updatedAt: now,
@@ -145,6 +147,31 @@ export class Appointment {
       throw new DomainError('invalid_date', 'A patient arrives on the day of the appointment');
     }
     this.props.status = 'arrived';
+    this.touch(now);
+  }
+
+  /** Booked or arrived, and not billed yet. */
+  assertBillable(): void {
+    if (this.props.billId !== null) throw new DomainError('appointment_billed', 'The appointment is billed already');
+    if (this.props.status !== 'booked' && this.props.status !== 'arrived') {
+      throw new DomainError(
+        'appointment_state',
+        `A ${this.props.status.replace('_', '-')} appointment cannot be billed`,
+      );
+    }
+  }
+
+  /** Billed at the counter (once): a booked patient arrives with the bill. */
+  billed(billId: string, today: string, now: Date): void {
+    if (this.props.billId !== null) throw new DomainError('appointment_billed', 'The appointment is billed already');
+    if (this.props.status === 'booked') this.arrive(today, now);
+    else if (this.props.status !== 'arrived') {
+      throw new DomainError(
+        'appointment_state',
+        `A ${this.props.status.replace('_', '-')} appointment cannot be billed`,
+      );
+    }
+    this.props.billId = billId;
     this.touch(now);
   }
 
