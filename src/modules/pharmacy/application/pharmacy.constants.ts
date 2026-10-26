@@ -11,6 +11,8 @@ export const PHARMACY_RECORDS = {
   product: 'product',
   outlet: 'outlet',
   outletUser: 'outlet_user',
+  productDiscount: 'product_discount',
+  loyalMember: 'loyal_member',
   reorderLevel: 'reorder_level',
 } as const;
 
@@ -26,3 +28,5 @@ export const PHARMACY_RECEIVE = 'pharmacy:receive';
 export const PHARMACY_PAYMENT = 'pharmacy:payment';
 /** Raising outlet indents, sending transfers and accepting them, at the outlets one works at. */
 export const PHARMACY_TRANSFER = 'pharmacy:transfer';
+/** Selling over the counter at the outlets one works at, and collecting loyal members' dues. */
+export const PHARMACY_SELL = 'pharmacy:sell';

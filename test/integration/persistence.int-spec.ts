@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 29 });
+    expect(applied.rows[0]).toEqual({ n: 30 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -144,10 +144,14 @@ describe('migrations', () => {
       'pf_fixed_deposits',
       'pf_ledger_entries',
       'pharmacy_brands',
+      'pharmacy_discount_policy',
+      'pharmacy_due_collection_lines',
+      'pharmacy_due_collections',
       'pharmacy_formations',
       'pharmacy_generic_groups',
       'pharmacy_generics',
       'pharmacy_lots',
+      'pharmacy_loyal_members',
       'pharmacy_manufacturers',
       'pharmacy_movements',
       'pharmacy_openings',
@@ -156,12 +160,15 @@ describe('migrations', () => {
       'pharmacy_outlet_users',
       'pharmacy_outlets',
       'pharmacy_package_units',
+      'pharmacy_product_discounts',
       'pharmacy_products',
       'pharmacy_purchase_order_lines',
       'pharmacy_purchase_orders',
       'pharmacy_receive_lines',
       'pharmacy_receives',
       'pharmacy_reorder_levels',
+      'pharmacy_sale_lines',
+      'pharmacy_sales',
       'pharmacy_sequences',
       'pharmacy_strengths',
       'pharmacy_supplier_payment_lines',

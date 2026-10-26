@@ -1,6 +1,8 @@
 import type { LotBalance } from './allocation.js';
 import type { OutletIndent } from './outlet-indent.js';
+import type { DiscountPolicy, ProductDiscount } from './discount.js';
 import type { PharmacyOrder } from './purchase-order.js';
+import type { PharmacySale, SaleDue } from './sale.js';
 import type { OutletTransfer } from './transfer.js';
 import type { PharmacyReceive } from './receive.js';
 import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
@@ -10,7 +12,8 @@ export abstract class PharmacySequences {
   abstract next(kind: string, year: number): Promise<number>;
 }
 
-export type MovementKind = 'opening' | 'receive' | 'supplier_return' | 'replacement' | 'transfer_out' | 'transfer_in';
+export type MovementKind =
+  'opening' | 'receive' | 'supplier_return' | 'replacement' | 'transfer_out' | 'transfer_in' | 'sale' | 'sale_cancel';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -144,4 +147,36 @@ export abstract class TransferRepository {
   abstract findForUpdate(id: string): Promise<OutletTransfer | null>;
   abstract insert(transfer: OutletTransfer): Promise<void>;
   abstract update(transfer: OutletTransfer): Promise<void>;
+}
+
+export abstract class DiscountRules {
+  /** The policy, or null when none is set up. */
+  abstract policy(): Promise<DiscountPolicy | null>;
+  abstract savePolicy(policy: DiscountPolicy, by: string): Promise<void>;
+  /** The products' own rules (those that have one). */
+  abstract productRules(productIds: readonly string[]): Promise<Map<string, ProductDiscount>>;
+}
+
+export interface CollectionRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly loyalMemberId: string;
+  readonly collectedOn: string;
+  readonly method: 'cash' | 'card' | 'mobile';
+  readonly reference: string | null;
+  readonly amount: number;
+  readonly voucherNumber: string | null;
+  readonly createdBy: string;
+  readonly lines: readonly { saleId: string; amount: number }[];
+}
+
+export abstract class SaleRepository {
+  abstract findForUpdate(id: string): Promise<PharmacySale | null>;
+  abstract insert(sale: PharmacySale): Promise<void>;
+  abstract update(sale: PharmacySale): Promise<void>;
+  /** Whether the loyal member exists and is active. */
+  abstract memberIsActive(loyalMemberId: string): Promise<boolean | null>;
+  /** The member's completed sales with a due, locked. */
+  abstract memberDues(loyalMemberId: string): Promise<SaleDue[]>;
+  abstract insertCollection(collection: CollectionRecord): Promise<void>;
 }

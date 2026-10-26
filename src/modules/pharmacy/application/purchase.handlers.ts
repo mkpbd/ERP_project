@@ -46,7 +46,7 @@ export const PURCHASE_JOURNAL = 'JV';
 export const PHARMACY_INVENTORY_ROLE = 'pharmacy_inventory';
 export const SUPPLIER_PAYABLE_ROLE = 'supplier_payable';
 
-export type DocumentKind = 'PO' | 'GR' | 'OP' | 'SP' | 'RT' | 'OI' | 'TT';
+export type DocumentKind = 'PO' | 'GR' | 'OP' | 'SP' | 'RT' | 'OI' | 'TT' | 'SI' | 'DC';
 
 /** What the purchase and stock handlers share. */
 @Injectable()

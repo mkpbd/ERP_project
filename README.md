@@ -170,6 +170,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | medicine receives (draft, edit, post, delete) and supplier returns (draft, send, settle, close) | `pharmacy:receive` + works at the outlet (or `pharmacy:manage`) |
 | supplier payments | `pharmacy:payment` |
 | outlet indents (raise, edit, cancel, close) and transfers (send, accept, reject) | `pharmacy:transfer` + works at the outlet concerned |
+| counter sales; collecting loyal member dues | `pharmacy:sell` (+ works at the outlet for sales) |
+| discount policy and product discounts, loyal members, cancelling sales | `pharmacy:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

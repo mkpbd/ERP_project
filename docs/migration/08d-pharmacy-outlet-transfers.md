@@ -1,6 +1,6 @@
 # Step 8d — Pharmacy: outlet indents and transfers
 
-Status: **done** (2026-10-26). Previous: [step 8c](08c-pharmacy-supplier-payments-returns.md) · Next: step 8e
+Status: **done** (2026-10-26). Previous: [step 8c](08c-pharmacy-supplier-payments-returns.md) · Next: [step 8e](08e-pharmacy-counter-sales.md)
 (counter sales).
 
 ## Where the old logic lives

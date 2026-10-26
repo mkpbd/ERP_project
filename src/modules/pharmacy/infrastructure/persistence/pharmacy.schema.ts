@@ -232,6 +232,8 @@ export const PHARMACY_MOVEMENT_KINDS = [
   'replacement',
   'transfer_out',
   'transfer_in',
+  'sale',
+  'sale_cancel',
 ] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
@@ -264,7 +266,7 @@ export const pharmacyMovements = pgTable(
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'pharmacy_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in')`,
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel')`,
     ),
   ],
 );
@@ -680,5 +682,193 @@ export const outletTransferLines = pgTable(
       foreignColumns: [outletTransfers.id],
     }).onDelete('cascade'),
     check('pharmacy_transfer_lines_qty_ck', sql`${t.qty} > 0 and ${t.unitCost} >= 0`),
+  ],
+);
+
+// Old Pharmacy.ProductDiscountPolicies: the pharmacy-wide default discount (one row).
+export const discountPolicy = pgTable(
+  'pharmacy_discount_policy',
+  {
+    id: smallint('id').primaryKey(),
+    allowedByDefault: boolean('allowed_by_default').notNull(),
+    /** Over the counter (OPD). */
+    opdPercent: percent('opd_percent').notNull(),
+    /** Indoor patients; null = the same as over the counter. */
+    ipdPercent: percent('ipd_percent'),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('pharmacy_discount_policy_one_ck', sql`${t.id} = 1`),
+    check(
+      'pharmacy_discount_policy_percent_ck',
+      sql`${t.opdPercent} between 0 and 100 and (${t.ipdPercent} is null or ${t.ipdPercent} between 0 and 100)`,
+    ),
+  ],
+);
+
+// Old Pharmacy.ProductDiscountSettings: a product's own discount rule.
+export const productDiscounts = pgTable(
+  'pharmacy_product_discounts',
+  {
+    id: uuid('id').primaryKey(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'cascade' }),
+    isAllowed: boolean('is_allowed').notNull(),
+    /** Null = the policy's percent. */
+    opdPercent: percent('opd_percent'),
+    /** Null = the same as over the counter. */
+    ipdPercent: percent('ipd_percent'),
+    remarks: text('remarks'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_product_discounts_product_uq').on(t.productId),
+    check(
+      'pharmacy_product_discounts_percent_ck',
+      sql`(${t.opdPercent} is null or ${t.opdPercent} between 0 and 100) and (${t.ipdPercent} is null or ${t.ipdPercent} between 0 and 100)`,
+    ),
+  ],
+);
+
+// Old Pharmacy.PLoyalMembers: regular customers who may buy on credit.
+export const loyalMembers = pgTable(
+  'pharmacy_loyal_members',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    contactNo: text('contact_no').notNull(),
+    referenceName: text('reference_name'),
+    remarks: text('remarks'),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_loyal_members_contact_uq').on(t.contactNo),
+    nameLength('pharmacy_loyal_members', t.name, 150),
+  ],
+);
+
+// Old Pharmacy.Invoices (ServeType OPD) / InvoiceDetails / InvoiceLedgers: a sale over the counter.
+export const pharmacySales = pgTable(
+  'pharmacy_sales',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    soldOn: day('sold_on').notNull(),
+    customerName: text('customer_name'),
+    mobileNo: text('mobile_no'),
+    loyalMemberId: uuid('loyal_member_id').references(() => loyalMembers.id, { onDelete: 'restrict' }),
+    /** Gross: units × sale rate. */
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    /** What the customer handed over (cash may exceed the total; the rest is change). */
+    tendered: money('tendered').notNull(),
+    paid: money('paid').notNull(),
+    due: money('due').notNull(),
+    /** Collected later against the due. */
+    collected: money('collected').notNull().default(0),
+    cost: money('cost').notNull(),
+    status: text('status', { enum: ['completed', 'cancelled'] }).notNull(),
+    cancelReason: text('cancel_reason'),
+    cancelledOn: day('cancelled_on'),
+    voucherNumber: text('voucher_number'),
+    cancelVoucherNumber: text('cancel_voucher_number'),
+    soldBy: uuid('sold_by').references(() => users.id, { onDelete: 'set null' }),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_sales_number_uq').on(t.number),
+    index('pharmacy_sales_outlet_idx').on(t.outletId, t.soldOn),
+    index('pharmacy_sales_member_idx').on(t.loyalMemberId),
+    check('pharmacy_sales_status_ck', sql`${t.status} in ('completed', 'cancelled')`),
+    check('pharmacy_sales_method_ck', sql`${t.method} in ('cash', 'card', 'mobile')`),
+    check(
+      'pharmacy_sales_amounts_ck',
+      sql`${t.total} = ${t.amount} - ${t.discount} and ${t.paid} + ${t.due} = ${t.total} and ${t.collected} between 0 and ${t.due}`,
+    ),
+    check('pharmacy_sales_due_member_ck', sql`${t.due} = 0 or ${t.loyalMemberId} is not null`),
+  ],
+);
+
+export const pharmacySaleLines = pgTable(
+  'pharmacy_sale_lines',
+  {
+    saleId: uuid('sale_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    saleRate: money('sale_rate').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+    amount: money('amount').notNull(),
+    discountPercent: percent('discount_percent').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.saleId, t.position] }),
+    foreignKey({ name: 'pharmacy_sale_lines_fk', columns: [t.saleId], foreignColumns: [pharmacySales.id] }).onDelete(
+      'cascade',
+    ),
+    index('pharmacy_sale_lines_product_idx').on(t.productId),
+    check('pharmacy_sale_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old PLoyalMemberLedger "due collection": money a loyal member pays against dues, oldest invoice first.
+export const dueCollections = pgTable(
+  'pharmacy_due_collections',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    loyalMemberId: uuid('loyal_member_id')
+      .notNull()
+      .references(() => loyalMembers.id, { onDelete: 'restrict' }),
+    collectedOn: day('collected_on').notNull(),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    amount: money('amount').notNull(),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_due_collections_number_uq').on(t.number),
+    index('pharmacy_due_collections_member_idx').on(t.loyalMemberId),
+    check('pharmacy_due_collections_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+export const dueCollectionLines = pgTable(
+  'pharmacy_due_collection_lines',
+  {
+    collectionId: uuid('collection_id').notNull(),
+    saleId: uuid('sale_id')
+      .notNull()
+      .references(() => pharmacySales.id, { onDelete: 'restrict' }),
+    amount: money('amount').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.collectionId, t.saleId] }),
+    foreignKey({
+      name: 'pharmacy_due_collection_lines_fk',
+      columns: [t.collectionId],
+      foreignColumns: [dueCollections.id],
+    }).onDelete('cascade'),
+    check('pharmacy_due_collection_lines_amount_ck', sql`${t.amount} > 0`),
   ],
 );

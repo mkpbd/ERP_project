@@ -12,10 +12,12 @@ import {
   formations,
   genericGroups,
   generics,
+  loyalMembers,
   manufacturers,
   outlets,
   outletUsers,
   packageUnits,
+  productDiscounts,
   products,
   reorderLevels,
   strengths,
@@ -99,6 +101,25 @@ export function pharmacyRecordTypes(context: DbContext): RecordType[] {
       references: {
         [fk('pharmacy_outlet_users', 'outlet_id', 'pharmacy_outlets')]: R.outlet,
         [fk('pharmacy_outlet_users', 'user_id', 'users')]: 'user',
+      },
+    }),
+    record(R.productDiscount, productDiscounts, {
+      orderBy: [productDiscounts.createdAt],
+      filters: { productId: productDiscounts.productId, isAllowed: productDiscounts.isAllowed },
+      unique: {
+        pharmacy_product_discounts_product_uq: taken(
+          'product_discount_exists',
+          'The product already has a discount rule',
+        ),
+      },
+      references: { [fk('pharmacy_product_discounts', 'product_id', 'pharmacy_products')]: R.product },
+    }),
+    record(R.loyalMember, loyalMembers, {
+      orderBy: [loyalMembers.name],
+      filters: { isActive: loyalMembers.isActive, contactNo: loyalMembers.contactNo },
+      search: [loyalMembers.name, loyalMembers.contactNo],
+      unique: {
+        pharmacy_loyal_members_contact_uq: taken('loyal_member_contact_taken', 'Another member has this number'),
       },
     }),
     record(R.reorderLevel, reorderLevels, {

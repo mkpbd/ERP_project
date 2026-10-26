@@ -148,6 +148,41 @@ export class ReorderLevelFilterDto extends createZodDto(
 ) {}
 export class ReorderLevelResponseDto extends responseDto(reorderLevel.response) {}
 
+const discountPercent = z.number().min(0).max(100).multipleOf(0.01);
+const productDiscount = shapes(
+  {
+    productId: ref,
+    isAllowed: z.boolean(),
+    opdPercent: discountPercent.nullable(),
+    ipdPercent: discountPercent.nullable(),
+    remarks: optionalText(500),
+  },
+  ['opdPercent', 'ipdPercent', 'remarks'],
+  { isAllowed: true },
+);
+export class CreateProductDiscountDto extends createZodDto(productDiscount.create) {}
+export class UpdateProductDiscountDto extends createZodDto(productDiscount.update) {}
+export class ProductDiscountFilterDto extends createZodDto(z.object({ productId: ref.optional(), isAllowed: flag })) {}
+export class ProductDiscountResponseDto extends responseDto(productDiscount.response) {}
+
+const loyalMember = shapes(
+  {
+    name: name(150),
+    contactNo: z.string().trim().min(3).max(20),
+    referenceName: optionalText(150),
+    remarks: optionalText(500),
+    isActive: z.boolean(),
+  },
+  ['referenceName', 'remarks'],
+  { isActive: true },
+);
+export class CreateLoyalMemberDto extends createZodDto(loyalMember.create) {}
+export class UpdateLoyalMemberDto extends createZodDto(loyalMember.update) {}
+export class LoyalMemberFilterDto extends createZodDto(
+  z.object({ isActive: flag, contactNo: z.string().trim().min(1).max(20).optional(), q: search }),
+) {}
+export class LoyalMemberResponseDto extends responseDto(loyalMember.response) {}
+
 // The catalogue: products with their names put together, for search and pick lists.
 
 export class CatalogueQueryDto extends createZodDto(

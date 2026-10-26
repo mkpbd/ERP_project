@@ -1,0 +1,31 @@
+{{#with data.dues}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Member</td><td><b>{{name}}</b></td><td style="width: 16%">Contact</td><td>{{contactNo}}</td></tr>
+  </tbody>
+</table>
+{{#if sales.length}}
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Sale</th><th>Date</th><th class="num">Total</th><th class="num">Due at sale</th><th class="num">Collected</th><th class="num">Still due</th></tr>
+  </thead>
+  <tbody>
+    {{#each sales}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{number}}</td>
+      <td>{{date soldOn}}</td>
+      <td class="num">{{money total}}</td>
+      <td class="num">{{money due}}</td>
+      <td class="num">{{money collected}}</td>
+      <td class="num">{{money stillDue}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Total due</td><td class="num">{{money due}}</td></tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords due}}</p>
+{{else}}
+<p>Nothing is due from this member.</p>
+{{/if}}
+{{/with}}

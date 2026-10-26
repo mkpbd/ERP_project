@@ -1,0 +1,49 @@
+<style>
+  /* An 80 mm roll: 70 mm of print inside the 5 mm margins. */
+  .receipt { width: 70mm; font-size: 8pt; line-height: 1.3; }
+  .receipt .head { text-align: center; margin-bottom: 2mm; }
+  .receipt .head .org { font-weight: 700; font-size: 10pt; }
+  .receipt .rule { border-top: 0.2mm dashed #000; margin: 1.5mm 0; }
+  .receipt table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .receipt td { padding: 0.4mm 0; vertical-align: top; }
+  .receipt .num { text-align: right; white-space: nowrap; }
+  .receipt .small { font-size: 6.5pt; color: #333; }
+  .receipt .total td { font-weight: 700; }
+  .receipt .void { text-align: center; font-weight: 700; font-size: 11pt; border: 0.4mm solid #000; margin: 1mm 0; }
+</style>
+{{#with data}}
+<div class="receipt">
+  <div class="head">
+    <div class="org">{{organization}}</div>
+    <div>{{sale.outletName}}</div>
+    <div>Sale {{sale.number}} · {{date sale.soldOn}}</div>
+    {{#if sale.customerName}}<div>{{sale.customerName}}{{#if sale.mobileNo}} · {{sale.mobileNo}}{{/if}}</div>{{/if}}
+    {{#if sale.loyalMemberName}}<div>Member: {{sale.loyalMemberName}}</div>{{/if}}
+  </div>
+  {{#if (eq sale.status "cancelled")}}<div class="void">CANCELLED</div>{{/if}}
+  <div class="rule"></div>
+  <table>
+    {{#each sale.lines}}
+    <tr>
+      <td colspan="2">{{displayName}}<br /><span class="small">Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · exp {{date expiryDate}}</span></td>
+    </tr>
+    <tr>
+      <td class="small">{{qty}} × {{money saleRate}}{{#if discount}} − {{discountPercent}}%{{/if}}</td>
+      <td class="num">{{money total}}</td>
+    </tr>
+    {{/each}}
+  </table>
+  <div class="rule"></div>
+  <table>
+    <tr><td>Amount</td><td class="num">{{money sale.amount}}</td></tr>
+    <tr><td>Discount</td><td class="num">{{money sale.discount}}</td></tr>
+    <tr class="total"><td>Total</td><td class="num">{{money sale.total}}</td></tr>
+    <tr><td>Paid ({{sale.method}})</td><td class="num">{{money sale.tendered}}</td></tr>
+    {{#if sale.change}}<tr><td>Change</td><td class="num">{{money sale.change}}</td></tr>{{/if}}
+    {{#if sale.due}}<tr class="total"><td>Due</td><td class="num">{{money sale.due}}</td></tr>{{/if}}
+  </table>
+  <div class="rule"></div>
+  <div class="small">In words: {{amountInWords sale.total}}</div>
+  <div class="small">Served by {{printedBy}}. Medicines once sold are returned only as the pharmacy's return rules allow.</div>
+</div>
+{{/with}}

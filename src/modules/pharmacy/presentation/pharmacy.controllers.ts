@@ -15,6 +15,8 @@ import {
   CreateFormationDto,
   CreateGenericDto,
   CreateGenericGroupDto,
+  CreateLoyalMemberDto,
+  CreateProductDiscountDto,
   CreateManufacturerDto,
   CreateOutletDto,
   CreateOutletUserDto,
@@ -29,6 +31,10 @@ import {
   GenericGroupFilterDto,
   GenericGroupResponseDto,
   GenericResponseDto,
+  LoyalMemberFilterDto,
+  LoyalMemberResponseDto,
+  ProductDiscountFilterDto,
+  ProductDiscountResponseDto,
   ManufacturerFilterDto,
   ManufacturerResponseDto,
   OutletFilterDto,
@@ -49,6 +55,8 @@ import {
   UpdateFormationDto,
   UpdateGenericDto,
   UpdateGenericGroupDto,
+  UpdateLoyalMemberDto,
+  UpdateProductDiscountDto,
   UpdateManufacturerDto,
   UpdateOutletDto,
   UpdateOutletUserDto,
@@ -193,6 +201,30 @@ export const OutletUsersController = createRecordController({
   filter: OutletUserFilterDto,
 });
 
+export const ProductDiscountsController = createRecordController({
+  ...pharmacy,
+  className: 'ProductDiscountsController',
+  path: 'pharmacy/product-discounts',
+  type: R.productDiscount,
+  label: 'product discount',
+  create: CreateProductDiscountDto,
+  update: UpdateProductDiscountDto,
+  response: ProductDiscountResponseDto,
+  filter: ProductDiscountFilterDto,
+});
+
+export const LoyalMembersController = createRecordController({
+  ...pharmacy,
+  className: 'LoyalMembersController',
+  path: 'pharmacy/loyal-members',
+  type: R.loyalMember,
+  label: 'loyal member',
+  create: CreateLoyalMemberDto,
+  update: UpdateLoyalMemberDto,
+  response: LoyalMemberResponseDto,
+  filter: LoyalMemberFilterDto,
+});
+
 export const ReorderLevelsController = createRecordController({
   ...pharmacy,
   className: 'ReorderLevelsController',
@@ -241,5 +273,7 @@ export const PHARMACY_CONTROLLERS = [
   OutletsController,
   OutletUsersController,
   ReorderLevelsController,
+  ProductDiscountsController,
+  LoyalMembersController,
   CatalogueController,
 ];

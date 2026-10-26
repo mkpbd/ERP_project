@@ -204,6 +204,13 @@
       "when": 1792992638074,
       "tag": "0028_pharmacy_transfer_line_rejected",
       "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1792993256755,
+      "tag": "0029_pharmacy_counter_sales",
+      "breakpoints": true
     }
   ]
 }

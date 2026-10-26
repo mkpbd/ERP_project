@@ -68,6 +68,10 @@ export const PERMISSION_CATALOG = [
     key: 'pharmacy:transfer',
     description: 'Raise outlet indents, send and accept transfers at the outlets you work at',
   },
+  {
+    key: 'pharmacy:sell',
+    description: 'Sell medicines over the counter at the outlets you work at and collect loyal member dues',
+  },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 
