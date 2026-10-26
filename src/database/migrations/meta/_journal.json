@@ -211,6 +211,13 @@
       "when": 1792993256755,
       "tag": "0029_pharmacy_counter_sales",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1792995638267,
+      "tag": "0030_pharmacy_sale_returns",
+      "breakpoints": true
     }
   ]
 }

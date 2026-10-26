@@ -50,6 +50,7 @@ export interface SaleLineView extends ProductRef {
   readonly discountPercent: number;
   readonly discount: number;
   readonly total: number;
+  readonly returnedQty: number;
 }
 
 export interface SaleView extends SaleSummary {
@@ -59,6 +60,8 @@ export interface SaleView extends SaleSummary {
   readonly reference: string | null;
   readonly tendered: number;
   readonly change: number;
+  /** Refunded by returns. */
+  readonly returned: number;
   readonly cancelReason: string | null;
   readonly cancelledOn: string | null;
   readonly voucherNumber: string | null;

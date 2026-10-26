@@ -2,7 +2,8 @@ import type { LotBalance } from './allocation.js';
 import type { OutletIndent } from './outlet-indent.js';
 import type { DiscountPolicy, ProductDiscount } from './discount.js';
 import type { PharmacyOrder } from './purchase-order.js';
-import type { PharmacySale, SaleDue } from './sale.js';
+import type { ReturnChannel, ReturnPolicy } from './return-window.js';
+import type { PharmacySale, ReturnedPart, SaleDue } from './sale.js';
 import type { OutletTransfer } from './transfer.js';
 import type { PharmacyReceive } from './receive.js';
 import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
@@ -13,7 +14,15 @@ export abstract class PharmacySequences {
 }
 
 export type MovementKind =
-  'opening' | 'receive' | 'supplier_return' | 'replacement' | 'transfer_out' | 'transfer_in' | 'sale' | 'sale_cancel';
+  | 'opening'
+  | 'receive'
+  | 'supplier_return'
+  | 'replacement'
+  | 'transfer_out'
+  | 'transfer_in'
+  | 'sale'
+  | 'sale_cancel'
+  | 'sale_return';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -179,4 +188,32 @@ export abstract class SaleRepository {
   /** The member's completed sales with a due, locked. */
   abstract memberDues(loyalMemberId: string): Promise<SaleDue[]>;
   abstract insertCollection(collection: CollectionRecord): Promise<void>;
+}
+
+export abstract class ReturnPolicies {
+  /** The channel's period, or null when none is set up (no limit). */
+  abstract policy(channel: ReturnChannel): Promise<ReturnPolicy | null>;
+  abstract save(channel: ReturnChannel, policy: ReturnPolicy, by: string): Promise<void>;
+}
+
+export interface SaleReturnRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly saleId: string;
+  readonly outletId: string;
+  readonly returnedOn: string;
+  readonly reason: string | null;
+  readonly amount: number;
+  readonly discount: number;
+  readonly refund: number;
+  readonly dueReduced: number;
+  readonly cashRefund: number;
+  readonly cost: number;
+  readonly voucherNumber: string | null;
+  readonly createdBy: string;
+  readonly parts: readonly ReturnedPart[];
+}
+
+export abstract class SaleReturnRepository {
+  abstract insert(saleReturn: SaleReturnRecord): Promise<void>;
 }

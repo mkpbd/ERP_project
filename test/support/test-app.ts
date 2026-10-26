@@ -44,6 +44,7 @@ export async function createTestApp(overrides: Record<string, string> = {}): Pro
 export async function resetDatabase(app: INestApplication): Promise<void> {
   await app.get(DbContext).db.execute(sql`
     truncate table audit_logs,
+      pharmacy_sale_return_lines, pharmacy_sale_returns, pharmacy_return_policies,
       pharmacy_due_collection_lines, pharmacy_due_collections, pharmacy_sale_lines, pharmacy_sales,
       pharmacy_loyal_members, pharmacy_product_discounts, pharmacy_discount_policy,
       pharmacy_transfer_lines, pharmacy_transfers, pharmacy_outlet_indent_lines, pharmacy_outlet_indents,

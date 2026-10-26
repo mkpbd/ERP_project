@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, ilike, inArray, lte, or, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
 import { escapeLike } from '../../../../shared/infrastructure/persistence/pg-errors.js';
@@ -43,6 +43,7 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
         paid: pharmacySales.paid,
         due: pharmacySales.due,
         collected: pharmacySales.collected,
+        returned: pharmacySales.returned,
         status: pharmacySales.status,
         cancelReason: pharmacySales.cancelReason,
         cancelledOn: pharmacySales.cancelledOn,
@@ -91,6 +92,7 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
           cancelledOn: _o,
           voucherNumber: _v,
           soldBy: _s,
+          returned: _rt,
           ...row
         }) => row,
       ),
@@ -114,6 +116,7 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
         discountPercent: pharmacySaleLines.discountPercent,
         discount: pharmacySaleLines.discount,
         total: pharmacySaleLines.total,
+        returnedQty: pharmacySaleLines.returnedQty,
       })
       .from(pharmacySaleLines)
       .innerJoin(pharmacyLots, eq(pharmacyLots.id, pharmacySaleLines.lotId))
@@ -143,7 +146,8 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
         soldOn: pharmacySales.soldOn,
         total: pharmacySales.total,
         due: pharmacySales.due,
-        collected: pharmacySales.collected,
+        /** Collected, and taken down by returns. */
+        collected: sql<number>`${pharmacySales.collected} + ${pharmacySales.dueReturned}`.mapWith(Number),
       })
       .from(pharmacySales)
       .where(and(eq(pharmacySales.loyalMemberId, loyalMemberId), eq(pharmacySales.status, 'completed')))

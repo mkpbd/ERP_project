@@ -7,6 +7,8 @@ import { PURCHASE_HANDLERS } from './application/purchase.handlers.js';
 import { PharmacyReadRepository } from './application/purchase.messages.js';
 import { SUPPLIER_HANDLERS } from './application/supplier.handlers.js';
 import { SupplierReadRepository } from './application/supplier.messages.js';
+import { RETURN_HANDLERS } from './application/return.handlers.js';
+import { ReturnReadRepository } from './application/return.messages.js';
 import { SALE_HANDLERS } from './application/sale.handlers.js';
 import { SaleReadRepository } from './application/sale.messages.js';
 import { TRANSFER_HANDLERS } from './application/transfer.handlers.js';
@@ -24,6 +26,8 @@ import {
   TransferRepository,
   DiscountRules,
   SaleRepository,
+  ReturnPolicies,
+  SaleReturnRepository,
 } from './domain/repositories.js';
 import { DrizzleCatalogueReadRepository } from './infrastructure/persistence/drizzle-catalogue.read-repository.js';
 import { DrizzlePharmacyReadRepository } from './infrastructure/persistence/drizzle-pharmacy.read-repository.js';
@@ -40,6 +44,11 @@ import {
   DrizzlePaymentRepository,
   DrizzleSupplierReturnRepository,
 } from './infrastructure/persistence/drizzle-supplier.repositories.js';
+import {
+  DrizzleReturnPolicies,
+  DrizzleReturnReadRepository,
+  DrizzleSaleReturnRepository,
+} from './infrastructure/persistence/drizzle-return.repositories.js';
 import { DrizzleSaleReadRepository } from './infrastructure/persistence/drizzle-sale.read-repository.js';
 import { DrizzleDiscountRules, DrizzleSaleRepository } from './infrastructure/persistence/drizzle-sale.repositories.js';
 import { DrizzleTransferReadRepository } from './infrastructure/persistence/drizzle-transfer.read-repository.js';
@@ -58,13 +67,16 @@ import { transferReport } from './infrastructure/reports/transfer.reports.js';
 import { TRANSFER_CONTROLLERS } from './presentation/transfer.controllers.js';
 import { memberDuesReport, saleReceiptReport } from './infrastructure/reports/sale.reports.js';
 import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
+import { returnReceiptReport } from './infrastructure/reports/return.reports.js';
+import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
 
 /**
  * Pharmacy: the medicine catalogue (generic groups and generics, formations, strengths, units, manufacturers,
  * brands and products), outlets, who works at each outlet and reorder levels (step 8a); purchase orders, stock
  * receives into outlets by lot, opening stock, the outlet movement ledger and posting purchases (step 8b);
  * supplier payments over receives and supplier returns settled by replacements (step 8c); outlet indents and
- * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e).
+ * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e);
+ * returns from customers within the return period (step 8f).
  */
 @Module({
   controllers: [
@@ -73,6 +85,7 @@ import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
     ...SUPPLIER_CONTROLLERS,
     ...TRANSFER_CONTROLLERS,
     ...SALE_CONTROLLERS,
+    ...RETURN_CONTROLLERS,
   ],
   providers: [
     ...CATALOGUE_HANDLERS,
@@ -80,6 +93,7 @@ import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
     ...SUPPLIER_HANDLERS,
     ...TRANSFER_HANDLERS,
     ...SALE_HANDLERS,
+    ...RETURN_HANDLERS,
     { provide: CatalogueReadRepository, useClass: DrizzleCatalogueReadRepository },
     { provide: PharmacyReadRepository, useClass: DrizzlePharmacyReadRepository },
     { provide: PharmacySequences, useClass: DrizzlePharmacySequences },
@@ -97,6 +111,9 @@ import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
     { provide: DiscountRules, useClass: DrizzleDiscountRules },
     { provide: SaleRepository, useClass: DrizzleSaleRepository },
     { provide: SaleReadRepository, useClass: DrizzleSaleReadRepository },
+    { provide: ReturnPolicies, useClass: DrizzleReturnPolicies },
+    { provide: SaleReturnRepository, useClass: DrizzleSaleReturnRepository },
+    { provide: ReturnReadRepository, useClass: DrizzleReturnReadRepository },
   ],
 })
 export class PharmacyModule implements OnModuleInit {
@@ -109,6 +126,7 @@ export class PharmacyModule implements OnModuleInit {
     private readonly suppliers: SupplierReadRepository,
     private readonly transfers: TransferReadRepository,
     private readonly sales: SaleReadRepository,
+    private readonly returns: ReturnReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -122,5 +140,6 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(transferReport(this.transfers));
     this.reports.register(saleReceiptReport(this.sales));
     this.reports.register(memberDuesReport(this.sales));
+    this.reports.register(returnReceiptReport(this.returns));
   }
 }

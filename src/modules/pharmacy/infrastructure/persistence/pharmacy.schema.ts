@@ -234,6 +234,7 @@ export const PHARMACY_MOVEMENT_KINDS = [
   'transfer_in',
   'sale',
   'sale_cancel',
+  'sale_return',
 ] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
@@ -266,7 +267,7 @@ export const pharmacyMovements = pgTable(
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'pharmacy_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel')`,
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return')`,
     ),
   ],
 );
@@ -775,6 +776,10 @@ export const pharmacySales = pgTable(
     due: money('due').notNull(),
     /** Collected later against the due. */
     collected: money('collected').notNull().default(0),
+    /** Value refunded by returns (step 8f). */
+    returned: money('returned').notNull().default(0),
+    /** The part of the refunds that took the due down instead of being paid back. */
+    dueReturned: money('due_returned').notNull().default(0),
     cost: money('cost').notNull(),
     status: text('status', { enum: ['completed', 'cancelled'] }).notNull(),
     cancelReason: text('cancel_reason'),
@@ -794,7 +799,7 @@ export const pharmacySales = pgTable(
     check('pharmacy_sales_method_ck', sql`${t.method} in ('cash', 'card', 'mobile')`),
     check(
       'pharmacy_sales_amounts_ck',
-      sql`${t.total} = ${t.amount} - ${t.discount} and ${t.paid} + ${t.due} = ${t.total} and ${t.collected} between 0 and ${t.due}`,
+      sql`${t.total} = ${t.amount} - ${t.discount} and ${t.paid} + ${t.due} = ${t.total} and ${t.collected} + ${t.dueReturned} between 0 and ${t.due} and ${t.returned} between 0 and ${t.total}`,
     ),
     check('pharmacy_sales_due_member_ck', sql`${t.due} = 0 or ${t.loyalMemberId} is not null`),
   ],
@@ -818,6 +823,8 @@ export const pharmacySaleLines = pgTable(
     discountPercent: percent('discount_percent').notNull(),
     discount: money('discount').notNull(),
     total: money('total').notNull(),
+    /** Units given back by returns. */
+    returnedQty: integer('returned_qty').notNull().default(0),
   },
   (t) => [
     primaryKey({ columns: [t.saleId, t.position] }),
@@ -825,7 +832,7 @@ export const pharmacySaleLines = pgTable(
       'cascade',
     ),
     index('pharmacy_sale_lines_product_idx').on(t.productId),
-    check('pharmacy_sale_lines_qty_ck', sql`${t.qty} > 0`),
+    check('pharmacy_sale_lines_qty_ck', sql`${t.qty} > 0 and ${t.returnedQty} between 0 and ${t.qty}`),
   ],
 );
 
@@ -870,5 +877,89 @@ export const dueCollectionLines = pgTable(
       foreignColumns: [dueCollections.id],
     }).onDelete('cascade'),
     check('pharmacy_due_collection_lines_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// Old Pharmacy.PharmacyReturnPolicies (19-10-2026): how many days after a sale medicines may come back, per channel.
+export const returnPolicies = pgTable(
+  'pharmacy_return_policies',
+  {
+    channel: text('channel', { enum: ['opd', 'ipd'] }).primaryKey(),
+    isEnabled: boolean('is_enabled').notNull(),
+    days: smallint('days').notNull(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    check('pharmacy_return_policies_channel_ck', sql`${t.channel} in ('opd', 'ipd')`),
+    check('pharmacy_return_policies_days_ck', sql`${t.days} between 0 and 365`),
+  ],
+);
+
+// Old ProcessOpdProductReturn (a return invoice with ServeType OPD return): medicines a customer brings back.
+export const saleReturns = pgTable(
+  'pharmacy_sale_returns',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    saleId: uuid('sale_id')
+      .notNull()
+      .references(() => pharmacySales.id, { onDelete: 'restrict' }),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    returnedOn: day('returned_on').notNull(),
+    reason: text('reason'),
+    /** Gross: units × sale rate. */
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    /** What the customer gets back: amount less the discount given back. */
+    refund: money('refund').notNull(),
+    /** The part of the refund that took the sale's due down. */
+    dueReduced: money('due_reduced').notNull(),
+    cashRefund: money('cash_refund').notNull(),
+    cost: money('cost').notNull(),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_sale_returns_number_uq').on(t.number),
+    index('pharmacy_sale_returns_sale_idx').on(t.saleId),
+    check(
+      'pharmacy_sale_returns_amounts_ck',
+      sql`${t.refund} = ${t.amount} - ${t.discount} and ${t.refund} = ${t.dueReduced} + ${t.cashRefund}`,
+    ),
+  ],
+);
+
+export const saleReturnLines = pgTable(
+  'pharmacy_sale_return_lines',
+  {
+    returnId: uuid('return_id').notNull(),
+    position: smallint('position').notNull(),
+    /** The sale line given back (its position on the sale). */
+    saleLine: smallint('sale_line').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    saleRate: money('sale_rate').notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    refund: money('refund').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_sale_return_lines_fk',
+      columns: [t.returnId],
+      foreignColumns: [saleReturns.id],
+    }).onDelete('cascade'),
+    check('pharmacy_sale_return_lines_qty_ck', sql`${t.qty} > 0`),
   ],
 );

@@ -1,0 +1,42 @@
+<style>
+  /* An 80 mm roll: 70 mm of print inside the 5 mm margins. */
+  .receipt { width: 70mm; font-size: 8pt; line-height: 1.3; }
+  .receipt .head { text-align: center; margin-bottom: 2mm; }
+  .receipt .head .org { font-weight: 700; font-size: 10pt; }
+  .receipt .rule { border-top: 0.2mm dashed #000; margin: 1.5mm 0; }
+  .receipt table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .receipt td { padding: 0.4mm 0; vertical-align: top; }
+  .receipt .num { text-align: right; white-space: nowrap; }
+  .receipt .small { font-size: 6.5pt; color: #333; }
+  .receipt .total td { font-weight: 700; }
+</style>
+{{#with data}}
+<div class="receipt">
+  <div class="head">
+    <div class="org">{{organization}}</div>
+    <div>{{saleReturn.outletName}}</div>
+    <div>Return {{saleReturn.number}} · {{date saleReturn.returnedOn}}</div>
+    <div>Against sale {{saleReturn.saleNumber}} of {{date saleReturn.soldOn}}</div>
+    {{#if saleReturn.customerName}}<div>{{saleReturn.customerName}}</div>{{/if}}
+    {{#if saleReturn.loyalMemberName}}<div>Member: {{saleReturn.loyalMemberName}}</div>{{/if}}
+  </div>
+  <div class="rule"></div>
+  <table>
+    {{#each saleReturn.lines}}
+    <tr><td colspan="2">{{displayName}}<br /><span class="small">Batch {{#if batchNo}}{{batchNo}}{{else}}—{{/if}} · exp {{date expiryDate}}</span></td></tr>
+    <tr><td class="small">{{qty}} × {{money saleRate}}{{#if discount}} − {{money discount}}{{/if}}</td><td class="num">{{money refund}}</td></tr>
+    {{/each}}
+  </table>
+  <div class="rule"></div>
+  <table>
+    <tr><td>Amount</td><td class="num">{{money saleReturn.amount}}</td></tr>
+    <tr><td>Discount taken back</td><td class="num">{{money saleReturn.discount}}</td></tr>
+    <tr class="total"><td>Refund</td><td class="num">{{money saleReturn.refund}}</td></tr>
+    {{#if saleReturn.dueReduced}}<tr><td>Off the due</td><td class="num">{{money saleReturn.dueReduced}}</td></tr>{{/if}}
+    <tr class="total"><td>Paid back in cash</td><td class="num">{{money saleReturn.cashRefund}}</td></tr>
+  </table>
+  <div class="rule"></div>
+  {{#if saleReturn.reason}}<div class="small">Reason: {{saleReturn.reason}}</div>{{/if}}
+  <div class="small">Received back by {{printedBy}}.</div>
+</div>
+{{/with}}

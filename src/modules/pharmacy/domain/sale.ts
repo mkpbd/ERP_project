@@ -19,6 +19,21 @@ export interface SaleLine extends SalePart {
   readonly amount: number;
   readonly discount: number;
   readonly total: number;
+  /** Units given back by returns. */
+  readonly returnedQty: number;
+}
+
+/** A part of a return: a sale line (1-based) and the units given back from it, with what they are worth. */
+export interface ReturnedPart {
+  readonly saleLine: number;
+  readonly productId: string;
+  readonly lotId: string;
+  readonly qty: number;
+  readonly saleRate: number;
+  readonly unitCost: number;
+  readonly amount: number;
+  readonly discount: number;
+  readonly refund: number;
 }
 
 export interface SaleProps {
@@ -38,6 +53,8 @@ export interface SaleProps {
   paid: number;
   due: number;
   collected: number;
+  returned: number;
+  dueReturned: number;
   cost: number;
   status: SaleStatus;
   cancelReason: string | null;
@@ -86,7 +103,7 @@ export class PharmacySale {
     const lines = params.parts.map((part) => {
       const amount = taka(paisa(part.saleRate * part.qty));
       const discount = lineDiscount(amount, part.discountPercent);
-      return { ...part, amount, discount, total: taka(paisa(amount) - paisa(discount)) };
+      return { ...part, amount, discount, total: taka(paisa(amount) - paisa(discount)), returnedQty: 0 };
     });
     const total = sum(lines, (line) => line.total);
     const tendered = taka(paisa(params.tendered));
@@ -116,6 +133,8 @@ export class PharmacySale {
       paid,
       due,
       collected: 0,
+      returned: 0,
+      dueReturned: 0,
       cost: sum(lines, (line) => line.unitCost * line.qty),
       status: 'completed',
       cancelReason: null,
@@ -189,6 +208,9 @@ export class PharmacySale {
     if (this.props.collected > 0) {
       throw new DomainError('sale_state', 'Dues were collected against the sale; return its medicines instead');
     }
+    if (this.props.returned > 0 || this.props.lines.some((line) => line.returnedQty > 0)) {
+      throw new DomainError('sale_state', 'Medicines were returned from the sale; return the rest instead');
+    }
     if (params.on < this.props.soldOn)
       throw new DomainError('invalid_date', 'A sale is not cancelled before it was made');
     const reason = text(params.reason, 500, 'reason', 'Sale');
@@ -199,6 +221,65 @@ export class PharmacySale {
     this.props.cancelledBy = params.by;
     this.props.version += 1;
     this.props.updatedAt = params.now;
+  }
+
+  /**
+   * Medicines given back (old ProcessOpdProductReturn): units of sale lines (1-based), never more than sold less what
+   * came back before. Each is worth its line's total per unit, so the discount given comes back with it. The refund
+   * takes the sale's open due down first; the rest is paid back. Returns the parts and how the refund splits.
+   */
+  giveBack(lines: readonly { line: number; qty: number }[], now: Date) {
+    if (this.props.status !== 'completed') throw new DomainError('sale_state', 'A cancelled sale takes no returns');
+    if (lines.length === 0) throw new DomainError('invalid_lines', 'A return gives something back');
+    const seen = new Set<number>();
+    const parts: ReturnedPart[] = lines.map((entry, index) => {
+      const at = `Line ${index + 1}`;
+      const line = this.props.lines[entry.line - 1];
+      if (!Number.isInteger(entry.line) || !line)
+        throw new DomainError('invalid_line', `${at}: the sale has no line ${entry.line}`);
+      if (seen.has(entry.line))
+        throw new DomainError('duplicate_line', `${at}: sale line ${entry.line} is already given back here`);
+      seen.add(entry.line);
+      const left = line.qty - line.returnedQty;
+      if (!Number.isInteger(entry.qty) || entry.qty <= 0 || entry.qty > left) {
+        throw new DomainError('over_return', `${at}: ${left} of sale line ${entry.line} may still come back`);
+      }
+      // The line's share up to these units less its share before them: all returns of a line add up to its total.
+      const share = (units: number) => Math.round((paisa(line.total) * units) / line.qty);
+      const refund = taka(share(line.returnedQty + entry.qty) - share(line.returnedQty));
+      const amount = taka(paisa(line.saleRate * entry.qty));
+      return {
+        saleLine: entry.line,
+        productId: line.productId,
+        lotId: line.lotId,
+        qty: entry.qty,
+        saleRate: line.saleRate,
+        unitCost: line.unitCost,
+        amount,
+        discount: taka(paisa(amount) - paisa(refund)),
+        refund,
+      };
+    });
+    this.props.lines = this.props.lines.map((line, index) => {
+      const part = parts.find((entry) => entry.saleLine === index + 1);
+      return part ? { ...line, returnedQty: line.returnedQty + part.qty } : line;
+    });
+    const refund = sum(parts, (part) => part.refund);
+    const openDue = paisa(this.props.due) - paisa(this.props.collected) - paisa(this.props.dueReturned);
+    const dueReduced = taka(Math.min(paisa(refund), Math.max(0, openDue)));
+    this.props.returned = taka(paisa(this.props.returned) + paisa(refund));
+    this.props.dueReturned = taka(paisa(this.props.dueReturned) + paisa(dueReduced));
+    this.props.version += 1;
+    this.props.updatedAt = now;
+    return {
+      parts,
+      amount: sum(parts, (part) => part.amount),
+      discount: sum(parts, (part) => part.discount),
+      refund,
+      dueReduced,
+      cashRefund: taka(paisa(refund) - paisa(dueReduced)),
+      cost: sum(parts, (part) => part.unitCost * part.qty),
+    };
   }
 
   /** A seller may undo their own sale, dated the day it was made, within a day of making it. */
@@ -231,6 +312,7 @@ export interface SaleDue {
   readonly soldOn: string;
   readonly number: string;
   readonly due: number;
+  /** Collected, and taken down by returns: what is no longer owed. */
   readonly collected: number;
 }
 

@@ -1,6 +1,6 @@
 # Step 8e — Pharmacy: counter sales, discounts, loyal members and dues
 
-Status: **done** (2026-10-26). Previous: [step 8d](08d-pharmacy-outlet-transfers.md) · Next: step 8f (returns
+Status: **done** (2026-10-26). Previous: [step 8d](08d-pharmacy-outlet-transfers.md) · Next: [step 8f](08f-pharmacy-returns.md) (returns
 from patients).
 
 ## Where the old logic lives

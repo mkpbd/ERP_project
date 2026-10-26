@@ -125,11 +125,12 @@ export class PharmacySaleResponseDto extends responseDto({
   reference: z.string().nullable(),
   tendered: z.number(),
   change: z.number(),
+  returned: z.number(),
   cancelReason: z.string().nullable(),
   cancelledOn: z.string().nullable(),
   voucherNumber: z.string().nullable(),
   soldBy: z.uuid().nullable(),
-  lines: z.array(z.object(lineShape)),
+  lines: z.array(z.object({ ...lineShape, returnedQty: z.int() })),
 }) {}
 export class PharmacyMemberDuesResponseDto extends responseDto({
   loyalMemberId: z.uuid(),

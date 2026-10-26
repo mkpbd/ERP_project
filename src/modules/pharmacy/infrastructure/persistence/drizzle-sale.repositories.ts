@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, gt, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { NotFoundError } from '../../../../shared/domain/errors.js';
 import { foreignKeyViolationConstraint } from '../../../../shared/infrastructure/persistence/pg-errors.js';
@@ -91,8 +91,14 @@ export class DrizzleSaleRepository extends SaleRepository {
   }
 
   async update(sale: PharmacySale): Promise<void> {
-    const { lines: _lines, ...row } = sale.toSnapshot();
+    const { lines, ...row } = sale.toSnapshot();
     await this.context.db.update(pharmacySales).set(row).where(eq(pharmacySales.id, row.id));
+    for (const [position, line] of lines.entries()) {
+      await this.context.db
+        .update(pharmacySaleLines)
+        .set({ returnedQty: line.returnedQty })
+        .where(and(eq(pharmacySaleLines.saleId, row.id), eq(pharmacySaleLines.position, position)));
+    }
   }
 
   async memberIsActive(loyalMemberId: string): Promise<boolean | null> {
@@ -110,14 +116,14 @@ export class DrizzleSaleRepository extends SaleRepository {
         soldOn: pharmacySales.soldOn,
         number: pharmacySales.number,
         due: pharmacySales.due,
-        collected: pharmacySales.collected,
+        collected: sql<number>`${pharmacySales.collected} + ${pharmacySales.dueReturned}`.mapWith(Number),
       })
       .from(pharmacySales)
       .where(
         and(
           eq(pharmacySales.loyalMemberId, loyalMemberId),
           eq(pharmacySales.status, 'completed'),
-          gt(pharmacySales.due, pharmacySales.collected),
+          sql`${pharmacySales.due} > ${pharmacySales.collected} + ${pharmacySales.dueReturned}`,
         ),
       )
       .orderBy(asc(pharmacySales.soldOn), asc(pharmacySales.number))
