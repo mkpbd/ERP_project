@@ -43,10 +43,11 @@ Name, contact number (unique), reference, remarks, active flag. Only a loyal mem
 * Each lot part sells at the **lot's sale rate** less the product's discount. Paid = the tendered amount up to the
   total; cash beyond the total is **change**; a card or wallet is not charged beyond the total (422 `overpaid`).
   What is left is a **due**, only for an active loyal member (422 `due_needs_member`).
-* One voucher: **Dr** `cash_in_hand` / `card_receipts` / `mobile_wallet_receipts` (what is paid) and
-  `pharmacy_receivable` (the due) / **Cr** `pharmacy_sales` (the total, net of discount); **Dr** `pharmacy_cogs` /
+* One voucher: **Dr** `cash_in_hand` / `card_receipts` / `mobile_wallet_receipts` (what is paid),
+  `pharmacy_receivable` (the due) and `pharmacy_sales_discount` (the discount) / **Cr** `pharmacy_sales` (gross); **Dr** `pharmacy_cogs` /
   **Cr** `pharmacy_inventory` at the lots' cost. Stock movements `sale`.
-* **Cancel** (`pharmacy:manage`, with a reason, not dated before the sale): only a sale nothing was collected
+* **Cancel** (`pharmacy:manage`; or the seller, with `pharmacy:sell`, on their own sale dated the day of the sale and
+  within a day of making it, else 403 `not_own_sale_today`; with a reason, not dated before the sale): only a sale nothing was collected
   against (422 `sale_state`): its lots come back at their cost (movement `sale_cancel`) and the voucher is reversed
   on the cancel date. Returning some units comes in step 8f.
 
@@ -61,7 +62,8 @@ An amount (`pharmacy:sell`) is set against the member's dues **oldest sale first
 | Method and path | Permission |
 |---|---|
 | `GET discount-policy`, `GET product-discounts`, `GET loyal-members`, `POST sales/quote`, `GET sales` (`outletId`, `loyalMemberId`, `status`, `from`, `to`, `q` number / customer / mobile), `GET sales/:id`, `GET loyal-members/:id/dues` | `pharmacy:read` |
-| `PUT discount-policy`, `product-discounts`, `loyal-members` (write), `POST sales/:id/cancel` | `pharmacy:manage` |
+| `PUT discount-policy`, `product-discounts`, `loyal-members` (write) | `pharmacy:manage` |
+| `POST sales/:id/cancel` | `pharmacy:manage`, or the seller the same day |
 | `POST sales` | `pharmacy:sell` + works at the outlet |
 | `POST loyal-members/:id/collections` | `pharmacy:sell` |
 
@@ -77,13 +79,12 @@ An amount (`pharmacy:sell`) is set against the member's dues **oldest sale first
 Corporate clients, staff purchases on credit (staff ledger), doctor appointment "medicine served" status and the
 prescription number are sales to parties that come with the hospital (step 9); indoor sales come in step 8g.
 
-## Open questions
+## Decisions taken (after the first version of this step)
 
-1. Should the sale be posted with gross sales and a separate discount account (Cr sales gross, Dr sales discount)
-   rather than net?
-2. Should the change of a cash sale and the tendered amount be kept per cash drawer (POS terminals, old
-   `PosTerminalId`) for a cash-counter report?
-3. Should a seller be able to cancel their own sale on the same day without `pharmacy:manage`?
+* Sales are posted gross with the discount on its own account (`pharmacy_sales_discount`).
+* A seller may cancel their own sale the same day.
+* Cash per drawer or POS terminal comes with the cash counter report in step 8i (seller, outlet and method are kept on
+  every sale).
 
 ## Verification
 

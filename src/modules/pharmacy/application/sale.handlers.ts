@@ -3,7 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import { AccessControl } from '../../../shared/application/contracts/access-control.js';
 import type { LedgerPostingLine } from '../../../shared/application/contracts/ledger-posting.js';
-import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
+import { DomainError, ForbiddenError, NotFoundError } from '../../../shared/domain/errors.js';
 import { allocate } from '../domain/allocation.js';
 import { DEFAULT_POLICY, discountPercent, lineDiscount, validDiscountPercent } from '../domain/discount.js';
 import { MAX_DOCUMENT_LINES, paisa, taka, text, validUnits } from '../domain/documents.js';
@@ -28,6 +28,8 @@ import { PharmacyKeeper } from './stock-keeper.js';
 
 /** GL roles of counter sales. */
 export const PHARMACY_SALES_ROLE = 'pharmacy_sales';
+/** Discounts given, kept apart from gross sales. */
+export const PHARMACY_DISCOUNT_ROLE = 'pharmacy_sales_discount';
 export const PHARMACY_COGS_ROLE = 'pharmacy_cogs';
 export const PHARMACY_RECEIVABLE_ROLE = 'pharmacy_receivable';
 /** Where each way of paying is received. */
@@ -168,8 +170,9 @@ export class QuoteSaleHandler implements IQueryHandler<QuoteSaleQuery> {
 /**
  * Old CreatePharmacySale / CreatePhInvoice: the outlet's stock leaves first expiring first (never an expired lot,
  * old PharmacySaleExpiryGuard) under a lock on its products; each part sells at its lot's sale rate less the
- * product's discount over the counter; and one voucher books it: Dr cash (card, wallet) for what is paid and the
- * receivable for a member's due / Cr pharmacy sales; Dr cost of medicines sold / Cr pharmacy inventory at cost.
+ * product's discount over the counter; and one voucher books it: Dr cash (card, wallet) for what is paid, the
+ * receivable for a member's due and the sales discount / Cr pharmacy sales (gross); Dr cost of medicines sold / Cr
+ * pharmacy inventory at cost.
  */
 @CommandHandler(MakeSaleCommand)
 export class MakeSaleHandler implements ICommandHandler<MakeSaleCommand> {
@@ -223,8 +226,11 @@ export class MakeSaleHandler implements ICommandHandler<MakeSaleCommand> {
         ...(sale.due > 0
           ? [{ account: { role: PHARMACY_RECEIVABLE_ROLE }, debit: sale.due, credit: 0, narration }]
           : []),
-        ...(sale.total > 0
-          ? [{ account: { role: PHARMACY_SALES_ROLE }, debit: 0, credit: sale.total, narration }]
+        ...(sale.discount > 0
+          ? [{ account: { role: PHARMACY_DISCOUNT_ROLE }, debit: sale.discount, credit: 0, narration }]
+          : []),
+        ...(sale.amount > 0
+          ? [{ account: { role: PHARMACY_SALES_ROLE }, debit: 0, credit: sale.amount, narration }]
           : []),
         ...(sale.cost > 0
           ? [
@@ -259,16 +265,23 @@ export class MakeSaleHandler implements ICommandHandler<MakeSaleCommand> {
   }
 }
 
-/** A whole sale undone (pharmacy:manage): its lots come back at their cost and a reversing voucher is posted. */
+/**
+ * A whole sale undone: its lots come back at their cost and a reversing voucher is posted. By pharmacy:manage, or by
+ * the seller (pharmacy:sell) on their own sale, dated the day of the sale, within a day of making it.
+ */
 @CommandHandler(CancelSaleCommand)
 export class CancelSaleHandler implements ICommandHandler<CancelSaleCommand> {
   constructor(private readonly sales: SaleDesk) {}
 
   async execute({ actor, id, version, on, reason }: CancelSaleCommand): Promise<void> {
     const { desk, keeper } = this.sales;
-    await desk.access.authorize(actor.userId, { permissions: [PHARMACY_MANAGE] });
+    const manages = await desk.access.isAllowed(actor.userId, { permissions: [PHARMACY_MANAGE] });
+    if (!manages) await desk.access.authorize(actor.userId, { permissions: [PHARMACY_SELL] });
     await desk.tx.run(async () => {
       const sale = await this.sales.sale(id, version);
+      if (!manages && !sale.isOwnSameDay(actor.userId, on, desk.clock.now())) {
+        throw new ForbiddenError('not_own_sale_today', 'Only a manager cancels a sale other than your own of today');
+      }
       const narration = `Cancelled sale ${sale.number}`;
       const lines: LedgerPostingLine[] = [
         ...(sale.paid > 0
@@ -277,8 +290,11 @@ export class CancelSaleHandler implements ICommandHandler<CancelSaleCommand> {
         ...(sale.due > 0
           ? [{ account: { role: PHARMACY_RECEIVABLE_ROLE }, debit: 0, credit: sale.due, narration }]
           : []),
-        ...(sale.total > 0
-          ? [{ account: { role: PHARMACY_SALES_ROLE }, debit: sale.total, credit: 0, narration }]
+        ...(sale.discount > 0
+          ? [{ account: { role: PHARMACY_DISCOUNT_ROLE }, debit: 0, credit: sale.discount, narration }]
+          : []),
+        ...(sale.amount > 0
+          ? [{ account: { role: PHARMACY_SALES_ROLE }, debit: sale.amount, credit: 0, narration }]
           : []),
         ...(sale.cost > 0
           ? [

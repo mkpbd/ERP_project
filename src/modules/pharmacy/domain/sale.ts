@@ -153,6 +153,13 @@ export class PharmacySale {
   get method(): PaymentMethod {
     return this.props.method;
   }
+  /** Gross: units × sale rate. */
+  get amount(): number {
+    return this.props.amount;
+  }
+  get discount(): number {
+    return this.props.discount;
+  }
   get total(): number {
     return this.props.total;
   }
@@ -192,6 +199,15 @@ export class PharmacySale {
     this.props.cancelledBy = params.by;
     this.props.version += 1;
     this.props.updatedAt = params.now;
+  }
+
+  /** A seller may undo their own sale, dated the day it was made, within a day of making it. */
+  isOwnSameDay(userId: string, on: string, now: Date): boolean {
+    return (
+      this.props.soldBy === userId &&
+      on === this.props.soldOn &&
+      now.getTime() - this.props.createdAt.getTime() <= 24 * 60 * 60 * 1000
+    );
   }
 
   cancelPosted(voucherNumber: string | null): void {

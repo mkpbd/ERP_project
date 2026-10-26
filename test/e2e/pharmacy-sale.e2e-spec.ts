@@ -93,6 +93,7 @@ beforeEach(async () => {
     ['card', '1', 'debit', '1002', 'Card receipts', 'card_receipts'],
     ['receivable', '1', 'debit', '1201', 'Pharmacy receivable', 'pharmacy_receivable'],
     ['sales', '4', 'credit', '4101', 'Medicine sales', 'pharmacy_sales'],
+    ['discount', '5', 'debit', '5102', 'Sales discount', 'pharmacy_sales_discount'],
     ['cogs', '5', 'debit', '5101', 'Cost of medicines sold', 'pharmacy_cogs'],
   ] as const) {
     gl[key] = await glAccount(nature, balance, code, name);
@@ -181,7 +182,9 @@ describe('pharmacy counter sales', () => {
     expect(sold.body).toMatchObject({ number: 'SI-2026-00001', total: 80.4, change: 19.6, due: 0 });
     expect(await napaAt(outdoor)).toBe(90);
     expect(await closing('cash')).toBe(80.4);
-    expect(await closing('sales')).toBe(-80.4);
+    // Gross sales, and the discount on its own account.
+    expect(await closing('sales')).toBe(-84);
+    expect(await closing('discount')).toBe(3.6);
     // 60 × 0.85 + 2 × 4 at cost.
     expect(await closing('cogs')).toBe(59);
     expect(await closing('inventory')).toBe(-59);
@@ -231,10 +234,14 @@ describe('pharmacy counter sales', () => {
     const third = await sale([{ productId: napa, qty: 20 }], { tendered: 22.8 }).expect(201);
     // 150 on hand (50 of them in the expired lot A) less 10, 5 and 20 sold.
     expect(await napaAt(outdoor)).toBe(115);
-    expect(
-      (await ph('post', `sales/${third.body.id}/cancel`, seller, { version: 1, on: '2026-04-10', reason: 'x' })).status,
-    ).toBe(403);
-    await ph('post', `sales/${third.body.id}/cancel`, admin, {
+    // The seller undoes their own sale only on its own date; the manager could on any.
+    const later = await ph('post', `sales/${third.body.id}/cancel`, seller, {
+      version: 1,
+      on: '2026-04-11',
+      reason: 'x',
+    });
+    expect([later.status, later.body.code]).toEqual([403, 'not_own_sale_today']);
+    await ph('post', `sales/${third.body.id}/cancel`, seller, {
       version: 1,
       on: '2026-04-10',
       reason: 'Wrong patient',

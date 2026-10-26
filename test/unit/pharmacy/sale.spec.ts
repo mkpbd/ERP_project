@@ -65,6 +65,15 @@ describe('PharmacySale', () => {
     expect(() => make({ parts: [] })).toThrow(/sells something/);
   });
 
+  it('lets the seller undo only their own sale, dated its own day, within a day', () => {
+    const sale = make();
+    expect(sale.isOwnSameDay('u', '2026-04-10', new Date('2026-04-11T07:59:00Z'))).toBe(true);
+    expect(sale.isOwnSameDay('u', '2026-04-10', new Date('2026-04-11T08:01:00Z'))).toBe(false);
+    expect(sale.isOwnSameDay('u', '2026-04-11', now)).toBe(false);
+    expect(sale.isOwnSameDay('someone else', '2026-04-10', now)).toBe(false);
+    expect([sale.amount, sale.discount]).toEqual([84, 3.6]);
+  });
+
   it('is cancelled once, with a reason, not before it was made', () => {
     const sale = make();
     expect(() => sale.cancel({ reason: ' ', on: '2026-04-10', by: 'u', now })).toThrow(/Give a reason/);

@@ -100,9 +100,10 @@ export class PharmacySalesController {
   }
 
   @Post('sales/:id/cancel')
-  @RequirePermissions('pharmacy:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Undo a whole sale nothing was collected against: stock back, voucher reversed' })
+  @ApiOperation({
+    summary: 'Undo a whole sale nothing was collected against (pharmacy:manage, or the seller the same day)',
+  })
   async cancel(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PharmacyCancelSaleDto) {
     await this.commandBus.execute(new CancelSaleCommand(actor, params.id, dto.version, dto.on, dto.reason));
   }
