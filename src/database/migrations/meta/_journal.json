@@ -162,6 +162,13 @@
       "when": 1792979064603,
       "tag": "0022_scm_asset_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792980931542,
+      "tag": "0023_scm_asset_service_stock_and_sale_ladder",
+      "breakpoints": true
     }
   ]
 }

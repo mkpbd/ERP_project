@@ -635,6 +635,8 @@ export const STOCK_MOVEMENT_KINDS = [
   'adjustment',
   'supplier_return',
   'discard',
+  'service_out',
+  'service_return',
 ] as const;
 
 // Every quantity in or out of a store, by lot, with its unit cost. Stock is the sum; the old system added up
@@ -670,7 +672,7 @@ export const stockMovements = pgTable(
     check('stock_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'stock_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer', 'consumption', 'department_return', 'adjustment', 'supplier_return', 'discard')`,
+      sql`${t.kind} in ('opening', 'receive', 'issue', 'transfer', 'consumption', 'department_return', 'adjustment', 'supplier_return', 'discard', 'service_out', 'service_return')`,
     ),
   ],
 );
@@ -1450,7 +1452,7 @@ export const assetApprovalLevels = pgTable(
   'asset_approval_levels',
   {
     id: uuid('id').primaryKey(),
-    flow: text('flow', { enum: ['service', 'discard', 'scrap_sale'] }).notNull(),
+    flow: text('flow', { enum: ['service', 'discard', 'discard_sale', 'scrap_sale'] }).notNull(),
     levelOrder: smallint('level_order').notNull(),
     name: text('name').notNull(),
     roleId: uuid('role_id')
@@ -1460,7 +1462,7 @@ export const assetApprovalLevels = pgTable(
   },
   (t) => [
     uniqueIndex('asset_approval_levels_order_uq').on(t.flow, t.levelOrder),
-    check('asset_approval_levels_flow_ck', sql`${t.flow} in ('service', 'discard', 'scrap_sale')`),
+    check('asset_approval_levels_flow_ck', sql`${t.flow} in ('service', 'discard', 'discard_sale', 'scrap_sale')`),
     check('asset_approval_levels_order_ck', sql`${t.levelOrder} between 1 and 20`),
     nameLength('asset_approval_levels', t.name, 50),
   ],
@@ -1480,11 +1482,14 @@ export const assetLocks = pgTable(
   (t) => [index('asset_locks_request_idx').on(t.requestId)],
 );
 
-// Decisions of service and discard requests and scrap sales, one per level.
+// Decisions of service and discard requests and scrap sales, in order; a discard request's sale has its own
+// ladder (stage 'sale'), and a rejected sale may be proposed again.
 export const assetDecisions = pgTable(
   'asset_decisions',
   {
     documentId: uuid('document_id').notNull(),
+    position: smallint('position').notNull(),
+    stage: text('stage', { enum: ['request', 'sale'] }).notNull(),
     levelOrder: smallint('level_order').notNull(),
     levelName: text('level_name').notNull(),
     decision: text('decision', { enum: ['approved', 'rejected'] }).notNull(),
@@ -1493,8 +1498,9 @@ export const assetDecisions = pgTable(
     remarks: text('remarks'),
   },
   (t) => [
-    primaryKey({ columns: [t.documentId, t.levelOrder] }),
+    primaryKey({ columns: [t.documentId, t.position] }),
     check('asset_decisions_decision_ck', sql`${t.decision} in ('approved', 'rejected')`),
+    check('asset_decisions_stage_ck', sql`${t.stage} in ('request', 'sale')`),
   ],
 );
 
@@ -1506,6 +1512,8 @@ export const serviceRequests = pgTable(
     number: text('number').notNull(),
     requestDate: day('request_date').notNull(),
     sentTo: text('sent_to').notNull(),
+    /** The vendor billing the maintenance, when it is a supplier (else the maintenance_payable role). */
+    supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
     note: text('note'),
     status: text('status', { enum: ['pending', 'approved', 'closed', 'rejected'] }).notNull(),
     currentLevel: smallint('current_level'),
@@ -1534,6 +1542,9 @@ export const serviceRequestLines = pgTable(
     cost: money('cost').notNull(),
     rejected: boolean('rejected').notNull(),
     returnedOn: day('returned_on'),
+    /** What the maintenance cost when the piece came back, and the voucher it was booked on. */
+    actualCost: money('actual_cost'),
+    receiptVoucherNumber: text('receipt_voucher_number'),
   },
   (t) => [
     primaryKey({ columns: [t.requestId, t.position] }),
@@ -1545,6 +1556,7 @@ export const serviceRequestLines = pgTable(
     index('asset_service_request_lines_asset_idx').on(t.assetId),
     check('asset_service_request_lines_type_ck', sql`${t.serviceType} in ('warranty', 'maintenance')`),
     check('asset_service_request_lines_cost_ck', sql`${t.cost} >= 0`),
+    check('asset_service_request_lines_actual_ck', sql`${t.actualCost} is null or ${t.actualCost} >= 0`),
   ],
 );
 
@@ -1556,13 +1568,16 @@ export const discardRequests = pgTable(
     number: text('number').notNull(),
     requestDate: day('request_date').notNull(),
     reason: text('reason').notNull(),
-    status: text('status', { enum: ['pending', 'discarded', 'sold', 'rejected'] }).notNull(),
+    status: text('status', { enum: ['pending', 'discarded', 'sale_pending', 'sold', 'rejected'] }).notNull(),
     currentLevel: smallint('current_level'),
     discardedOn: day('discarded_on'),
     disposalRunId: uuid('disposal_run_id').references(() => depreciationRuns.id, { onDelete: 'set null' }),
     disposalVoucherNumber: text('disposal_voucher_number'),
     soldOn: day('sold_on'),
     soldTo: text('sold_to'),
+    /** The buyer's party ledger, when the buyer is a supplier (else the sale is cash). */
+    buyerSupplierId: uuid('buyer_supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
+    saleProposedBy: uuid('sale_proposed_by').references(() => users.id, { onDelete: 'set null' }),
     invoiceNo: text('invoice_no'),
     saleVoucherNumber: text('sale_voucher_number'),
     createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
@@ -1575,7 +1590,10 @@ export const discardRequests = pgTable(
       .on(t.invoiceNo)
       .where(sql`${t.invoiceNo} is not null`),
     index('asset_discard_requests_status_idx').on(t.status, t.requestDate),
-    check('asset_discard_requests_status_ck', sql`${t.status} in ('pending', 'discarded', 'sold', 'rejected')`),
+    check(
+      'asset_discard_requests_status_ck',
+      sql`${t.status} in ('pending', 'discarded', 'sale_pending', 'sold', 'rejected')`,
+    ),
   ],
 );
 
@@ -1613,6 +1631,7 @@ export const scrapSales = pgTable(
     number: text('number').notNull(),
     saleDate: day('sale_date').notNull(),
     buyer: text('buyer').notNull(),
+    buyerSupplierId: uuid('buyer_supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
     status: text('status', { enum: ['pending', 'sold', 'rejected'] }).notNull(),
     currentLevel: smallint('current_level'),
     lines: jsonb('lines')

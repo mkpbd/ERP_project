@@ -9,22 +9,33 @@ import {
   DiscardRequest,
   ScrapSale,
   ServiceRequest,
+  type AssetDecision,
   type AssetFlow,
   type ServiceType,
 } from '../domain/asset-requests.js';
 import { disposalCharges, type DepreciationTerms } from '../domain/depreciation.js';
-import { documentNumber, paisa, taka, type Decision } from '../domain/documents.js';
-import { AssetRequestRepository, type DepreciationRecord, type RunEntry } from '../domain/repositories.js';
+import { documentNumber, paisa, taka } from '../domain/documents.js';
+import {
+  AssetRequestRepository,
+  type DepreciationRecord,
+  type PayableSupplier,
+  type RequestPiece,
+  type RunEntry,
+} from '../domain/repositories.js';
 import { ACCUMULATED_DEPRECIATION_ROLE, AssetDesk } from './asset.handlers.js';
 import { DepartmentDesk } from './department.handlers.js';
-import { PURCHASE_JOURNAL, STORE_INVENTORY_ROLE } from './stock.handlers.js';
+import type { StockDocument } from './stock-keeper.js';
+import { PURCHASE_JOURNAL, STORE_INVENTORY_ROLE, SUPPLIER_PAYABLE_ROLE } from './stock.handlers.js';
 import { SCM_ASSETS, SCM_READ } from './supply-chain.constants.js';
 
-/** GL roles of disposals and scrap sales. */
+/** GL roles of disposals, scrap sales and maintenance. */
 export const DISPOSAL_LOSS_ROLE = 'asset_disposal_loss';
 export const DISPOSAL_GAIN_ROLE = 'asset_disposal_gain';
 export const SCRAP_INCOME_ROLE = 'scrap_sale_income';
 export const CASH_ROLE = 'cash_in_hand';
+export const MAINTENANCE_EXPENSE_ROLE = 'asset_maintenance_expense';
+/** The payable for maintenance vendors that are not suppliers. */
+export const MAINTENANCE_PAYABLE_ROLE = 'maintenance_payable';
 
 export type AssetDocumentKind = 'service' | 'discard' | 'scrap_sale';
 
@@ -43,7 +54,7 @@ export interface AssetDocumentView extends AssetDocumentSummary {
   readonly kind: AssetDocumentKind;
   readonly fields: Readonly<Record<string, string | number | null>>;
   readonly lines: Readonly<Record<string, string | number | boolean | null>>[];
-  readonly decisions: Decision[];
+  readonly decisions: AssetDecision[];
 }
 
 export abstract class AssetRequestReadRepository {
@@ -60,6 +71,7 @@ export class OpenServiceCommand extends Command<{ id: string; number: string }> 
     readonly actor: Actor,
     readonly requestDate: string,
     readonly sentTo: string,
+    readonly supplierId: string | null,
     readonly note: string | null,
     readonly lines: readonly { assetId: string; serviceType: ServiceType; problem: string | null; cost: number }[],
   ) {
@@ -83,6 +95,7 @@ export class OpenScrapSaleCommand extends Command<{ id: string; number: string }
     readonly actor: Actor,
     readonly saleDate: string,
     readonly buyer: string,
+    readonly buyerSupplierId: string | null,
     readonly lines: readonly { description: string; unit: string | null; qty: number; unitPrice: number }[],
   ) {
     super();
@@ -112,18 +125,22 @@ export class ReceiveServiceCommand extends Command<void> {
     readonly id: string,
     readonly version: number,
     readonly assetIds: readonly string[],
+    /** What each maintenance cost (the expected cost when left out). */
+    readonly costs: ReadonlyMap<string, number>,
     readonly on: string,
   ) {
     super();
   }
 }
 
-export class SellDiscardCommand extends Command<{ invoiceNo: string; voucherNumber: string | null }> {
+/** Proposes the sale of written-off pieces; it is decided on the discard_sale ladder. */
+export class SellDiscardCommand extends Command<{ status: string }> {
   constructor(
     readonly actor: Actor,
     readonly id: string,
     readonly version: number,
     readonly soldTo: string,
+    readonly buyerSupplierId: string | null,
     readonly on: string,
     readonly amounts: ReadonlyMap<string, number>,
   ) {
@@ -160,7 +177,20 @@ export class AssetInboxQuery extends Query<AssetDocumentSummary[]> {
   }
 }
 
-const FLOW: Record<AssetDocumentKind, AssetFlow> = { service: 'service', discard: 'discard', scrap_sale: 'scrap_sale' };
+/** The debit of a sale: the buyer's party ledger when a supplier, otherwise cash. */
+function saleDebit(buyer: PayableSupplier | null, amount: number, narration: string): LedgerPostingLine {
+  return buyer
+    ? {
+        account: buyer.glAccountId ? { id: buyer.glAccountId } : { role: SUPPLIER_PAYABLE_ROLE },
+        debit: amount,
+        credit: 0,
+        narration,
+        subLedgerId: buyer.subLedgerId,
+      }
+    : { account: { role: CASH_ROLE }, debit: amount, credit: 0, narration };
+}
+
+const stockLine = (piece: RequestPiece) => [{ variantId: piece.variantId, qty: 1, lotId: piece.lotId }];
 
 /** What the asset request handlers share. */
 @Injectable()
@@ -175,11 +205,11 @@ export class AssetRequestDesk {
     return this.assets.desk;
   }
 
-  /** The level the actor decides at: they hold its role and did not raise the document. */
-  async level(actor: Actor, kind: AssetDocumentKind, currentLevel: number | null, createdBy: string | null) {
-    const levels = await this.requests.levels(FLOW[kind]);
+  /** The level the actor decides at: they hold its role and did not raise the document (or propose the sale). */
+  async level(actor: Actor, flow: AssetFlow, currentLevel: number | null, createdBy: string | null) {
+    const levels = await this.requests.levels(flow);
     const level = levels.find((entry) => entry.order === currentLevel);
-    if (!level) throw new DomainError(`${kind}_state`, 'The document is not waiting for an approval');
+    if (!level) throw new DomainError(`${flow}_state`, 'The document is not waiting for an approval');
     const profile = await this.desk.access.getProfile(actor.userId);
     if (!profile.roleIds.includes(level.roleId)) {
       throw new ForbiddenError('not_approver', `Only the ${level.name} approvers can decide at this level`);
@@ -199,6 +229,11 @@ export class AssetRequestDesk {
     return pieces;
   }
 
+  /** A supplier as a party (maintenance vendor, buyer): active, with its ledger. */
+  async party(supplierId: string | null): Promise<PayableSupplier | null> {
+    return supplierId ? this.departments.receiving.supplier(supplierId) : null;
+  }
+
   /** Disposal invoices share one series (old FKH-DIS-yy#####). */
   async invoiceNumber(on: string): Promise<string> {
     const year = Number(on.slice(0, 4));
@@ -210,15 +245,17 @@ export class AssetRequestDesk {
 export class OpenServiceHandler implements ICommandHandler<OpenServiceCommand> {
   constructor(private readonly requests: AssetRequestDesk) {}
 
-  async execute({ actor, requestDate, sentTo, note, lines }: OpenServiceCommand) {
+  async execute({ actor, requestDate, sentTo, supplierId, note, lines }: OpenServiceCommand) {
     const { desk } = this.requests;
     await desk.access.authorize(actor.userId, { permissions: [SCM_ASSETS] });
     return desk.tx.run(async () => {
+      await this.requests.party(supplierId);
       const request = ServiceRequest.open({
         id: randomUUID(),
         number: await desk.number('AS', requestDate),
         requestDate,
         sentTo,
+        supplierId,
         note,
         lines,
         levels: await this.requests.requests.levels('service'),
@@ -273,15 +310,17 @@ export class OpenDiscardHandler implements ICommandHandler<OpenDiscardCommand> {
 export class OpenScrapSaleHandler implements ICommandHandler<OpenScrapSaleCommand> {
   constructor(private readonly requests: AssetRequestDesk) {}
 
-  async execute({ actor, saleDate, buyer, lines }: OpenScrapSaleCommand) {
+  async execute({ actor, saleDate, buyer, buyerSupplierId, lines }: OpenScrapSaleCommand) {
     const { desk } = this.requests;
     await desk.access.authorize(actor.userId, { permissions: [SCM_ASSETS] });
     return desk.tx.run(async () => {
+      await this.requests.party(buyerSupplierId);
       const sale = ScrapSale.open({
         id: randomUUID(),
         number: await desk.number('SS', saleDate),
         saleDate,
         buyer,
+        buyerSupplierId,
         lines,
         levels: await this.requests.requests.levels('scrap_sale'),
         createdBy: actor.userId,
@@ -295,9 +334,10 @@ export class OpenScrapSaleHandler implements ICommandHandler<OpenScrapSaleComman
 }
 
 /**
- * Approving or rejecting at the current level. The last level of a service request sends the pieces out with a
- * gate pass; of a discard request writes them off (stock out, depreciation closed to the disposal date, the
- * disposal journal); of a scrap sale gives the invoice number and books the cash. A rejection frees the pieces.
+ * Approving or rejecting at the current level. The last level of a service request sends the pieces out of stock
+ * with a gate pass; of a discard request writes them off (stock out, depreciation closed to the disposal date,
+ * the disposal journal); of a discard request's sale or a scrap sale gives the invoice number and books the
+ * proceeds. A rejection frees the pieces (a rejected sale leaves them written off).
  */
 @CommandHandler(DecideAssetDocumentCommand)
 export class DecideAssetDocumentHandler implements ICommandHandler<DecideAssetDocumentCommand> {
@@ -333,6 +373,15 @@ export class DecideAssetDocumentHandler implements ICommandHandler<DecideAssetDo
       await requests.unlock(request.lines.filter((line) => line.rejected).map((line) => line.assetId));
       if (out.length > 0) {
         await requests.unlock(out);
+        const document: StockDocument = { id: request.id, number: request.number, on };
+        for (const piece of await requests.pieces(out)) {
+          if (!piece.place || piece.status !== 'in_stock') {
+            throw new DomainError('asset_state', `${piece.assetNo} is ${piece.status.replace('_', ' ')}`);
+          }
+          await departments.stores.keeper.takeOut(piece.place, stockLine(piece), document, 'service_out', {
+            includeExpired: true,
+          });
+        }
         await requests.setStatus(out, 'out_for_service');
         const pass = await departments.issueGatePass({
           passDate: on,
@@ -357,6 +406,7 @@ export class DecideAssetDocumentHandler implements ICommandHandler<DecideAssetDo
     const request = await requests.findDiscard(id);
     if (!request) throw new NotFoundError('asset_discard_request');
     request.assertVersion(version);
+    if (request.status === 'sale_pending') return this.sale(request, { actor, decision, remarks });
     const { level, levels } = await this.requests.level(actor, 'discard', request.currentLevel, request.createdBy);
     const now = desk.clock.now();
     let reference: string | null = null;
@@ -376,6 +426,60 @@ export class DecideAssetDocumentHandler implements ICommandHandler<DecideAssetDo
     await desk.record('asset_discard_request', decision === 'approve' ? 'approved' : 'rejected', actor, id, {
       level: level.name,
     });
+    return { status: request.status, reference };
+  }
+
+  /** A decision on the sale of written-off pieces; the last level gives the invoice and books the proceeds. */
+  private async sale(
+    request: DiscardRequest,
+    { actor, decision, remarks }: Pick<DecideAssetDocumentCommand, 'actor' | 'decision' | 'remarks'>,
+  ) {
+    const { desk, requests, assets } = this.requests;
+    const { level, levels } = await this.requests.level(
+      actor,
+      'discard_sale',
+      request.currentLevel,
+      request.saleProposedBy,
+    );
+    const now = desk.clock.now();
+    let reference: string | null = null;
+    let voucherNumber: string | null = null;
+    if (decision === 'reject') {
+      request.reject({ level, by: actor.userId, remarks: remarks ?? '', now });
+    } else if (request.approveSale({ level, levels, by: actor.userId, remarks, now })) {
+      const on = request.soldOn!;
+      reference = await this.requests.invoiceNumber(on);
+      request.setInvoice(reference);
+      const sold = request.lines
+        .filter((line) => !line.rejected && (line.saleAmount ?? 0) > 0)
+        .map((line) => line.assetId);
+      if (sold.length > 0) await requests.markSold(sold);
+      const total = request.saleTotal;
+      if (total > 0) {
+        const buyer = await this.requests.party(request.buyerSupplierId);
+        const voucher = await assets.ledger.post({
+          journal: PURCHASE_JOURNAL,
+          voucherDate: on,
+          narration: `Sale of written-off assets ${reference} to ${request.soldTo ?? ''}`,
+          source: { module: 'scm', reference: request.id },
+          lines: [
+            saleDebit(buyer, total, reference),
+            { account: { role: DISPOSAL_GAIN_ROLE }, debit: 0, credit: total, narration: reference },
+          ],
+          postedBy: actor.userId,
+        });
+        voucherNumber = voucher.number;
+      }
+    }
+    await requests.saveDiscard(request, false);
+    if (reference) await requests.recordSale(request.id, voucherNumber);
+    await desk.record(
+      'asset_discard_request',
+      decision === 'approve' ? (reference ? 'sold' : 'sale_approved') : 'sale_rejected',
+      actor,
+      request.id,
+      { level: level.name, ...(reference ? { invoiceNo: reference, total: request.saleTotal } : {}) },
+    );
     return { status: request.status, reference };
   }
 
@@ -523,13 +627,14 @@ export class DecideAssetDocumentHandler implements ICommandHandler<DecideAssetDo
       reference = await this.requests.invoiceNumber(sale.saleDate);
       sale.setInvoice(reference);
       if (sale.total > 0) {
+        const buyer = await this.requests.party(sale.buyerSupplierId);
         const voucher = await assets.ledger.post({
           journal: PURCHASE_JOURNAL,
           voucherDate: sale.saleDate,
           narration: `Scrap sale ${reference} to ${sale.buyer}`,
           source: { module: 'scm', reference: sale.id },
           lines: [
-            { account: { role: CASH_ROLE }, debit: sale.total, credit: 0, narration: `Scrap sale ${reference}` },
+            saleDebit(buyer, sale.total, `Scrap sale ${reference}`),
             {
               account: { role: SCRAP_INCOME_ROLE },
               debit: 0,
@@ -560,57 +665,84 @@ const terms = (record: DepreciationRecord): DepreciationTerms => ({
 export class ReceiveServiceHandler implements ICommandHandler<ReceiveServiceCommand> {
   constructor(private readonly requests: AssetRequestDesk) {}
 
-  async execute({ actor, id, version, assetIds, on }: ReceiveServiceCommand): Promise<void> {
-    const { desk, requests } = this.requests;
+  async execute({ actor, id, version, assetIds, costs, on }: ReceiveServiceCommand): Promise<void> {
+    const { desk, requests, departments, assets } = this.requests;
     await desk.access.authorize(actor.userId, { permissions: [SCM_ASSETS] });
     await desk.tx.run(async () => {
       const request = await requests.findService(id);
       if (!request) throw new NotFoundError('asset_service_request');
       request.assertVersion(version);
-      request.receiveBack(assetIds, on, desk.clock.now());
+      const total = request.receiveBack({ assetIds, costs, on, now: desk.clock.now() });
+      // Back into the place they left, at the cost they carry.
+      const document: StockDocument = { id: request.id, number: request.number, on };
+      for (const piece of await requests.pieces(assetIds)) {
+        if (!piece.place) throw new DomainError('asset_state', `${piece.assetNo} has no place to come back to`);
+        await departments.stores.keeper.putIn(
+          piece.place,
+          [{ variantId: piece.variantId, lotId: piece.lotId, qty: 1, unitCost: piece.cost, line: 0 }],
+          document,
+          'service_return',
+        );
+      }
       await requests.setStatus(assetIds, 'in_stock');
+      if (total > 0) {
+        const vendor = await this.requests.party(request.supplierId);
+        const narration = `Maintenance ${request.number} by ${request.sentTo}`;
+        const voucher = await assets.ledger.post({
+          journal: PURCHASE_JOURNAL,
+          voucherDate: on,
+          narration,
+          source: { module: 'scm', reference: request.id },
+          lines: [
+            { account: { role: MAINTENANCE_EXPENSE_ROLE }, debit: total, credit: 0, narration },
+            vendor
+              ? {
+                  account: vendor.glAccountId ? { id: vendor.glAccountId } : { role: SUPPLIER_PAYABLE_ROLE },
+                  debit: 0,
+                  credit: total,
+                  narration,
+                  subLedgerId: vendor.subLedgerId,
+                }
+              : { account: { role: MAINTENANCE_PAYABLE_ROLE }, debit: 0, credit: total, narration },
+          ],
+          postedBy: actor.userId,
+        });
+        request.booked(assetIds, voucher.number);
+      }
       await requests.saveService(request, false);
-      await desk.record('asset_service_request', 'received', actor, id, { pieces: assetIds.length });
+      await desk.record('asset_service_request', 'received', actor, id, { pieces: assetIds.length, cost: total });
     });
   }
 }
 
-/** The sale of written-off pieces, once, with an invoice number; the proceeds are a gain on disposal. */
+/**
+ * Proposes the sale of written-off pieces (once at a time); it is approved on the discard_sale ladder, whose last
+ * level gives the invoice number and books the proceeds as a gain on disposal.
+ */
 @CommandHandler(SellDiscardCommand)
 export class SellDiscardHandler implements ICommandHandler<SellDiscardCommand> {
   constructor(private readonly requests: AssetRequestDesk) {}
 
-  async execute({ actor, id, version, soldTo, on, amounts }: SellDiscardCommand) {
-    const { desk, requests, assets } = this.requests;
+  async execute({ actor, id, version, soldTo, buyerSupplierId, on, amounts }: SellDiscardCommand) {
+    const { desk, requests } = this.requests;
     await desk.access.authorize(actor.userId, { permissions: [SCM_ASSETS] });
     return desk.tx.run(async () => {
       const request = await requests.findDiscard(id);
       if (!request) throw new NotFoundError('asset_discard_request');
       request.assertVersion(version);
-      const invoiceNo = await this.requests.invoiceNumber(on);
-      const total = request.sell({ amounts, soldTo, on, invoiceNo, now: desk.clock.now() });
-      const sold = request.lines
-        .filter((line) => !line.rejected && (line.saleAmount ?? 0) > 0)
-        .map((line) => line.assetId);
-      if (sold.length > 0) await requests.markSold(sold);
-      const voucher =
-        total > 0
-          ? await assets.ledger.post({
-              journal: PURCHASE_JOURNAL,
-              voucherDate: on,
-              narration: `Sale of written-off assets ${invoiceNo} to ${soldTo}`,
-              source: { module: 'scm', reference: id },
-              lines: [
-                { account: { role: CASH_ROLE }, debit: total, credit: 0, narration: invoiceNo },
-                { account: { role: DISPOSAL_GAIN_ROLE }, debit: 0, credit: total, narration: invoiceNo },
-              ],
-              postedBy: actor.userId,
-            })
-          : null;
+      await this.requests.party(buyerSupplierId);
+      request.proposeSale({
+        amounts,
+        soldTo,
+        buyerSupplierId,
+        on,
+        levels: await requests.levels('discard_sale'),
+        by: actor.userId,
+        now: desk.clock.now(),
+      });
       await requests.saveDiscard(request, false);
-      await requests.recordSale(id, voucher?.number ?? null);
-      await desk.record('asset_discard_request', 'sold', actor, id, { invoiceNo, total });
-      return { invoiceNo, voucherNumber: voucher?.number ?? null };
+      await desk.record('asset_discard_request', 'sale_proposed', actor, id, { total: request.saleTotal });
+      return { status: request.status };
     });
   }
 }

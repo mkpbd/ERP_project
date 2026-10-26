@@ -12,7 +12,12 @@ import {
   type Decision,
 } from './documents.js';
 
-export type AssetFlow = 'service' | 'discard' | 'scrap_sale';
+export type AssetFlow = 'service' | 'discard' | 'discard_sale' | 'scrap_sale';
+
+/** A decision, and whether it was on the document itself or on the sale of a discard request. */
+export interface AssetDecision extends Decision {
+  readonly stage: 'request' | 'sale';
+}
 
 const text = (value: string | null, max: number, what: string, required = false): string | null => {
   const trimmed = value?.trim() ?? '';
@@ -24,7 +29,7 @@ const text = (value: string | null, max: number, what: string, required = false)
 interface Ladder {
   status: string;
   currentLevel: number | null;
-  decisions: Decision[];
+  decisions: AssetDecision[];
   version: number;
   updatedAt: Date;
 }
@@ -34,6 +39,16 @@ abstract class LadderDocument<P extends Ladder> {
   protected constructor(protected readonly props: P) {}
 
   protected abstract readonly what: string;
+
+  /** The stage a decision now is on. */
+  protected get stage(): AssetDecision['stage'] {
+    return 'request';
+  }
+
+  /** Whether the document waits for a decision. */
+  protected get awaiting(): boolean {
+    return this.props.status === 'pending';
+  }
 
   get status(): string {
     return this.props.status;
@@ -76,7 +91,7 @@ abstract class LadderDocument<P extends Ladder> {
   }
 
   protected assertDecidable(level: ApprovalLevel): void {
-    if (this.props.status !== 'pending') {
+    if (!this.awaiting) {
       throw new DomainError(`${this.what}_state`, `A ${this.props.status} document cannot be decided`);
     }
     if (level.order !== this.props.currentLevel) {
@@ -84,8 +99,15 @@ abstract class LadderDocument<P extends Ladder> {
     }
   }
 
-  private decide(level: ApprovalLevel, decision: Decision['decision'], by: string, remarks: string | null, now: Date) {
+  protected decide(
+    level: ApprovalLevel,
+    decision: Decision['decision'],
+    by: string,
+    remarks: string | null,
+    now: Date,
+  ): void {
     this.props.decisions.push({
+      stage: this.stage,
       levelOrder: level.order,
       levelName: level.name,
       decision,
@@ -126,6 +148,9 @@ export interface ServiceLine {
   readonly cost: number;
   readonly rejected: boolean;
   readonly returnedOn: string | null;
+  /** What it did cost, when back (warranty: 0), and the voucher that booked it. */
+  readonly actualCost: number | null;
+  readonly receiptVoucherNumber: string | null;
 }
 
 export interface ServiceProps extends Ladder {
@@ -133,6 +158,8 @@ export interface ServiceProps extends Ladder {
   number: string;
   requestDate: string;
   sentTo: string;
+  /** The vendor, when a supplier: the maintenance is payable to its ledger. */
+  supplierId: string | null;
   note: string | null;
   status: 'pending' | 'approved' | 'closed' | 'rejected';
   lines: ServiceLine[];
@@ -143,8 +170,8 @@ export interface ServiceProps extends Ladder {
 
 /**
  * Old WarrantyMaintenanceIndent: pieces sent out for warranty repair or maintenance, approved level by level;
- * final approval sends them out with a gate pass, and they come back when received (the old receive had its own
- * ladder; here the asset keepers receive them).
+ * final approval sends them out of stock with a gate pass, and they come back into stock when received, with
+ * what the maintenance cost (the old receive had its own ladder; here the asset keepers receive them).
  */
 export class ServiceRequest extends LadderDocument<ServiceProps> {
   protected readonly what = 'service_request';
@@ -154,6 +181,7 @@ export class ServiceRequest extends LadderDocument<ServiceProps> {
     number: string;
     requestDate: string;
     sentTo: string;
+    supplierId: string | null;
     note: string | null;
     lines: readonly Pick<ServiceLine, 'assetId' | 'serviceType' | 'problem' | 'cost'>[];
     levels: readonly ApprovalLevel[];
@@ -165,6 +193,7 @@ export class ServiceRequest extends LadderDocument<ServiceProps> {
       number: params.number,
       requestDate: params.requestDate,
       sentTo: text(params.sentTo, 200, 'service provider', true)!,
+      supplierId: params.supplierId,
       note: text(params.note, 1000, 'note'),
       status: 'pending',
       currentLevel: null,
@@ -175,6 +204,8 @@ export class ServiceRequest extends LadderDocument<ServiceProps> {
         cost: line.serviceType === 'warranty' ? 0 : validAmount(line.cost, `Line ${index + 1}`),
         rejected: false,
         returnedOn: null,
+        actualCost: null,
+        receiptVoucherNumber: null,
       })),
       gatePassId: null,
       createdBy: params.createdBy,
@@ -198,6 +229,9 @@ export class ServiceRequest extends LadderDocument<ServiceProps> {
   }
   get sentTo(): string {
     return this.props.sentTo;
+  }
+  get supplierId(): string | null {
+    return this.props.supplierId;
   }
   get createdBy(): string | null {
     return this.props.createdBy;
@@ -235,21 +269,49 @@ export class ServiceRequest extends LadderDocument<ServiceProps> {
     this.props.gatePassId = gatePassId;
   }
 
-  /** Pieces back from service (old receive); the request closes when every piece is back. */
-  receiveBack(assetIds: readonly string[], on: string, now: Date): void {
+  /**
+   * Pieces back from service (old receive), with what each maintenance cost (`costs`; the expected cost when not
+   * given, 0 for warranty); the request closes when every piece is back. Returns the cost to book.
+   */
+  receiveBack(params: {
+    assetIds: readonly string[];
+    costs: ReadonlyMap<string, number>;
+    on: string;
+    now: Date;
+  }): number {
     if (this.props.status !== 'approved') {
       throw new DomainError('service_request_state', `A ${this.props.status} request has nothing out`);
     }
-    if (on < this.props.requestDate) throw new DomainError('invalid_date', 'Nothing comes back before it was sent');
-    const out = this.props.lines.filter((line) => !line.rejected && !line.returnedOn).map((line) => line.assetId);
-    for (const id of assetIds) {
-      if (!out.includes(id)) throw new DomainError('not_out', 'A piece received is not out on this request');
+    if (params.on < this.props.requestDate) {
+      throw new DomainError('invalid_date', 'Nothing comes back before it was sent');
     }
-    this.props.lines = this.props.lines.map((line) =>
-      assetIds.includes(line.assetId) ? { ...line, returnedOn: on } : line,
-    );
+    const out = this.props.lines.filter((line) => !line.rejected && !line.returnedOn).map((line) => line.assetId);
+    for (const id of [...params.assetIds, ...params.costs.keys()]) {
+      if (!out.includes(id) || !params.assetIds.includes(id)) {
+        throw new DomainError('not_out', 'A piece received is not out on this request');
+      }
+    }
+    let total = 0;
+    this.props.lines = this.props.lines.map((line, index) => {
+      if (!params.assetIds.includes(line.assetId)) return line;
+      const given = params.costs.get(line.assetId);
+      if (line.serviceType === 'warranty' && (given ?? 0) > 0) {
+        throw new DomainError('warranty_cost', `Line ${index + 1}: a warranty repair costs nothing`);
+      }
+      const actualCost = line.serviceType === 'warranty' ? 0 : validAmount(given ?? line.cost, `Line ${index + 1}`);
+      total += paisa(actualCost);
+      return { ...line, returnedOn: params.on, actualCost };
+    });
     if (this.props.lines.every((line) => line.rejected || line.returnedOn)) this.props.status = 'closed';
-    this.touch(now);
+    this.touch(params.now);
+    return taka(total);
+  }
+
+  /** The voucher that booked the cost of the pieces just received. */
+  booked(assetIds: readonly string[], voucherNumber: string): void {
+    this.props.lines = this.props.lines.map((line) =>
+      assetIds.includes(line.assetId) ? { ...line, receiptVoucherNumber: voucherNumber } : line,
+    );
   }
 
   toSnapshot(): Readonly<ServiceProps> {
@@ -272,11 +334,14 @@ export interface DiscardProps extends Ladder {
   number: string;
   requestDate: string;
   reason: string;
-  status: 'pending' | 'discarded' | 'sold' | 'rejected';
+  status: 'pending' | 'discarded' | 'sale_pending' | 'sold' | 'rejected';
   lines: DiscardLine[];
   discardedOn: string | null;
   soldOn: string | null;
   soldTo: string | null;
+  /** The buyer's party ledger when the buyer is a supplier; otherwise the sale is cash. */
+  buyerSupplierId: string | null;
+  saleProposedBy: string | null;
   invoiceNo: string | null;
   createdBy: string | null;
   createdAt: Date;
@@ -284,11 +349,20 @@ export interface DiscardProps extends Ladder {
 
 /**
  * Old AssetDiscardIndent: pieces written off, approved level by level; final approval takes them out of stock
- * and the register (and closes their depreciation), and their sale is recorded once, with an invoice number,
- * for every line at once (the old serve also served lines without an amount at 0).
+ * and the register (and closes their depreciation). Their sale is then proposed for every line at once (the old
+ * serve also served lines without an amount at 0) and approved on its own ladder; the last level gives the
+ * invoice number. A rejected sale goes back to discarded and may be proposed again.
  */
 export class DiscardRequest extends LadderDocument<DiscardProps> {
   protected readonly what = 'discard_request';
+
+  protected override get stage(): AssetDecision['stage'] {
+    return this.props.status === 'sale_pending' ? 'sale' : 'request';
+  }
+
+  protected override get awaiting(): boolean {
+    return this.props.status === 'pending' || this.props.status === 'sale_pending';
+  }
 
   static open(params: {
     id: string;
@@ -317,6 +391,8 @@ export class DiscardRequest extends LadderDocument<DiscardProps> {
       discardedOn: null,
       soldOn: null,
       soldTo: null,
+      buyerSupplierId: null,
+      saleProposedBy: null,
       invoiceNo: null,
       createdBy: params.createdBy,
       version: 1,
@@ -343,6 +419,22 @@ export class DiscardRequest extends LadderDocument<DiscardProps> {
   get lines(): readonly DiscardLine[] {
     return this.props.lines;
   }
+  get soldOn(): string | null {
+    return this.props.soldOn;
+  }
+  get soldTo(): string | null {
+    return this.props.soldTo;
+  }
+  get buyerSupplierId(): string | null {
+    return this.props.buyerSupplierId;
+  }
+  get saleProposedBy(): string | null {
+    return this.props.saleProposedBy;
+  }
+  /** What the pieces are sold for. */
+  get saleTotal(): number {
+    return taka(this.props.lines.reduce((sum, line) => sum + paisa(line.saleAmount ?? 0), 0));
+  }
 
   /** Returns the pieces written off when this was the final level. */
   approve(params: {
@@ -355,6 +447,9 @@ export class DiscardRequest extends LadderDocument<DiscardProps> {
     now: Date;
   }): string[] {
     this.assertDecidable(params.level);
+    if (this.props.status !== 'pending') {
+      throw new DomainError('discard_request_state', 'The sale is decided on its own ladder');
+    }
     this.props.lines = this.props.lines.map((line) =>
       params.reject.includes(line.assetId) ? { ...line, rejected: true } : line,
     );
@@ -370,16 +465,18 @@ export class DiscardRequest extends LadderDocument<DiscardProps> {
     return final ? this.props.lines.filter((line) => !line.rejected).map((line) => line.assetId) : [];
   }
 
-  /** `amounts`: piece → sale amount (0 or more). Returns the total. */
-  sell(params: {
+  /** Proposes the sale of the written-off pieces; `amounts`: piece → sale amount (0 or more). */
+  proposeSale(params: {
     amounts: ReadonlyMap<string, number>;
     soldTo: string;
+    buyerSupplierId: string | null;
     on: string;
-    invoiceNo: string;
+    levels: readonly ApprovalLevel[];
+    by: string;
     now: Date;
-  }): number {
+  }): void {
     if (this.props.status !== 'discarded') {
-      throw new DomainError('discard_request_state', `A ${this.props.status} request cannot be sold`);
+      throw new DomainError('discard_request_state', `A ${this.props.status.replace('_', ' ')} request cannot be sold`);
     }
     if (params.on < this.props.discardedOn!) throw new DomainError('invalid_date', 'A sale is not before the discard');
     const kept = this.props.lines.filter((line) => !line.rejected);
@@ -387,17 +484,59 @@ export class DiscardRequest extends LadderDocument<DiscardProps> {
       if (!kept.some((line) => line.assetId === id))
         throw new DomainError('invalid_line', 'A piece sold is not discarded here');
     }
+    const soldTo = text(params.soldTo, 200, 'buyer', true);
+    this.startApproval(params.levels, 'discard sales');
     this.props.lines = this.props.lines.map((line, index) =>
       line.rejected
         ? line
         : { ...line, saleAmount: validAmount(params.amounts.get(line.assetId) ?? 0, `Line ${index + 1}`) },
     );
-    this.props.status = 'sold';
     this.props.soldOn = params.on;
-    this.props.soldTo = text(params.soldTo, 200, 'buyer', true);
-    this.props.invoiceNo = params.invoiceNo;
+    this.props.soldTo = soldTo;
+    this.props.buyerSupplierId = params.buyerSupplierId;
+    this.props.saleProposedBy = params.by;
+    this.props.status = 'sale_pending';
     this.touch(params.now);
-    return taka(this.props.lines.reduce((sum, line) => sum + paisa(line.saleAmount ?? 0), 0));
+  }
+
+  /** Approves the sale at the current level; returns true when this was the final level (then it is sold). */
+  approveSale(params: {
+    level: ApprovalLevel;
+    levels: readonly ApprovalLevel[];
+    by: string;
+    remarks: string | null;
+    now: Date;
+  }): boolean {
+    this.assertDecidable(params.level);
+    if (this.props.status !== 'sale_pending') {
+      throw new DomainError('discard_request_state', 'No sale is waiting for approval');
+    }
+    const final = this.advance(params);
+    if (final) this.props.status = 'sold';
+    this.touch(params.now);
+    return final;
+  }
+
+  /** Rejecting the request, or only its sale: then the pieces stay written off and the sale may be proposed again. */
+  override reject(params: { level: ApprovalLevel; by: string; remarks: string; now: Date }): void {
+    if (this.props.status !== 'sale_pending') {
+      super.reject(params);
+      return;
+    }
+    this.assertDecidable(params.level);
+    this.decide(params.level, 'rejected', params.by, validRemarks(params.remarks, true), params.now);
+    this.props.status = 'discarded';
+    this.props.currentLevel = null;
+    this.props.lines = this.props.lines.map((line) => ({ ...line, saleAmount: null }));
+    this.props.soldOn = null;
+    this.props.soldTo = null;
+    this.props.buyerSupplierId = null;
+    this.props.saleProposedBy = null;
+    this.touch(params.now);
+  }
+
+  setInvoice(invoiceNo: string): void {
+    this.props.invoiceNo = invoiceNo;
   }
 
   toSnapshot(): Readonly<DiscardProps> {
@@ -420,6 +559,8 @@ export interface ScrapProps extends Ladder {
   number: string;
   saleDate: string;
   buyer: string;
+  /** The buyer's party ledger when the buyer is a supplier; otherwise the sale is cash. */
+  buyerSupplierId: string | null;
   status: 'pending' | 'sold' | 'rejected';
   lines: ScrapLine[];
   total: number;
@@ -430,7 +571,8 @@ export interface ScrapProps extends Ladder {
 
 /**
  * Old ManualDiscardRequisition: scrap (cartons, broken furniture…) sold by description, approved level by level;
- * the final approval gives the invoice number and books the cash (the old one posted nothing).
+ * the final approval gives the invoice number and books the cash, or the buyer's party ledger (the old one
+ * posted nothing).
  */
 export class ScrapSale extends LadderDocument<ScrapProps> {
   protected readonly what = 'scrap_sale';
@@ -440,6 +582,7 @@ export class ScrapSale extends LadderDocument<ScrapProps> {
     number: string;
     saleDate: string;
     buyer: string;
+    buyerSupplierId: string | null;
     lines: readonly Omit<ScrapLine, 'total'>[];
     levels: readonly ApprovalLevel[];
     createdBy: string;
@@ -465,6 +608,7 @@ export class ScrapSale extends LadderDocument<ScrapProps> {
       number: params.number,
       saleDate: params.saleDate,
       buyer: text(params.buyer, 200, 'buyer', true)!,
+      buyerSupplierId: params.buyerSupplierId,
       status: 'pending',
       currentLevel: null,
       decisions: [],
@@ -498,6 +642,9 @@ export class ScrapSale extends LadderDocument<ScrapProps> {
   }
   get buyer(): string {
     return this.props.buyer;
+  }
+  get buyerSupplierId(): string | null {
+    return this.props.buyerSupplierId;
   }
   get createdBy(): string | null {
     return this.props.createdBy;

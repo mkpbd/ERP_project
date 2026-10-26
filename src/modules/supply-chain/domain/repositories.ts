@@ -73,7 +73,9 @@ export type MovementKind =
   | 'department_return'
   | 'adjustment'
   | 'supplier_return'
-  | 'discard';
+  | 'discard'
+  | 'service_out'
+  | 'service_return';
 
 export interface NewMovement {
   readonly store: StockPlace;

@@ -9,7 +9,9 @@ let admin: string;
 let keeper: string;
 let biomed: string;
 let director: string;
+let accountant: string;
 let main: string;
+let supplier: string;
 let pieces: string[];
 const gl: Record<string, string> = {};
 
@@ -69,6 +71,8 @@ const closing = async (account: string) =>
       .set(bearer(admin))
       .expect(200)
   ).body.closing as number;
+const stockQty = async () =>
+  ((await scm('get', `stock?mainStoreId=${main}`, admin).expect(200)).body.items[0]?.qty as number | undefined) ?? 0;
 const statusOf = async () =>
   ((await scm('get', 'fixed-assets', admin).expect(200)).body.items as { assetNo: string; status: string }[]).map(
     (asset) => `${asset.assetNo}:${asset.status}`,
@@ -89,8 +93,10 @@ beforeEach(async () => {
   );
   const biomeds = await create('roles', { name: 'biomedical', permissions: ['scm:read'] });
   const directors = await create('roles', { name: 'directors', permissions: ['scm:read'] });
+  const accounts = await create('roles', { name: 'accounts', permissions: ['scm:read'] });
   biomed = await user('biomed', biomeds);
   director = await user('director', directors);
+  accountant = await user('accountant', accounts);
   await create('scm/asset-approval-levels', {
     flow: 'service',
     levelOrder: 1,
@@ -99,6 +105,12 @@ beforeEach(async () => {
   });
   await create('scm/asset-approval-levels', { flow: 'discard', levelOrder: 1, name: 'Director', roleId: directors });
   await create('scm/asset-approval-levels', { flow: 'scrap_sale', levelOrder: 1, name: 'Director', roleId: directors });
+  await create('scm/asset-approval-levels', {
+    flow: 'discard_sale',
+    levelOrder: 1,
+    name: 'Accounts',
+    roleId: accounts,
+  });
 
   await create('accounts/fiscal-years', { label: '2025-2026', startsOn: '2025-07-01', endsOn: '2026-06-30' });
   await create('accounts/journal-types', { shortName: 'JV', name: 'Journal' });
@@ -110,6 +122,8 @@ beforeEach(async () => {
   gl.scrap = await glAccount('4', 'credit', '4910', 'Scrap sales');
   gl.expense = await glAccount('5', 'debit', '5900', 'Depreciation expense');
   gl.loss = await glAccount('5', 'debit', '5910', 'Loss on disposal');
+  gl.maintenance = await glAccount('5', 'debit', '5920', 'Repairs and maintenance');
+  gl.repairsDue = await glAccount('2', 'credit', '2102', 'Repairs payable');
   for (const [role, account] of [
     ['store_inventory', 'equipment'],
     ['supplier_payable', 'payable'],
@@ -119,6 +133,8 @@ beforeEach(async () => {
     ['asset_disposal_gain', 'gain'],
     ['cash_in_hand', 'cash'],
     ['scrap_sale_income', 'scrap'],
+    ['asset_maintenance_expense', 'maintenance'],
+    ['maintenance_payable', 'repairsDue'],
   ] as const) {
     await create('accounts/gl-roles', { role, glAccountId: gl[account] });
   }
@@ -139,7 +155,7 @@ beforeEach(async () => {
   });
   const ecg = await create('scm/item-variants', { itemId: item, name: '12 channel' });
   const local = await create('scm/supplier-types', { name: 'Local' });
-  const supplier = await create('scm/suppliers', { typeId: local, name: 'Medical Systems Ltd', subLedgerId: party });
+  supplier = await create('scm/suppliers', { typeId: local, name: 'Medical Systems Ltd', subLedgerId: party });
   const receive = await create('scm/stock-receives', {
     mainStoreId: main,
     supplierId: supplier,
@@ -159,13 +175,15 @@ beforeEach(async () => {
 });
 
 describe('asset service, discard and scrap sale', () => {
-  it('sends pieces out for service with a gate pass and takes them back', async () => {
+  it('sends pieces out of stock for service with a gate pass and books the maintenance on return', async () => {
     const service = await scm('post', 'asset-service-requests', keeper, {
       requestDate: '2026-03-01',
-      sentTo: 'Biomed Services',
+      sentTo: 'Medical Systems service centre',
+      supplierId: supplier,
       lines: [
         { assetId: pieces[0], serviceType: 'warranty', problem: 'No display' },
         { assetId: pieces[1], serviceType: 'maintenance', cost: 2_500 },
+        { assetId: pieces[2], serviceType: 'maintenance', cost: 100 },
       ],
     }).expect(201);
     expect(service.body.number).toBe('AS-2026-00001');
@@ -184,18 +202,50 @@ describe('asset service, discard and scrap sale', () => {
     const approved = await scm('post', `asset-service-requests/${service.body.id}/decision`, biomed, {
       version: 1,
       decision: 'approve',
-      rejectAssets: [pieces[1]],
+      rejectAssets: [pieces[2]],
       on: '2026-03-02',
     }).expect(200);
     expect(approved.body).toEqual({ status: 'approved', reference: 'GP-2026-00001' });
-    expect(await statusOf()).toEqual(['FA-000001:out_for_service', 'FA-000002:in_stock', 'FA-000003:in_stock']);
+    expect(await statusOf()).toEqual(['FA-000001:out_for_service', 'FA-000002:out_for_service', 'FA-000003:in_stock']);
+    // Out of the store while away; the books keep the asset.
+    expect(await stockQty()).toBe(1);
+    expect(await closing('equipment')).toBe(360_000);
+
+    const warranty = await scm('post', `asset-service-requests/${service.body.id}/receive`, keeper, {
+      version: 2,
+      assetIds: [pieces[0]],
+      costs: [{ assetId: pieces[0], cost: 50 }],
+      on: '2026-03-20',
+    }).expect(422);
+    expect(warranty.body.code).toBe('warranty_cost');
     await scm('post', `asset-service-requests/${service.body.id}/receive`, keeper, {
       version: 2,
       assetIds: [pieces[0]],
       on: '2026-03-20',
     }).expect(204);
+    expect(await stockQty()).toBe(2);
+    expect(await closing('maintenance')).toBe(0);
+    await scm('post', `asset-service-requests/${service.body.id}/receive`, keeper, {
+      version: 3,
+      assetIds: [pieces[1]],
+      costs: [{ assetId: pieces[1], cost: 2_750 }],
+      on: '2026-03-25',
+    }).expect(204);
+    expect(await stockQty()).toBe(3);
+    expect(await closing('maintenance')).toBe(2_750);
+    // On the vendor's supplier ledger, not the generic repairs payable.
+    expect(await closing('payable')).toBe(-362_750);
+    expect(await closing('repairsDue')).toBe(0);
     const done = await scm('get', `asset-service-requests/${service.body.id}`, keeper).expect(200);
-    expect(done.body).toMatchObject({ status: 'closed', lines: [{ returnedOn: '2026-03-20' }, { rejected: true }] });
+    expect(done.body).toMatchObject({
+      status: 'closed',
+      fields: { supplierId: supplier },
+      lines: [
+        { returnedOn: '2026-03-20', actualCost: 0, receiptVoucherNumber: null },
+        { returnedOn: '2026-03-25', actualCost: 2_750, receiptVoucherNumber: expect.stringMatching(/^JV-/) },
+        { rejected: true },
+      ],
+    });
     expect(await statusOf()).toEqual(['FA-000001:in_stock', 'FA-000002:in_stock', 'FA-000003:in_stock']);
   });
 
@@ -221,22 +271,47 @@ describe('asset service, discard and scrap sale', () => {
     const stock = await scm('get', `stock?mainStoreId=${main}`, keeper).expect(200);
     expect(stock.body.items[0].qty).toBe(1);
 
-    const sold = await scm('post', `asset-discard-requests/${discard.body.id}/sell`, keeper, {
-      version: 2,
-      soldTo: 'Scrap Traders',
+    const sell = (version: number) =>
+      scm('post', `asset-discard-requests/${discard.body.id}/sell`, keeper, {
+        version,
+        soldTo: 'Medical Systems Ltd',
+        buyerSupplierId: supplier,
+        on: '2026-03-20',
+        amounts: [{ assetId: pieces[1], amount: 5_000 }],
+      });
+    expect((await sell(2).expect(200)).body).toEqual({ status: 'sale_pending' });
+    const inbox = await scm('get', 'asset-discard-requests/inbox', accountant).expect(200);
+    expect(inbox.body.items).toMatchObject([{ status: 'sale_pending', currentLevelName: 'Accounts' }]);
+    await scm('post', `asset-discard-requests/${discard.body.id}/decision`, director, {
+      version: 3,
+      decision: 'approve',
       on: '2026-03-20',
-      amounts: [{ assetId: pieces[1], amount: 5_000 }],
+    }).expect(403);
+    // A rejected sale leaves the pieces written off, ready for another offer.
+    const refused = await scm('post', `asset-discard-requests/${discard.body.id}/decision`, accountant, {
+      version: 3,
+      decision: 'reject',
+      remarks: 'Get a better offer',
+      on: '2026-03-20',
     }).expect(200);
-    expect(sold.body.invoiceNo).toBe('DIS-2026-00001');
-    expect(await closing('cash')).toBe(5_000);
+    expect(refused.body).toEqual({ status: 'discarded', reference: null });
+    await sell(4).expect(200);
+    const sold = await scm('post', `asset-discard-requests/${discard.body.id}/decision`, accountant, {
+      version: 5,
+      decision: 'approve',
+      on: '2026-03-20',
+    }).expect(200);
+    expect(sold.body).toEqual({ status: 'sold', reference: 'DIS-2026-00001' });
+    // To the buyer's party ledger (a supplier), not cash.
+    expect(await closing('cash')).toBe(0);
+    expect(await closing('payable')).toBe(-355_000);
     expect(await closing('gain')).toBe(-5_000);
     expect(await statusOf()).toEqual(['FA-000001:in_stock', 'FA-000002:sold', 'FA-000003:discarded']);
-    await scm('post', `asset-discard-requests/${discard.body.id}/sell`, keeper, {
-      version: 3,
-      soldTo: 'Again',
-      on: '2026-03-21',
-      amounts: [],
-    }).expect(422);
+    const history = await scm('get', `asset-discard-requests/${discard.body.id}`, keeper).expect(200);
+    expect(
+      history.body.decisions.map((entry: { stage: string; decision: string }) => `${entry.stage}:${entry.decision}`),
+    ).toEqual(['request:approved', 'sale:rejected', 'sale:approved']);
+    await sell(6).expect(422);
 
     const scrap = await scm('post', 'scrap-sales', keeper, {
       saleDate: '2026-03-25',
@@ -250,6 +325,7 @@ describe('asset service, discard and scrap sale', () => {
     }).expect(200);
     expect(scrapSold.body).toEqual({ status: 'sold', reference: 'DIS-2026-00002' });
     expect(await closing('scrap')).toBe(-100);
+    expect(await closing('cash')).toBe(100);
 
     for (const params of [
       { kind: 'discard', id: discard.body.id },

@@ -37,6 +37,7 @@ class OpenServiceDto extends createZodDto(
   z.strictObject({
     requestDate: day,
     sentTo: z.string().trim().min(1).max(200),
+    supplierId: ref.nullable().default(null),
     note: text(1000).default(null),
     lines: z
       .array(
@@ -65,6 +66,7 @@ class OpenScrapSaleDto extends createZodDto(
   z.strictObject({
     saleDate: day,
     buyer: z.string().trim().min(1).max(200),
+    buyerSupplierId: ref.nullable().default(null),
     lines: z
       .array(
         z.strictObject({
@@ -87,11 +89,22 @@ class DecideDto extends createZodDto(
     on: day,
   }),
 ) {}
-class ReceiveDto extends createZodDto(z.strictObject({ version, assetIds: z.array(ref).min(1).max(300), on: day })) {}
+class ReceiveDto extends createZodDto(
+  z.strictObject({
+    version,
+    assetIds: z.array(ref).min(1).max(300),
+    costs: z
+      .array(z.strictObject({ assetId: ref, cost: z.number().min(0).max(1_000_000_000) }))
+      .max(300)
+      .default([]),
+    on: day,
+  }),
+) {}
 class SellDto extends createZodDto(
   z.strictObject({
     version,
     soldTo: z.string().trim().min(1).max(200),
+    buyerSupplierId: ref.nullable().default(null),
     on: day,
     amounts: z.array(z.strictObject({ assetId: ref, amount: z.number().min(0).max(1_000_000_000) })).max(300),
   }),
@@ -109,13 +122,14 @@ const summaryShape = {
 };
 class PageResponseDto extends responseDto({ items: z.array(z.object(summaryShape)), ...pageMetaShape }) {}
 class InboxResponseDto extends responseDto({ items: z.array(z.object(summaryShape)) }) {}
-class DocumentResponseDto extends responseDto({
+class AssetDocumentResponseDto extends responseDto({
   ...summaryShape,
   kind: z.string(),
   fields: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
   lines: z.array(z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))),
   decisions: z.array(
     z.object({
+      stage: z.enum(['request', 'sale']),
       levelOrder: z.int(),
       levelName: z.string(),
       decision: z.string(),
@@ -126,7 +140,7 @@ class DocumentResponseDto extends responseDto({
   ),
 }) {}
 class DecisionResponseDto extends responseDto({ status: z.string(), reference: z.string().nullable() }) {}
-class SoldResponseDto extends responseDto({ invoiceNo: z.string(), voucherNumber: z.string().nullable() }) {}
+class SaleProposedResponseDto extends responseDto({ status: z.string() }) {}
 
 /** List, detail, inbox and decision of one kind of asset document. */
 abstract class AssetDocuments {
@@ -153,14 +167,16 @@ abstract class AssetDocuments {
 
   @Get(':id')
   @RequirePermissions('scm:read')
-  @ApiOkResponse({ type: DocumentResponseDto })
+  @ApiOkResponse({ type: AssetDocumentResponseDto })
   get(@CurrentUser() actor: Actor, @Param() params: IdParamDto) {
     return this.queryBus.execute(new GetAssetDocumentQuery(actor, this.kind, params.id));
   }
 
   @Post(':id/decision')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Approve (dropping pieces if needed) or reject at the current level' })
+  @ApiOperation({
+    summary: 'Approve (dropping pieces if needed) or reject at the current level (of the sale, when one is pending)',
+  })
   @ApiOkResponse({ type: DecisionResponseDto })
   decide(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: DecideDto) {
     return this.commandBus.execute(
@@ -193,15 +209,26 @@ export class AssetServiceRequestsController extends AssetDocuments {
   @ApiOperation({ summary: 'Ask to send pieces out for warranty repair or maintenance' })
   @ApiCreatedResponse({ type: CreatedDocumentResponseDto })
   open(@CurrentUser() actor: Actor, @Body() dto: OpenServiceDto) {
-    return this.commandBus.execute(new OpenServiceCommand(actor, dto.requestDate, dto.sentTo, dto.note, dto.lines));
+    return this.commandBus.execute(
+      new OpenServiceCommand(actor, dto.requestDate, dto.sentTo, dto.supplierId, dto.note, dto.lines),
+    );
   }
 
   @Post(':id/receive')
   @RequirePermissions('scm:assets')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Pieces back from service' })
+  @ApiOperation({ summary: 'Pieces back from service into stock, with what the maintenance cost' })
   async receive(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: ReceiveDto) {
-    await this.commandBus.execute(new ReceiveServiceCommand(actor, params.id, dto.version, dto.assetIds, dto.on));
+    await this.commandBus.execute(
+      new ReceiveServiceCommand(
+        actor,
+        params.id,
+        dto.version,
+        dto.assetIds,
+        new Map(dto.costs.map((line) => [line.assetId, line.cost])),
+        dto.on,
+      ),
+    );
   }
 }
 
@@ -226,8 +253,8 @@ export class AssetDiscardRequestsController extends AssetDocuments {
   @Post(':id/sell')
   @RequirePermissions('scm:assets')
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Record the sale of the written-off pieces (once), with an invoice number' })
-  @ApiOkResponse({ type: SoldResponseDto })
+  @ApiOperation({ summary: 'Propose the sale of the written-off pieces, for approval on the discard_sale ladder' })
+  @ApiOkResponse({ type: SaleProposedResponseDto })
   sell(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: SellDto) {
     return this.commandBus.execute(
       new SellDiscardCommand(
@@ -235,6 +262,7 @@ export class AssetDiscardRequestsController extends AssetDocuments {
         params.id,
         dto.version,
         dto.soldTo,
+        dto.buyerSupplierId,
         dto.on,
         new Map(dto.amounts.map((line) => [line.assetId, line.amount])),
       ),
@@ -257,7 +285,9 @@ export class ScrapSalesController extends AssetDocuments {
   @ApiOperation({ summary: 'Raise a sale of scrap that is not a registered asset' })
   @ApiCreatedResponse({ type: CreatedDocumentResponseDto })
   open(@CurrentUser() actor: Actor, @Body() dto: OpenScrapSaleDto) {
-    return this.commandBus.execute(new OpenScrapSaleCommand(actor, dto.saleDate, dto.buyer, dto.lines));
+    return this.commandBus.execute(
+      new OpenScrapSaleCommand(actor, dto.saleDate, dto.buyer, dto.buyerSupplierId, dto.lines),
+    );
   }
 }
 

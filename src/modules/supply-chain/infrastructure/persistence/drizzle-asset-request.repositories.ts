@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, count, desc, eq, inArray, type SQL } from 'drizzle-orm';
+import { and, asc, count, desc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import type { PgColumn, PgTable } from 'drizzle-orm/pg-core';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page, type PageRequest } from '../../../../shared/application/pagination.js';
@@ -11,8 +11,13 @@ import {
   type AssetDocumentSummary,
   type AssetDocumentView,
 } from '../../application/asset-request.handlers.js';
-import { DiscardRequest, ScrapSale, ServiceRequest, type AssetFlow } from '../../domain/asset-requests.js';
-import type { Decision } from '../../domain/documents.js';
+import {
+  DiscardRequest,
+  ScrapSale,
+  ServiceRequest,
+  type AssetDecision,
+  type AssetFlow,
+} from '../../domain/asset-requests.js';
 import { AssetRequestRepository, type PurchaseApprovalLevel, type RequestPiece } from '../../domain/repositories.js';
 import {
   assetApprovalLevels,
@@ -113,19 +118,16 @@ export class DrizzleAssetRequestRepository extends AssetRequestRepository {
       .where(inArray(fixedAssets.id, [...ids]));
   }
 
-  private async decisions(documentId: string): Promise<Decision[]> {
-    const rows = await this.context.db
-      .select()
-      .from(assetDecisions)
-      .where(eq(assetDecisions.documentId, documentId))
-      .orderBy(asc(assetDecisions.levelOrder));
-    return rows.map(({ documentId: _id, ...decision }) => decision);
+  private async decisions(documentId: string): Promise<AssetDecision[]> {
+    return decisionsOf(this.context, documentId);
   }
 
-  private async saveDecisions(documentId: string, decisions: readonly Decision[]): Promise<void> {
+  private async saveDecisions(documentId: string, decisions: readonly AssetDecision[]): Promise<void> {
     await this.context.db.delete(assetDecisions).where(eq(assetDecisions.documentId, documentId));
     if (decisions.length > 0) {
-      await this.context.db.insert(assetDecisions).values(decisions.map((decision) => ({ ...decision, documentId })));
+      await this.context.db
+        .insert(assetDecisions)
+        .values(decisions.map((decision, position) => ({ ...decision, documentId, position })));
     }
   }
 
@@ -229,6 +231,15 @@ export class DrizzleAssetRequestRepository extends AssetRequestRepository {
   }
 }
 
+async function decisionsOf(context: DbContext, documentId: string): Promise<AssetDecision[]> {
+  const rows = await context.db
+    .select()
+    .from(assetDecisions)
+    .where(eq(assetDecisions.documentId, documentId))
+    .orderBy(asc(assetDecisions.position));
+  return rows.map(({ documentId: _id, position: _position, ...decision }) => decision);
+}
+
 interface Header {
   readonly table: PgTable;
   readonly id: PgColumn;
@@ -238,7 +249,9 @@ interface Header {
   readonly currentLevel: PgColumn;
   readonly version: PgColumn;
   readonly party: PgColumn;
-  readonly flow: AssetFlow;
+  /** The ladder the current level is on. */
+  readonly flow: AssetFlow | SQL;
+  readonly pending: readonly string[];
 }
 
 const HEADERS: Record<AssetDocumentKind, Header> = {
@@ -252,6 +265,7 @@ const HEADERS: Record<AssetDocumentKind, Header> = {
     version: serviceRequests.version,
     party: serviceRequests.sentTo,
     flow: 'service',
+    pending: ['pending'],
   },
   discard: {
     table: discardRequests,
@@ -262,7 +276,8 @@ const HEADERS: Record<AssetDocumentKind, Header> = {
     currentLevel: discardRequests.currentLevel,
     version: discardRequests.version,
     party: discardRequests.soldTo,
-    flow: 'discard',
+    flow: sql`case when ${discardRequests.status} = 'sale_pending' then 'discard_sale' else 'discard' end`,
+    pending: ['pending', 'sale_pending'],
   },
   scrap_sale: {
     table: scrapSales,
@@ -274,6 +289,7 @@ const HEADERS: Record<AssetDocumentKind, Header> = {
     version: scrapSales.version,
     party: scrapSales.buyer,
     flow: 'scrap_sale',
+    pending: ['pending'],
   },
 };
 
@@ -299,7 +315,12 @@ export class DrizzleAssetRequestReadRepository extends AssetRequestReadRepositor
       .from(header.table)
       .leftJoin(
         assetApprovalLevels,
-        and(eq(assetApprovalLevels.flow, header.flow), eq(assetApprovalLevels.levelOrder, header.currentLevel)),
+        and(
+          typeof header.flow === 'string'
+            ? eq(assetApprovalLevels.flow, header.flow)
+            : sql`${assetApprovalLevels.flow} = ${header.flow}`,
+          eq(assetApprovalLevels.levelOrder, header.currentLevel),
+        ),
       )
       .$dynamic();
   }
@@ -324,7 +345,7 @@ export class DrizzleAssetRequestReadRepository extends AssetRequestReadRepositor
   async inbox(kind: AssetDocumentKind, roleIds: readonly string[]): Promise<AssetDocumentSummary[]> {
     const header = HEADERS[kind];
     const rows = await this.summaries(kind)
-      .where(and(eq(header.status, 'pending'), inArray(assetApprovalLevels.roleId, [...roleIds])))
+      .where(and(inArray(header.status, [...header.pending]), inArray(assetApprovalLevels.roleId, [...roleIds])))
       .orderBy(asc(header.date))
       .limit(500);
     return rows as AssetDocumentSummary[];
@@ -334,26 +355,25 @@ export class DrizzleAssetRequestReadRepository extends AssetRequestReadRepositor
     const header = HEADERS[kind];
     const [summary] = (await this.summaries(kind).where(eq(header.id, id))) as AssetDocumentSummary[];
     if (!summary) return null;
-    const decisions = (
-      await this.context.db
-        .select()
-        .from(assetDecisions)
-        .where(eq(assetDecisions.documentId, id))
-        .orderBy(asc(assetDecisions.levelOrder))
-    ).map(({ documentId: _id, ...decision }) => decision);
+    const decisions = await decisionsOf(this.context, id);
     if (kind === 'scrap_sale') {
       const [row] = await this.context.db.select().from(scrapSales).where(eq(scrapSales.id, id));
       return {
         ...summary,
         kind,
-        fields: { total: row!.total, invoiceNo: row!.invoiceNo, voucherNumber: row!.voucherNumber },
+        fields: {
+          total: row!.total,
+          buyerSupplierId: row!.buyerSupplierId,
+          invoiceNo: row!.invoiceNo,
+          voucherNumber: row!.voucherNumber,
+        },
         lines: row!.lines,
         decisions,
       };
     }
     if (kind === 'service') {
       const [row] = await this.context.db
-        .select({ note: serviceRequests.note })
+        .select({ note: serviceRequests.note, supplierId: serviceRequests.supplierId })
         .from(serviceRequests)
         .where(eq(serviceRequests.id, id));
       const lines = await this.context.db
@@ -365,12 +385,20 @@ export class DrizzleAssetRequestReadRepository extends AssetRequestReadRepositor
           cost: serviceRequestLines.cost,
           rejected: serviceRequestLines.rejected,
           returnedOn: serviceRequestLines.returnedOn,
+          actualCost: serviceRequestLines.actualCost,
+          receiptVoucherNumber: serviceRequestLines.receiptVoucherNumber,
         })
         .from(serviceRequestLines)
         .innerJoin(fixedAssets, eq(fixedAssets.id, serviceRequestLines.assetId))
         .where(eq(serviceRequestLines.requestId, id))
         .orderBy(asc(serviceRequestLines.position));
-      return { ...summary, kind, fields: { note: row?.note ?? null }, lines, decisions };
+      return {
+        ...summary,
+        kind,
+        fields: { note: row?.note ?? null, supplierId: row?.supplierId ?? null },
+        lines,
+        decisions,
+      };
     }
     const [row] = await this.context.db
       .select({
@@ -378,6 +406,7 @@ export class DrizzleAssetRequestReadRepository extends AssetRequestReadRepositor
         discardedOn: discardRequests.discardedOn,
         disposalVoucherNumber: discardRequests.disposalVoucherNumber,
         soldOn: discardRequests.soldOn,
+        buyerSupplierId: discardRequests.buyerSupplierId,
         invoiceNo: discardRequests.invoiceNo,
         saleVoucherNumber: discardRequests.saleVoucherNumber,
       })
