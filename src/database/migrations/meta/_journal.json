@@ -148,6 +148,13 @@
       "when": 1792955852414,
       "tag": "0020_scm_department_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1792977477852,
+      "tag": "0021_scm_fixed_assets",
+      "breakpoints": true
     }
   ]
 }

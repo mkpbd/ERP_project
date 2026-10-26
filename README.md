@@ -159,6 +159,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | department consumption, returns and counts | `scm:department` (+ department access) |
 | approving or rejecting department counts | `scm:adjust` (not the counter) |
 | supplier returns (draft, send, settle) | `scm:receive` |
+| `GET /scm/fixed-assets[/:id]`, `GET /scm/depreciation-runs[/:id]` | `scm:read` |
+| describe pieces, configure depreciation, preview, post and reverse runs | `scm:assets` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies}/inbox` | signed in |

@@ -124,7 +124,12 @@ export function supplyChainRecordTypes(context: DbContext): RecordType[] {
     }),
     record(R.item, items, {
       orderBy: [items.name],
-      filters: { subGroupId: items.subGroupId, subCategoryId: items.subCategoryId, isActive: items.isActive },
+      filters: {
+        subGroupId: items.subGroupId,
+        subCategoryId: items.subCategoryId,
+        isAsset: items.isAsset,
+        isActive: items.isActive,
+      },
       search: [items.name],
       unique: { items_name_uq: taken('item_name_taken', 'The sub-group already has an item of this name') },
       references: {

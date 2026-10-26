@@ -2,6 +2,7 @@ import { Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { ASSET_HANDLERS, AssetReadRepository } from './application/asset.handlers.js';
 import { DEPARTMENT_HANDLERS } from './application/department.handlers.js';
 import { DepartmentReadRepository } from './application/department.messages.js';
 import { PURCHASE_HANDLERS } from './application/purchase.handlers.js';
@@ -12,10 +13,12 @@ import { StoreReadRepository } from './application/store.messages.js';
 import { StockReadRepository } from './application/stock.messages.js';
 import {
   AdjustmentRepository,
+  AssetRegister,
   ApprovalLevels,
   CatalogueFacts,
   ConsumptionRepository,
   DepartmentReturnRepository,
+  DepreciationRepository,
   GatePassRepository,
   IndentRepository,
   OpeningRepository,
@@ -51,6 +54,12 @@ import { stockTransferReport, storeIndentReport, storeIssueReport } from './infr
 import { STOCK_CONTROLLERS } from './presentation/stock.controllers.js';
 import { STORE_CONTROLLERS } from './presentation/store.controllers.js';
 import { DEPARTMENT_CONTROLLERS } from './presentation/department.controllers.js';
+import { ASSET_CONTROLLERS } from './presentation/asset.controllers.js';
+import {
+  DrizzleAssetReadRepository,
+  DrizzleAssetRegister,
+  DrizzleDepreciationRepository,
+} from './infrastructure/persistence/drizzle-asset.repositories.js';
 import { DrizzleDepartmentReadRepository } from './infrastructure/persistence/drizzle-department.read-repository.js';
 import {
   DrizzleAdjustmentRepository,
@@ -82,7 +91,8 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
  * and purchase orders with their approval levels (step 7b); stock receives, lots, the stock movement ledger,
  * opening stock and GRN faults, posting purchases to accounts (step 7c); store indents and their approval,
  * store requests, issues to departments and transfers between stores (step 7d); department stock (consumption,
- * returns, counts), supplier returns and gate passes (step 7e).
+ * returns, counts), supplier returns and gate passes (step 7e); the fixed asset register and straight-line
+ * depreciation (step 7f).
  */
 @Module({
   controllers: [
@@ -91,12 +101,17 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
     ...STOCK_CONTROLLERS,
     ...STORE_CONTROLLERS,
     ...DEPARTMENT_CONTROLLERS,
+    ...ASSET_CONTROLLERS,
   ],
   providers: [
     ...PURCHASE_HANDLERS,
     ...STOCK_HANDLERS,
     ...STORE_HANDLERS,
     ...DEPARTMENT_HANDLERS,
+    ...ASSET_HANDLERS,
+    { provide: AssetRegister, useClass: DrizzleAssetRegister },
+    { provide: DepreciationRepository, useClass: DrizzleDepreciationRepository },
+    { provide: AssetReadRepository, useClass: DrizzleAssetReadRepository },
     { provide: ConsumptionRepository, useClass: DrizzleConsumptionRepository },
     { provide: DepartmentReturnRepository, useClass: DrizzleDepartmentReturnRepository },
     { provide: AdjustmentRepository, useClass: DrizzleAdjustmentRepository },

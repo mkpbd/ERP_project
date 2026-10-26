@@ -38,3 +38,5 @@ export const SCM_ISSUE = 'scm:issue';
 export const SCM_DEPARTMENT = 'scm:department';
 /** Approving department stock counts. */
 export const SCM_ADJUST = 'scm:adjust';
+/** The fixed asset register and depreciation: configuring, running and reversing it. */
+export const SCM_ASSETS = 'scm:assets';

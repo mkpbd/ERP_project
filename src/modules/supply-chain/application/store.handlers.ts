@@ -343,7 +343,9 @@ export class CreateIssueHandler implements ICommandHandler<CreateIssueCommand> {
       // The goods leave the sub-store and become the department's stock, lot by lot.
       const document = { id, number, on: issue.issueDate };
       const taken = await this.stores.keeper.takeOut({ subStoreId: issue.subStoreId }, lines, document, 'issue');
-      await this.stores.keeper.putIn({ departmentId: issue.departmentId }, taken, document, 'issue');
+      await this.stores.keeper.putIn({ departmentId: issue.departmentId }, taken, document, 'issue', {
+        subStoreId: issue.subStoreId,
+      });
       await desk.record('store_issue', 'issued', actor, id, { number, lines: lines.length });
       return { id, number };
     });
@@ -424,7 +426,7 @@ export class CreateTransferHandler implements ICommandHandler<CreateTransferComm
       if (kind !== 'sub_to_sub') {
         const document = { id, number, on: transfer.transferDate };
         const taken = await keeper.takeOut(transfer.from, lines, document, 'transfer');
-        await keeper.putIn(transfer.to, taken, document, 'transfer');
+        await keeper.putIn(transfer.to, taken, document, 'transfer', transfer.from);
       }
       await desk.record('stock_transfer', 'sent', actor, id, { number, kind });
       return { id, number, status: record.status };
@@ -465,7 +467,7 @@ export class DecideTransferHandler implements ICommandHandler<DecideTransferComm
           .map((line) => ({ ...line, qty: line.acceptedQty }));
         const document = { id, number: transfer.number, on };
         const taken = await keeper.takeOut(transfer.from, lines, document, 'transfer');
-        await keeper.putIn(transfer.to, taken, document, 'transfer');
+        await keeper.putIn(transfer.to, taken, document, 'transfer', transfer.from);
         transfer.status = 'completed';
       }
       transfer.decidedBy = actor.userId;

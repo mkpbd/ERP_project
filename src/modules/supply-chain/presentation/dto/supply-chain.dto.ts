@@ -102,15 +102,16 @@ const item = shapes(
     subCategoryId: ref,
     unit: z.string().trim().min(1).max(30),
     typeGlAccountId: ref.nullable(),
+    isAsset: z.boolean(),
     isActive: z.boolean(),
   },
   ['typeGlAccountId'],
-  { isActive: true },
+  { isAsset: false, isActive: true },
 );
 export class CreateItemDto extends createZodDto(item.create) {}
 export class UpdateItemDto extends createZodDto(item.update) {}
 export class ItemFilterDto extends createZodDto(
-  z.object({ subGroupId: ref.optional(), subCategoryId: ref.optional(), isActive: flag, q: search }),
+  z.object({ subGroupId: ref.optional(), subCategoryId: ref.optional(), isAsset: flag, isActive: flag, q: search }),
 ) {}
 export class ItemResponseDto extends responseDto(item.response) {}
 

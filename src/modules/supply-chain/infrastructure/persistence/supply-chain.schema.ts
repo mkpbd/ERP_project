@@ -207,6 +207,8 @@ export const items = pgTable(
       .references(() => itemSubCategories.id, { onDelete: 'restrict' }),
     unit: text('unit').notNull(),
     typeGlAccountId: uuid('type_gl_account_id').references(() => glAccounts.id, { onDelete: 'restrict' }),
+    /** Reusable and fixed-asset items: every piece received is registered (old: item type GL named so). */
+    isAsset: boolean('is_asset').notNull().default(false),
     isActive: boolean('is_active').notNull().default(true),
     ...timestamps,
   },
@@ -1311,5 +1313,128 @@ export const supplierReturnLines = pgTable(
       'supplier_return_lines_qty_ck',
       sql`${t.qty} > 0 and (${t.receivedQty} is null or ${t.receivedQty} between 0 and ${t.qty})`,
     ),
+  ],
+);
+
+export const ASSET_STATUSES = ['in_stock', 'out_for_service', 'discarded', 'sold', 'returned'] as const;
+
+// Old FixedAssetItems (FA-000001): one row per piece of an asset item, where it is and what it cost.
+export const fixedAssets = pgTable(
+  'fixed_assets',
+  {
+    id: uuid('id').primaryKey(),
+    assetNo: text('asset_no').notNull(),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => stockLots.id, { onDelete: 'restrict' }),
+    sourceDocumentId: uuid('source_document_id').notNull(),
+    sourceNumber: text('source_number').notNull(),
+    supplierId: uuid('supplier_id').references(() => suppliers.id, { onDelete: 'restrict' }),
+    cost: money('cost').notNull(),
+    acquiredOn: day('acquired_on').notNull(),
+    status: text('status', { enum: ASSET_STATUSES }).notNull(),
+    mainStoreId: uuid('main_store_id').references(() => mainStores.id, { onDelete: 'restrict' }),
+    subStoreId: uuid('sub_store_id').references(() => subStores.id, { onDelete: 'restrict' }),
+    departmentId: uuid('department_id').references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    serialNo: text('serial_no'),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('fixed_assets_no_uq').on(t.assetNo),
+    index('fixed_assets_variant_idx').on(t.variantId, t.lotId, t.status),
+    index('fixed_assets_department_idx').on(t.departmentId),
+    index('fixed_assets_source_idx').on(t.sourceDocumentId),
+    check(
+      'fixed_assets_status_ck',
+      sql`${t.status} in ('in_stock', 'out_for_service', 'discarded', 'sold', 'returned')`,
+    ),
+    check('fixed_assets_place_ck', sql`num_nonnulls(${t.mainStoreId}, ${t.subStoreId}, ${t.departmentId}) <= 1`),
+    check('fixed_assets_cost_ck', sql`${t.cost} >= 0`),
+  ],
+);
+
+// Old AssetDepreciationProfiles: how one piece depreciates and how far it has gone.
+export const assetDepreciation = pgTable(
+  'asset_depreciation',
+  {
+    assetId: uuid('asset_id')
+      .primaryKey()
+      .references(() => fixedAssets.id, { onDelete: 'cascade' }),
+    frequency: text('frequency', { enum: ['monthly', 'quarterly', 'half_yearly', 'yearly'] }).notNull(),
+    lifeMonths: smallint('life_months').notNull(),
+    cost: money('cost').notNull(),
+    residual: money('residual').notNull(),
+    startDate: day('start_date').notNull(),
+    openingAccumulated: money('opening_accumulated').notNull().default(0),
+    periodsDone: smallint('periods_done').notNull(),
+    accumulated: money('accumulated').notNull(),
+    lastPeriodEnd: day('last_period_end'),
+    status: text('status', { enum: ['active', 'fully_depreciated', 'suspended', 'disposed'] }).notNull(),
+    configuredBy: uuid('configured_by').references(() => users.id, { onDelete: 'set null' }),
+    ...timestamps,
+  },
+  (t) => [
+    check('asset_depreciation_frequency_ck', sql`${t.frequency} in ('monthly', 'quarterly', 'half_yearly', 'yearly')`),
+    check('asset_depreciation_status_ck', sql`${t.status} in ('active', 'fully_depreciated', 'suspended', 'disposed')`),
+    check(
+      'asset_depreciation_amounts_ck',
+      sql`${t.residual} between 0 and ${t.cost} and ${t.accumulated} between 0 and ${t.cost} - ${t.residual}
+        and ${t.lifeMonths} between 1 and 1200 and ${t.periodsDone} >= 0`,
+    ),
+  ],
+);
+
+// Old AssetDepreciationRuns: one posting of every charge due up to a date.
+export const depreciationRuns = pgTable(
+  'depreciation_runs',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    asOf: day('as_of').notNull(),
+    status: text('status', { enum: ['posted', 'reversed'] }).notNull(),
+    assetCount: integer('asset_count').notNull(),
+    total: money('total').notNull(),
+    voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    reversalVoucherId: uuid('reversal_voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    reversalVoucherNumber: text('reversal_voucher_number'),
+    reverseReason: text('reverse_reason'),
+    postedBy: uuid('posted_by').references(() => users.id, { onDelete: 'set null' }),
+    reversedBy: uuid('reversed_by').references(() => users.id, { onDelete: 'set null' }),
+    reversedAt: tz('reversed_at'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('depreciation_runs_number_uq').on(t.number),
+    index('depreciation_runs_as_of_idx').on(t.asOf),
+    check('depreciation_runs_status_ck', sql`${t.status} in ('posted', 'reversed')`),
+  ],
+);
+
+// Old AssetDepreciationEntries: one charge per piece per period. A reversed run's entries are removed, so a
+// period is charged once.
+export const depreciationEntries = pgTable(
+  'depreciation_entries',
+  {
+    runId: uuid('run_id')
+      .notNull()
+      .references(() => depreciationRuns.id, { onDelete: 'cascade' }),
+    assetId: uuid('asset_id')
+      .notNull()
+      .references(() => fixedAssets.id, { onDelete: 'restrict' }),
+    periodIndex: smallint('period_index').notNull(),
+    periodEnd: day('period_end').notNull(),
+    amount: money('amount').notNull(),
+    /** Where the piece was when charged (old StoreDeptId at run time). */
+    departmentId: uuid('department_id').references(() => storeDepartments.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.runId, t.assetId, t.periodIndex] }),
+    uniqueIndex('depreciation_entries_period_uq').on(t.assetId, t.periodIndex),
+    check('depreciation_entries_amount_ck', sql`${t.amount} >= 0`),
   ],
 );

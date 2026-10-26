@@ -1,6 +1,6 @@
 # Step 7e — Supply chain: department stock, supplier returns, gate passes
 
-Status: **done** (2026-10-26). Previous: [step 7d](07d-scm-store-operations.md) · Next: step 7f (fixed assets).
+Status: **done** (2026-10-26). Previous: [step 7d](07d-scm-store-operations.md) · Next: [step 7f](07f-scm-fixed-assets.md) (fixed assets).
 
 ## Where the old logic lives
 

@@ -180,6 +180,7 @@ export class DrizzleCatalogueFacts extends CatalogueFacts {
               id: itemVariants.id,
               isActive: sql<boolean>`${itemVariants.isActive} and ${items.isActive}`,
               expiryRequired: itemVariants.expiryRequired,
+              isAsset: items.isAsset,
               inventoryGlAccountId: items.typeGlAccountId,
             })
             .from(itemVariants)

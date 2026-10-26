@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { StockKeeper } from '../../../src/modules/supply-chain/application/stock-keeper.js';
 import type { LotBalance } from '../../../src/modules/supply-chain/domain/allocation.js';
 import type { ApprovalLevel } from '../../../src/modules/supply-chain/domain/documents.js';
-import { StockLedger, type NewMovement, type StoreRef } from '../../../src/modules/supply-chain/domain/repositories.js';
+import {
+  type AssetRegister,
+  StockLedger,
+  type NewMovement,
+  type StoreRef,
+} from '../../../src/modules/supply-chain/domain/repositories.js';
 import {
   acceptedLines,
   quantitiesOf,
@@ -187,7 +192,12 @@ describe('StockKeeper', () => {
         ['v1', [{ lotId: 'x', batchNo: null, expiryDate: null, qty: 1, value: 7 }]],
       ]),
     );
-    const keeper = new StockKeeper(tx, ledger);
+    const relocated: string[] = [];
+    const assets = {
+      relocate: (variantId: string, lotId: string, count: number) =>
+        Promise.resolve(void relocated.push(`${variantId}:${lotId}:${count}`)),
+    } as unknown as AssetRegister;
+    const keeper = new StockKeeper(tx, ledger, assets);
     const document = { id: 'd1', number: 'IS-2026-00001', on: '2026-04-01' };
     const taken = await keeper.takeOut(
       { subStoreId: 's1' },
@@ -207,7 +217,8 @@ describe('StockKeeper', () => {
       [2, 'x', 1, 7],
     ]);
     expect(ledger.written.map((movement) => movement.qty)).toEqual([-2, -1, -3, -1]);
-    await keeper.putIn({ mainStoreId: 'm1' }, taken, document, 'transfer');
+    await keeper.putIn({ mainStoreId: 'm1' }, taken, document, 'transfer', { subStoreId: 's1' });
+    expect(relocated).toEqual(['v2:early:3', 'v2:late:3', 'v1:x:1']);
     expect(ledger.written.slice(4).map((movement) => [movement.store, movement.qty])).toEqual([
       [{ mainStoreId: 'm1' }, 2],
       [{ mainStoreId: 'm1' }, 1],

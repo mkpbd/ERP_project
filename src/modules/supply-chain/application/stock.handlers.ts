@@ -8,11 +8,14 @@ import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { MAX_DOCUMENT_LINES, paisa, taka, validAmount, validQuantity } from '../domain/documents.js';
 import type { PurchaseOrder } from '../domain/purchase-order.js';
 import {
+  AssetRegister,
+  assetNumber,
   CatalogueFacts,
   OpeningRepository,
   ReceiveRepository,
   StockLedger,
   type CatalogueVariant,
+  type NewAsset,
   type NewMovement,
   type PayableSupplier,
 } from '../domain/repositories.js';
@@ -53,6 +56,7 @@ export class ReceiveDesk {
     readonly catalogue: CatalogueFacts,
     readonly stock: StockLedger,
     readonly ledger: LedgerPosting,
+    readonly assets: AssetRegister,
   ) {}
 
   async receive(id: string, version: number): Promise<StockReceive> {
@@ -121,6 +125,52 @@ export function purchaseVoucherLines(
   ];
 }
 
+/** Fixed-asset items come in whole pieces (the old receive dropped the fraction when numbering them). */
+function assertWholePieces(
+  lines: readonly { variantId: string; qty: number }[],
+  variants: ReadonlyMap<string, CatalogueVariant>,
+): void {
+  lines.forEach((line, index) => {
+    if (variants.get(line.variantId)?.isAsset && !Number.isInteger(line.qty)) {
+      throw new DomainError('whole_pieces', `Line ${index + 1}: a fixed asset comes in whole pieces`);
+    }
+  });
+}
+
+/**
+ * Old GenerateFixedAssetNumbersCommand, now inside the posting: every piece of a fixed-asset item gets an asset
+ * number (FA-000001, one series), its unit cost and the place it went into.
+ */
+async function registerPieces(
+  desk: PurchaseDesk,
+  assets: AssetRegister,
+  movements: readonly NewMovement[],
+  variants: ReadonlyMap<string, CatalogueVariant>,
+  source: { id: string; number: string },
+  supplierId: string | null,
+  acquiredOn: string,
+): Promise<void> {
+  const pieces: NewAsset[] = [];
+  for (const movement of movements) {
+    if (!variants.get(movement.variantId)?.isAsset) continue;
+    for (let piece = 0; piece < movement.qty; piece += 1) {
+      pieces.push({
+        id: randomUUID(),
+        assetNo: assetNumber(await desk.sequences.next('FA', 0)),
+        variantId: movement.variantId,
+        lotId: movement.lotId,
+        sourceDocumentId: source.id,
+        sourceNumber: source.number,
+        supplierId,
+        cost: Math.round(movement.unitCost * 100) / 100,
+        acquiredOn,
+        place: movement.store,
+      });
+    }
+  }
+  if (pieces.length > 0) await assets.add(pieces);
+}
+
 @CommandHandler(CreateReceiveCommand)
 export class CreateReceiveHandler implements ICommandHandler<CreateReceiveCommand> {
   constructor(private readonly receiving: ReceiveDesk) {}
@@ -187,6 +237,7 @@ export class PostReceiveHandler implements ICommandHandler<PostReceiveCommand> {
       const supplier = await this.receiving.supplier(header.supplierId);
       const variants = await catalogue.variants(receive.lines.map((line) => line.variantId));
       receive.checkPostable(variants);
+      assertWholePieces(receive.lines, variants);
       const order = await this.receiving.order(header);
       if (order) {
         order.receive(receive.quantities(), now);
@@ -233,6 +284,15 @@ export class PostReceiveHandler implements ICommandHandler<PostReceiveCommand> {
         });
       }
       await stock.add(movements);
+      await registerPieces(
+        desk,
+        this.receiving.assets,
+        movements,
+        variants,
+        receive,
+        header.supplierId,
+        header.receivedOn,
+      );
       await receives.update(receive);
       await receives.setLots(receive.id, lotIds);
       await catalogue.updatePurchasePrices(
@@ -303,6 +363,7 @@ export class EnterOpeningStockHandler implements ICommandHandler<EnterOpeningSto
           throw new DomainError('expiry_required', `${at}: the item needs an expiry date`);
         }
       });
+      assertWholePieces(lines, variants);
       const id = randomUUID();
       const number = await desk.number('OS', openedOn);
       await this.openings.insert({ id, number, store, openedOn, note: note?.trim() || null, createdBy: actor.userId });
@@ -321,6 +382,7 @@ export class EnterOpeningStockHandler implements ICommandHandler<EnterOpeningSto
         });
       }
       await stock.add(movements);
+      await registerPieces(desk, this.receiving.assets, movements, variants, { id, number }, null, openedOn);
       await desk.record('stock_opening', 'entered', actor, id, { number, lines: lines.length });
       return { id, number };
     });

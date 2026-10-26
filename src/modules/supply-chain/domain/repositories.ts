@@ -93,6 +93,8 @@ export abstract class StockLedger {
 
 export interface CatalogueVariant {
   readonly isActive: boolean;
+  /** Every piece is registered as a fixed asset. */
+  readonly isAsset?: boolean;
   readonly expiryRequired: boolean;
   /** The item type's inventory account (old BrandName.ItemTypeId), if set. */
   readonly inventoryGlAccountId: string | null;
@@ -234,4 +236,99 @@ export interface NewGatePass {
 
 export abstract class GatePassRepository {
   abstract insert(pass: NewGatePass): Promise<void>;
+}
+
+/** Asset numbers are one series for all years (old FA-{SerialNo:D6}). */
+export const assetNumber = (serial: number) => `FA-${String(serial).padStart(6, '0')}`;
+
+export interface NewAsset {
+  readonly id: string;
+  readonly assetNo: string;
+  readonly variantId: string;
+  readonly lotId: string;
+  readonly sourceDocumentId: string;
+  readonly sourceNumber: string;
+  readonly supplierId: string | null;
+  readonly cost: number;
+  readonly acquiredOn: string;
+  readonly place: StockPlace;
+}
+
+/** Old FixedAssetItems and RelocateFixedAssetPiecesCommand: pieces follow the stock that moves. */
+export abstract class AssetRegister {
+  abstract add(assets: readonly NewAsset[]): Promise<void>;
+  /** Moves up to `count` pieces of the variant and lot in stock at `from` to `to`, oldest number first. */
+  abstract relocate(variantId: string, lotId: string, count: number, from: StockPlace, to: StockPlace): Promise<number>;
+  /** Up to `count` pieces at `from` leave the register's stock with the status (e.g. returned to the supplier). */
+  abstract release(
+    variantId: string,
+    lotId: string,
+    count: number,
+    from: StockPlace,
+    status: 'returned',
+  ): Promise<number>;
+}
+
+export type DepreciationFrequency = 'monthly' | 'quarterly' | 'half_yearly' | 'yearly';
+
+export interface DepreciationRecord {
+  readonly assetId: string;
+  readonly frequency: DepreciationFrequency;
+  readonly lifeMonths: number;
+  readonly cost: number;
+  readonly residual: number;
+  readonly startDate: string;
+  readonly openingAccumulated: number;
+  readonly periodsDone: number;
+  readonly accumulated: number;
+  readonly lastPeriodEnd: string | null;
+  readonly status: 'active' | 'fully_depreciated' | 'suspended' | 'disposed';
+}
+
+export interface DepreciableAsset {
+  readonly id: string;
+  readonly assetNo: string;
+  readonly cost: number;
+  readonly acquiredOn: string;
+  readonly status: string;
+  readonly departmentId: string | null;
+  /** Whether depreciation was already posted for it (then it is revised, not configured again). */
+  readonly charged: boolean;
+}
+
+export interface RunEntry {
+  readonly assetId: string;
+  readonly periodIndex: number;
+  readonly periodEnd: string;
+  readonly amount: number;
+  readonly departmentId: string | null;
+}
+
+export interface RunRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly asOf: string;
+  readonly status: 'posted' | 'reversed';
+  readonly assetCount: number;
+  readonly total: number;
+  readonly voucherId: string | null;
+  readonly voucherNumber: string | null;
+}
+
+export abstract class DepreciationRepository {
+  /** Throws NotFoundError when an asset does not exist. */
+  abstract assets(ids: readonly string[]): Promise<DepreciableAsset[]>;
+  abstract save(records: readonly DepreciationRecord[], by: string): Promise<void>;
+  /** Active profiles (locked) whose next period ends on or before `asOf`, with where the piece is. */
+  abstract due(asOf: string): Promise<(DepreciationRecord & { departmentId: string | null })[]>;
+  abstract insertRun(run: RunRecord & { postedBy: string }, entries: readonly RunEntry[]): Promise<void>;
+  /** The most recent run that is still posted, locked. */
+  abstract latestPosted(): Promise<RunRecord | null>;
+  abstract entries(runId: string): Promise<RunEntry[]>;
+  abstract profiles(assetIds: readonly string[]): Promise<DepreciationRecord[]>;
+  /** Removes the run's entries and marks it reversed. */
+  abstract markReversed(
+    runId: string,
+    reversal: { by: string; at: Date; reason: string; voucher: { id: string; number: string } | null },
+  ): Promise<void>;
 }

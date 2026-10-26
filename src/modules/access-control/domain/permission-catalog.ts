@@ -55,6 +55,7 @@ export const PERMISSION_CATALOG = [
   { key: 'scm:issue', description: 'Issue from sub-stores to departments and transfer between stores' },
   { key: 'scm:department', description: 'Record consumption, returns and stock counts of your departments' },
   { key: 'scm:adjust', description: 'Approve or reject department stock counts (not your own)' },
+  { key: 'scm:assets', description: 'Configure, run and reverse fixed asset depreciation; describe asset pieces' },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;
 

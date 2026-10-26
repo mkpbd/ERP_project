@@ -68,10 +68,10 @@ export class PurchaseDesk {
 
   /**
    * PR requisition, CS study, PO order, SR receive, OS opening, SI indent, RQ store request, IS issue, TR transfer,
-   * DC consumption, DR department return, DA stock count, RT supplier return, GP gate pass.
+   * DC consumption, DR department return, DA stock count, RT supplier return, GP gate pass, DP depreciation run.
    */
   async number(
-    kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR' | 'DC' | 'DR' | 'DA' | 'RT' | 'GP',
+    kind: 'PR' | 'CS' | 'PO' | 'SR' | 'OS' | 'SI' | 'RQ' | 'IS' | 'TR' | 'DC' | 'DR' | 'DA' | 'RT' | 'GP' | 'DP',
     date: string,
   ): Promise<string> {
     const year = Number(date.slice(0, 4));

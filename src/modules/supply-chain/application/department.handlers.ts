@@ -111,6 +111,12 @@ export class DepartmentDesk {
   }
 }
 
+/** Fixed-asset pieces are tracked one by one, not consumed or counted in bulk. */
+async function refuseAssets(departments: DepartmentDesk, lines: readonly { variantId: string }[], message: string) {
+  const variants = await departments.receiving.catalogue.variants(lines.map((line) => line.variantId));
+  if ([...variants.values()].some((variant) => variant.isAsset)) throw new DomainError('asset_item', message);
+}
+
 @CommandHandler(PostConsumptionCommand)
 export class PostConsumptionHandler implements ICommandHandler<PostConsumptionCommand> {
   constructor(private readonly departments: DepartmentDesk) {}
@@ -120,6 +126,7 @@ export class PostConsumptionHandler implements ICommandHandler<PostConsumptionCo
     await desk.access.authorize(actor.userId, { permissions: [SCM_DEPARTMENT] });
     await stores.assertMayIndentFor(actor.userId, departmentId);
     return desk.tx.run(async () => {
+      await refuseAssets(this.departments, lines, 'Fixed assets are not consumed; discard them instead');
       const consumption = DepartmentConsumption.post({
         id: randomUUID(),
         number: await desk.number('DC', consumedOn),
@@ -217,7 +224,9 @@ export class DecideDepartmentReturnHandler implements ICommandHandler<DecideDepa
           'department_return',
           { includeExpired: true },
         );
-        await stores.keeper.putIn({ subStoreId: departmentReturn.subStoreId }, taken, document, 'department_return');
+        await stores.keeper.putIn({ subStoreId: departmentReturn.subStoreId }, taken, document, 'department_return', {
+          departmentId: departmentReturn.departmentId,
+        });
       }
       await this.departments.returns.update(departmentReturn);
       await desk.record('department_return', decision === 'receive' ? 'received' : 'cancelled', actor, id);
@@ -234,6 +243,7 @@ export class RequestAdjustmentHandler implements ICommandHandler<RequestAdjustme
     await desk.access.authorize(actor.userId, { permissions: [SCM_DEPARTMENT] });
     await stores.assertMayIndentFor(actor.userId, departmentId);
     return desk.tx.run(async () => {
+      await refuseAssets(this.departments, lines, 'Fixed assets are counted in the asset register');
       const balances = await stores.ledger.balances(
         { departmentId },
         lines.map((line) => line.variantId),
@@ -406,6 +416,7 @@ export class SendSupplierReturnHandler implements ICommandHandler<SendSupplierRe
         'supplier_return',
         { includeExpired: true },
       );
+      await stores.keeper.release({ mainStoreId: supplierReturn.mainStoreId }, taken);
       const unitCosts = supplierReturn.lines.map((line, index) => {
         const value = taken
           .filter((part) => part.line === index)
