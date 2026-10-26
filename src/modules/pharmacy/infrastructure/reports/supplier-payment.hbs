@@ -1,0 +1,32 @@
+{{#with data.payment}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Payment no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date paidOn}}</td></tr>
+    <tr><td>Paid to</td><td><b>{{supplierName}}</b>{{#if supplierAddress}}<br /><small>{{supplierAddress}}</small>{{/if}}</td><td>Paid by</td><td>{{#if (eq method "bank")}}Bank{{else}}Cash{{/if}}{{#if reference}}<br /><small>{{reference}}</small>{{/if}}</td></tr>
+    <tr><td>Voucher</td><td>{{voucherNumber}}</td><td>Remarks</td><td>{{remarks}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Receive</th><th>Date</th><th>Supplier invoice</th><th class="num">Due before</th><th class="num">Paid</th><th class="num">Due after</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{receiveNumber}}</td>
+      <td>{{date receivedOn}}</td>
+      <td>{{supplierInvoiceNo}}</td>
+      <td class="num">{{money dueBefore}}</td>
+      <td class="num">{{money amount}}</td>
+      <td class="num">{{money dueAfter}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="5">Total paid</td><td class="num">{{money total}}</td><td></td></tr>
+  </tbody>
+</table>
+<p>In words: {{amountInWords total}}</p>
+<table style="width: 100%; margin-top: 64px; text-align: center">
+  <tr><td>Received by (supplier)</td><td>Accounts</td><td>Authorised by</td></tr>
+</table>
+{{/with}}

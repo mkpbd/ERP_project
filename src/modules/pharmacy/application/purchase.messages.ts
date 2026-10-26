@@ -65,6 +65,7 @@ export interface ReceiveSummary {
 
 export interface ReceiveLineView extends ProductRef {
   readonly qty: number;
+  readonly bonusQty: number;
   readonly purchaseRate: number;
   readonly saleRate: number;
   readonly discountPercent: number;

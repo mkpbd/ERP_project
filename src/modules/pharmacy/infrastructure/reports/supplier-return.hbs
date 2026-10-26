@@ -1,0 +1,55 @@
+{{#with data.supplierReturn}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 16%">Return no</td><td><b>{{number}}</b></td><td style="width: 16%">Date</td><td>{{date returnDate}}</td></tr>
+    <tr><td>Supplier</td><td><b>{{supplierName}}</b></td><td>From outlet</td><td>{{outletName}}</td></tr>
+    <tr><td>Reason</td><td>{{reason}}</td><td>Status</td><td>{{status}}{{#if closeReason}} — {{closeReason}}{{/if}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Unit cost</th><th class="num">Value</th></tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{displayName}}<br /><small>{{genericName}}</small></td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{unitCost}}</td>
+      <td class="num">{{#if value}}{{money value}}{{/if}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Value returned{{#if sentVoucherNumber}} ({{sentVoucherNumber}}){{/if}}</td><td class="num">{{money value}}</td></tr>
+  </tbody>
+</table>
+{{#if settlements.length}}
+<h3 style="margin: 14px 0 6px">Replacements received</h3>
+<table class="report">
+  <thead>
+    <tr><th class="center" style="width: 24px">#</th><th>Date</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Value</th></tr>
+  </thead>
+  <tbody>
+    {{#each settlements}}
+    <tr>
+      <td class="center">{{inc @index}}</td>
+      <td>{{date settledOn}}</td>
+      <td>{{displayName}}</td>
+      <td>{{batchNo}}</td>
+      <td>{{date expiryDate}}</td>
+      <td class="num">{{qty}}</td>
+      <td class="num">{{purchaseRate}}</td>
+      <td class="num">{{money value}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="7">Value replaced</td><td class="num">{{money settledValue}}</td></tr>
+  </tbody>
+</table>
+{{/if}}
+<p><b>Still owed by the supplier: {{money @root.data.owed}}</b></p>
+<table style="width: 100%; margin-top: 56px; text-align: center">
+  <tr><td>Prepared by</td><td>Pharmacy in-charge</td><td>Received by (supplier)</td></tr>
+</table>
+{{/with}}

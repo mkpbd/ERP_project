@@ -22,3 +22,5 @@ export const PHARMACY_MANAGE = 'pharmacy:manage';
 export const PHARMACY_PURCHASE = 'pharmacy:purchase';
 /** Drafting and posting stock receives at the outlets one works at. */
 export const PHARMACY_RECEIVE = 'pharmacy:receive';
+/** Paying suppliers for posted receives. */
+export const PHARMACY_PAYMENT = 'pharmacy:payment';

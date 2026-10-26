@@ -167,7 +167,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /pharmacy/*` (catalogue, outlets, outlet users, reorder levels) | `pharmacy:read` |
 | set up the medicine catalogue, outlets, outlet users and reorder levels; opening stock | `pharmacy:manage` |
 | medicine purchase orders (raise, edit, cancel, close) | `pharmacy:purchase` |
-| medicine receives (draft, edit, post, delete) | `pharmacy:receive` + works at the outlet (or `pharmacy:manage`) |
+| medicine receives (draft, edit, post, delete) and supplier returns (draft, send, settle, close) | `pharmacy:receive` + works at the outlet (or `pharmacy:manage`) |
+| supplier payments | `pharmacy:payment` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

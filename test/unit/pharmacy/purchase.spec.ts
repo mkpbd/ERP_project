@@ -68,6 +68,7 @@ describe('PharmacyReceive', () => {
   const line = {
     productId: 'a',
     qty: 600,
+    bonusQty: 0,
     purchaseRate: 0.9,
     saleRate: 1.2,
     discountPercent: 5,
@@ -111,6 +112,9 @@ describe('PharmacyReceive', () => {
     // Another sale rate is another lot.
     expect(draft([line, { ...line, saleRate: 1.5 }]).lines).toHaveLength(2);
     expect(() => draft([{ ...line, qty: 2.5 }])).toThrow(/whole number/);
+    expect(() => draft([{ ...line, bonusQty: -1 }])).toThrow(/\(bonus\): the quantity must be a whole number from 0/);
+    // Bonus units change nothing that is owed.
+    expect(draft([{ ...line, bonusQty: 60 }]).total).toBe(513);
     expect(() => draft([{ ...line, purchaseRate: 0.12345 }])).toThrow(/4 decimals/);
 
     const expired = draft([{ ...line, expiryDate: '2026-03-05' }]);

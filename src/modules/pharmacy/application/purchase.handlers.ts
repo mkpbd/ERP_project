@@ -46,7 +46,7 @@ export const PURCHASE_JOURNAL = 'JV';
 export const PHARMACY_INVENTORY_ROLE = 'pharmacy_inventory';
 export const SUPPLIER_PAYABLE_ROLE = 'supplier_payable';
 
-export type DocumentKind = 'PO' | 'GR' | 'OP';
+export type DocumentKind = 'PO' | 'GR' | 'OP' | 'SP' | 'RT';
 
 /** What the purchase and stock handlers share. */
 @Injectable()
@@ -243,9 +243,10 @@ export class EditReceiveHandler implements ICommandHandler<EditReceiveCommand> {
 }
 
 /**
- * Posting: the order takes the quantities (not beyond what is still to come), each line goes into stock in its
- * lot at its own unit cost (VAT included, discount taken off), the products' purchase price becomes the received
- * rate, and the purchase is posted Dr pharmacy inventory / Cr the supplier's payable on its sub-ledger.
+ * Posting: the order takes the paid quantities (not beyond what is still to come), each line goes into stock in
+ * its lot, bonus units included, at its own unit cost (line total with VAT, less discount, over every unit), the
+ * products' purchase and sale price become the received rates, and the purchase is posted Dr pharmacy inventory /
+ * Cr the supplier's payable on its sub-ledger.
  */
 @CommandHandler(PostReceiveCommand)
 export class PostReceiveHandler implements ICommandHandler<PostReceiveCommand> {
@@ -309,8 +310,8 @@ export class PostReceiveHandler implements ICommandHandler<PostReceiveCommand> {
           outletId: header.outletId,
           productId: line.productId,
           lotId,
-          qty: line.qty,
-          unitCost: unitCost(line.total, line.qty),
+          qty: line.qty + line.bonusQty,
+          unitCost: unitCost(line.total, line.qty + line.bonusQty),
           movedOn: header.receivedOn,
           kind: 'receive',
           documentId: receive.id,
@@ -320,9 +321,9 @@ export class PostReceiveHandler implements ICommandHandler<PostReceiveCommand> {
       await desk.ledger.add(movements);
       await desk.receives.update(receive);
       await desk.receives.setLots(receive.id, lotIds);
-      await desk.facts.updatePurchasePrices(
+      await desk.facts.updatePrices(
         new Map(
-          receive.lines.filter((line) => line.purchaseRate > 0).map((line) => [line.productId, line.purchaseRate]),
+          receive.lines.map((line) => [line.productId, { purchaseRate: line.purchaseRate, saleRate: line.saleRate }]),
         ),
       );
       await desk.record('receive', 'posted', actor, id, {

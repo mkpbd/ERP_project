@@ -38,7 +38,7 @@ import {
 const cents = (value: number) => Math.round(value * 100) / 100;
 
 /** The columns a product reference is made of. */
-const productColumns = {
+export const productColumns = {
   productId: products.id,
   brandName: brands.name,
   formationName: formations.name,
@@ -49,7 +49,7 @@ const productColumns = {
   manufacturerName: manufacturers.name,
 };
 
-type ProductColumns = {
+export type ProductColumns = {
   productId: string;
   brandName: string;
   formationName: string;
@@ -60,7 +60,7 @@ type ProductColumns = {
   manufacturerName: string;
 };
 
-function productRef<T extends ProductColumns>(row: T) {
+export function productRef<T extends ProductColumns>(row: T) {
   const {
     brandName: _b,
     formationName: _f,
@@ -74,6 +74,22 @@ function productRef<T extends ProductColumns>(row: T) {
     'brandName' | 'formationName' | 'formationShortName' | 'strength' | 'manufacturerName'
   > &
     ProductRef;
+}
+
+/** Products with their names, for the given ids. */
+export async function productsById(context: DbContext, ids: readonly string[]): Promise<Map<string, ProductColumns>> {
+  if (ids.length === 0) return new Map();
+  const rows = await context.db
+    .select(productColumns)
+    .from(products)
+    .innerJoin(brands, eq(brands.id, products.brandId))
+    .innerJoin(manufacturers, eq(manufacturers.id, brands.manufacturerId))
+    .innerJoin(formations, eq(formations.id, products.formationId))
+    .innerJoin(generics, eq(generics.id, products.genericId))
+    .leftJoin(strengths, eq(strengths.id, products.strengthId))
+    .leftJoin(units, eq(units.id, products.unitId))
+    .where(inArray(products.id, [...new Set(ids)]));
+  return new Map(rows.map((row) => [row.productId, row]));
 }
 
 @Injectable()
@@ -95,20 +111,8 @@ export class DrizzlePharmacyReadRepository extends PharmacyReadRepository {
     }));
   }
 
-  /** Products with their names, for the given ids. */
-  private async productsById(ids: readonly string[]) {
-    if (ids.length === 0) return new Map<string, ProductColumns>();
-    const rows = await this.context.db
-      .select(productColumns)
-      .from(products)
-      .innerJoin(brands, eq(brands.id, products.brandId))
-      .innerJoin(manufacturers, eq(manufacturers.id, brands.manufacturerId))
-      .innerJoin(formations, eq(formations.id, products.formationId))
-      .innerJoin(generics, eq(generics.id, products.genericId))
-      .leftJoin(strengths, eq(strengths.id, products.strengthId))
-      .leftJoin(units, eq(units.id, products.unitId))
-      .where(inArray(products.id, [...new Set(ids)]));
-    return new Map(rows.map((row) => [row.productId, row]));
+  private productsById(ids: readonly string[]) {
+    return productsById(this.context, ids);
   }
 
   private orderHeaders() {

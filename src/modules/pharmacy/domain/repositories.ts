@@ -1,11 +1,13 @@
 import type { PharmacyOrder } from './purchase-order.js';
 import type { PharmacyReceive } from './receive.js';
+import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
+import type { SupplierReturn } from './supplier-return.js';
 
 export abstract class PharmacySequences {
   abstract next(kind: string, year: number): Promise<number>;
 }
 
-export type MovementKind = 'opening' | 'receive';
+export type MovementKind = 'opening' | 'receive' | 'supplier_return' | 'replacement';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -25,6 +27,12 @@ export abstract class PharmacyLedger {
   /** The lot of this product, batch, expiry and sale rate, made when new. */
   abstract lot(productId: string, batchNo: string | null, expiryDate: string, saleRate: number): Promise<string>;
   abstract add(movements: readonly NewMovement[]): Promise<void>;
+  /** The product and expiry of each lot; NotFoundError when one does not exist. */
+  abstract lotFacts(lotIds: readonly string[]): Promise<Map<string, { productId: string; expiryDate: string }>>;
+  /** Units of each lot at an outlet. */
+  abstract balances(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>>;
+  /** What a unit of the lot cost at the outlet: the weighted average of what came in (4 decimals). */
+  abstract lotCosts(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>>;
 }
 
 export interface CatalogueProduct {
@@ -46,8 +54,8 @@ export abstract class PharmacyFacts {
   abstract outletExists(id: string): Promise<boolean>;
   /** Whether the user works at the outlet (old PharmacistDutyOutlets). */
   abstract worksAt(userId: string, outletId: string): Promise<boolean>;
-  /** The latest purchase rate per unit becomes the product's purchase price (old receive did the same). */
-  abstract updatePurchasePrices(rates: ReadonlyMap<string, number>): Promise<void>;
+  /** The latest purchase and sale rate per unit become the product's prices (the old receive kept the purchase rate). */
+  abstract updatePrices(rates: ReadonlyMap<string, { purchaseRate: number; saleRate: number }>): Promise<void>;
 }
 
 export abstract class OrderRepository {
@@ -76,4 +84,47 @@ export interface OpeningRecord {
 
 export abstract class OpeningRepository {
   abstract insert(opening: OpeningRecord): Promise<void>;
+}
+
+export interface PaymentRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly supplierId: string;
+  readonly paidOn: string;
+  readonly method: 'cash' | 'bank';
+  readonly bankAccountId: string | null;
+  readonly reference: string | null;
+  readonly remarks: string | null;
+  readonly total: number;
+  readonly voucherId: string | null;
+  readonly voucherNumber: string | null;
+  readonly createdBy: string;
+  readonly allocations: readonly PaymentAllocation[];
+}
+
+export abstract class PaymentRepository {
+  /** Posted receives among `ids`, with what has been paid on each. */
+  abstract dues(receiveIds: readonly string[]): Promise<Map<string, ReceiveDue>>;
+  abstract insert(payment: PaymentRecord): Promise<void>;
+}
+
+export interface SettlementRecord {
+  readonly id: string;
+  readonly returnId: string;
+  readonly settledOn: string;
+  readonly productId: string;
+  readonly lotId: string;
+  readonly qty: number;
+  readonly purchaseRate: number;
+  readonly value: number;
+  readonly voucherNumber: string | null;
+  readonly createdBy: string;
+}
+
+export abstract class SupplierReturnRepository {
+  abstract findForUpdate(id: string): Promise<SupplierReturn | null>;
+  abstract insert(supplierReturn: SupplierReturn): Promise<void>;
+  abstract update(supplierReturn: SupplierReturn): Promise<void>;
+  abstract delete(id: string): Promise<void>;
+  abstract addSettlements(settlements: readonly SettlementRecord[]): Promise<void>;
 }

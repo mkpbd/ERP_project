@@ -183,6 +183,13 @@
       "when": 1792985206350,
       "tag": "0025_pharmacy_purchase_stock",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792987783465,
+      "tag": "0026_pharmacy_supplier_payments_returns",
+      "breakpoints": true
     }
   ]
 }

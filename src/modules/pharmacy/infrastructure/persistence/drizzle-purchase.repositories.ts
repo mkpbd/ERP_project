@@ -120,6 +120,53 @@ export class DrizzlePharmacyLedger extends PharmacyLedger {
     return existing!.id;
   }
 
+  async lotFacts(lotIds: readonly string[]): Promise<Map<string, { productId: string; expiryDate: string }>> {
+    const unique = [...new Set(lotIds)];
+    const rows =
+      unique.length === 0
+        ? []
+        : await this.context.db
+            .select({ id: pharmacyLots.id, productId: pharmacyLots.productId, expiryDate: pharmacyLots.expiryDate })
+            .from(pharmacyLots)
+            .where(inArray(pharmacyLots.id, unique));
+    if (rows.length !== unique.length) throw new NotFoundError('lot');
+    return new Map(rows.map(({ id, ...lot }) => [id, lot]));
+  }
+
+  async balances(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>> {
+    if (lotIds.length === 0) return new Map();
+    const rows = await this.context.db
+      .select({
+        lotId: pharmacyMovements.lotId,
+        qty: sql<number>`sum(${pharmacyMovements.qty})`.mapWith(Number),
+      })
+      .from(pharmacyMovements)
+      .where(and(eq(pharmacyMovements.outletId, outletId), inArray(pharmacyMovements.lotId, [...new Set(lotIds)])))
+      .groupBy(pharmacyMovements.lotId);
+    return new Map(rows.map((row) => [row.lotId, row.qty]));
+  }
+
+  async lotCosts(outletId: string, lotIds: readonly string[]): Promise<Map<string, number>> {
+    if (lotIds.length === 0) return new Map();
+    const rows = await this.context.db
+      .select({
+        lotId: pharmacyMovements.lotId,
+        cost: sql<number>`sum(${pharmacyMovements.qty} * ${pharmacyMovements.unitCost}) / nullif(sum(${pharmacyMovements.qty}), 0)`.mapWith(
+          Number,
+        ),
+      })
+      .from(pharmacyMovements)
+      .where(
+        and(
+          eq(pharmacyMovements.outletId, outletId),
+          inArray(pharmacyMovements.lotId, [...new Set(lotIds)]),
+          sql`${pharmacyMovements.qty} > 0`,
+        ),
+      )
+      .groupBy(pharmacyMovements.lotId);
+    return new Map(rows.map((row) => [row.lotId, Math.round((row.cost ?? 0) * 10_000) / 10_000]));
+  }
+
   async add(movements: readonly NewMovement[]): Promise<void> {
     if (movements.length === 0) return;
     await translated(() =>
@@ -170,11 +217,15 @@ export class DrizzlePharmacyFacts extends PharmacyFacts {
     return row !== undefined;
   }
 
-  async updatePurchasePrices(rates: ReadonlyMap<string, number>): Promise<void> {
+  async updatePrices(rates: ReadonlyMap<string, { purchaseRate: number; saleRate: number }>): Promise<void> {
     for (const [productId, rate] of rates) {
       await this.context.db
         .update(products)
-        .set({ purchasePrice: Math.round(rate * 100) / 100, updatedAt: new Date() })
+        .set({
+          purchasePrice: Math.round(rate.purchaseRate * 100) / 100,
+          salePrice: rate.saleRate,
+          updatedAt: new Date(),
+        })
         .where(eq(products.id, productId));
     }
   }

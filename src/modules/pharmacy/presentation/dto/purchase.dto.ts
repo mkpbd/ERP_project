@@ -82,6 +82,7 @@ export class PharmacyOrderResponseDto extends responseDto({
 const receiveLine = z.strictObject({
   productId: ref,
   qty: units,
+  bonusQty: z.int().min(0).max(10_000_000).default(0),
   purchaseRate: money,
   saleRate: money,
   discountPercent: percent.default(0),
@@ -152,6 +153,7 @@ export class PharmacyReceiveResponseDto extends responseDto({
     z.object({
       ...productRefShape,
       qty: z.int(),
+      bonusQty: z.int(),
       purchaseRate: z.number(),
       saleRate: z.number(),
       discountPercent: z.number(),

@@ -168,7 +168,7 @@ describe('pharmacy purchase and stock', () => {
       supplierInvoiceNo: 'BX-7781',
     };
     const lines = [
-      { ...napaLine, productId: napa },
+      { ...napaLine, productId: napa, bonusQty: 60 },
       {
         productId: seclo,
         qty: 200,
@@ -208,11 +208,12 @@ describe('pharmacy purchase and stock', () => {
 
     const stock = await stockAt(central);
     expect(stock.map((row) => [row.displayName, row.qty, row.value, row.saleValue])).toEqual([
-      ['Tab. Napa', 600, 513, 720],
+      // 60 bonus units come in free: 513 over 660 units is 0.7773 a unit (4 decimals), so 513.02 at cost.
+      ['Tab. Napa', 660, 513.02, 792],
       ['Cap. Seclo', 200, 918, 1_200],
     ]);
     const product = await ph('get', `products/${napa}`, admin).expect(200);
-    expect(product.body.purchasePrice).toBe(0.9);
+    expect(product.body).toMatchObject({ purchasePrice: 0.9, salePrice: 1.2 });
 
     const ordered = await ph('get', `purchase-orders/${order.body.id}`, buyer).expect(200);
     expect(ordered.body).toMatchObject({

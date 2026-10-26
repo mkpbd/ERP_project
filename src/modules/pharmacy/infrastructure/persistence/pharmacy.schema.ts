@@ -15,7 +15,7 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
-import { vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
+import { glAccounts, vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import { suppliers } from '../../../supply-chain/infrastructure/persistence/supply-chain.schema.js';
 
@@ -225,7 +225,7 @@ export const pharmacyLots = pgTable(
   ],
 );
 
-export const PHARMACY_MOVEMENT_KINDS = ['opening', 'receive'] as const;
+export const PHARMACY_MOVEMENT_KINDS = ['opening', 'receive', 'supplier_return', 'replacement'] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
 // StockFlows, written by separate commits).
@@ -255,7 +255,7 @@ export const pharmacyMovements = pgTable(
     index('pharmacy_movements_lot_idx').on(t.lotId),
     index('pharmacy_movements_document_idx').on(t.documentId),
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
-    check('pharmacy_movements_kind_ck', sql`${t.kind} in ('opening', 'receive')`),
+    check('pharmacy_movements_kind_ck', sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement')`),
   ],
 );
 
@@ -380,6 +380,8 @@ export const pharmacyReceiveLines = pgTable(
       .references(() => products.id, { onDelete: 'restrict' }),
     lotId: uuid('lot_id').references(() => pharmacyLots.id, { onDelete: 'restrict' }),
     qty: integer('qty').notNull(),
+    /** Free units the supplier adds; they go into stock and share the line cost. */
+    bonusQty: integer('bonus_qty').notNull().default(0),
     purchaseRate: unitCost('purchase_rate').notNull(),
     saleRate: money('sale_rate').notNull(),
     discountPercent: percent('discount_percent').notNull(),
@@ -399,6 +401,155 @@ export const pharmacyReceiveLines = pgTable(
       foreignColumns: [pharmacyReceives.id],
     }).onDelete('cascade'),
     index('pharmacy_receive_lines_product_idx').on(t.productId),
-    check('pharmacy_receive_lines_qty_ck', sql`${t.qty} > 0`),
+    check('pharmacy_receive_lines_qty_ck', sql`${t.qty} > 0 and ${t.bonusQty} >= 0`),
+  ],
+);
+
+// Old Pharmacy.SupplierPaymentRecords: one payment to a supplier, over one or more receives.
+export const supplierPayments = pgTable(
+  'pharmacy_supplier_payments',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    paidOn: day('paid_on').notNull(),
+    method: text('method', { enum: ['cash', 'bank'] }).notNull(),
+    /** The bank account paid from (method bank). */
+    bankAccountId: uuid('bank_account_id').references(() => glAccounts.id, { onDelete: 'restrict' }),
+    reference: text('reference'),
+    remarks: text('remarks'),
+    total: money('total').notNull(),
+    voucherId: uuid('voucher_id').references(() => vouchers.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_supplier_payments_number_uq').on(t.number),
+    index('pharmacy_supplier_payments_supplier_idx').on(t.supplierId, t.paidOn),
+    check('pharmacy_supplier_payments_method_ck', sql`${t.method} in ('cash', 'bank')`),
+    check(
+      'pharmacy_supplier_payments_bank_ck',
+      sql`(${t.method} = 'bank') = (${t.bankAccountId} is not null) and ${t.total} > 0`,
+    ),
+  ],
+);
+
+// Old SupplierPaymentRecordDetails: what a payment paid of each receive.
+export const supplierPaymentLines = pgTable(
+  'pharmacy_supplier_payment_lines',
+  {
+    paymentId: uuid('payment_id').notNull(),
+    receiveId: uuid('receive_id')
+      .notNull()
+      .references(() => pharmacyReceives.id, { onDelete: 'restrict' }),
+    /** Due before this payment. */
+    dueBefore: money('due_before').notNull(),
+    amount: money('amount').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.paymentId, t.receiveId] }),
+    foreignKey({
+      name: 'pharmacy_supplier_payment_lines_fk',
+      columns: [t.paymentId],
+      foreignColumns: [supplierPayments.id],
+    }).onDelete('cascade'),
+    index('pharmacy_supplier_payment_lines_receive_idx').on(t.receiveId),
+    check('pharmacy_supplier_payment_lines_amount_ck', sql`${t.amount} > 0 and ${t.amount} <= ${t.dueBefore}`),
+  ],
+);
+
+// Old Pharmacy.SupplierReturnIndents / Details: medicines sent back to a supplier from an outlet, and what the
+// supplier sends in their place.
+export const supplierReturns = pgTable(
+  'pharmacy_supplier_returns',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    supplierId: uuid('supplier_id')
+      .notNull()
+      .references(() => suppliers.id, { onDelete: 'restrict' }),
+    returnDate: day('return_date').notNull(),
+    reason: text('reason').notNull(),
+    status: text('status', { enum: ['draft', 'sent', 'partly_settled', 'settled', 'closed'] }).notNull(),
+    /** Purchase value of what was sent (frozen when sent). */
+    value: money('value').notNull(),
+    /** Value of the replacements received so far. */
+    settledValue: money('settled_value').notNull(),
+    sentVoucherNumber: text('sent_voucher_number'),
+    closeReason: text('close_reason'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_supplier_returns_number_uq').on(t.number),
+    index('pharmacy_supplier_returns_supplier_idx').on(t.supplierId, t.status),
+    check(
+      'pharmacy_supplier_returns_status_ck',
+      sql`${t.status} in ('draft', 'sent', 'partly_settled', 'settled', 'closed')`,
+    ),
+    check('pharmacy_supplier_returns_value_ck', sql`${t.settledValue} between 0 and ${t.value}`),
+  ],
+);
+
+export const supplierReturnLines = pgTable(
+  'pharmacy_supplier_return_lines',
+  {
+    returnId: uuid('return_id').notNull(),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    /** The lot's cost at the outlet, frozen when sent. */
+    unitCost: unitCost('unit_cost'),
+    value: money('value'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.position] }),
+    foreignKey({
+      name: 'pharmacy_supplier_return_lines_fk',
+      columns: [t.returnId],
+      foreignColumns: [supplierReturns.id],
+    }).onDelete('cascade'),
+    uniqueIndex('pharmacy_supplier_return_lines_lot_uq').on(t.returnId, t.lotId),
+    check('pharmacy_supplier_return_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Replacements received against a supplier return (old ReceiveSupplierReturnCommand, status 18 lines).
+export const supplierReturnSettlements = pgTable(
+  'pharmacy_supplier_return_settlements',
+  {
+    id: uuid('id').primaryKey(),
+    returnId: uuid('return_id')
+      .notNull()
+      .references(() => supplierReturns.id, { onDelete: 'cascade' }),
+    settledOn: day('settled_on').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    purchaseRate: unitCost('purchase_rate').notNull(),
+    value: money('value').notNull(),
+    voucherNumber: text('voucher_number'),
+    createdBy: uuid('created_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('pharmacy_supplier_return_settlements_return_idx').on(t.returnId),
+    check('pharmacy_supplier_return_settlements_ck', sql`${t.qty} > 0 and ${t.value} >= 0`),
   ],
 );

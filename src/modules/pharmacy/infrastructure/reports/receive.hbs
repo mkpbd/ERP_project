@@ -21,7 +21,7 @@
 <table class="report">
   <thead>
     <tr>
-      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th>
+      <th class="center" style="width: 24px">#</th><th>Product</th><th>Batch</th><th>Expiry</th><th class="num">Qty</th><th class="num">Bonus</th>
       <th class="num">Purchase rate</th><th class="num">Sale rate</th><th class="num">Amount</th>
       <th class="num">Discount</th><th class="num">VAT</th><th class="num">Total</th>
     </tr>
@@ -34,6 +34,7 @@
       <td>{{batchNo}}</td>
       <td>{{date expiryDate}}</td>
       <td class="num">{{qty}}</td>
+      <td class="num">{{#if bonusQty}}{{bonusQty}}{{/if}}</td>
       <td class="num">{{purchaseRate}}</td>
       <td class="num">{{money saleRate}}</td>
       <td class="num">{{money amount}}</td>
@@ -43,7 +44,7 @@
     </tr>
     {{/each}}
     <tr class="group-row">
-      <td colspan="7">Total</td><td class="num">{{money amount}}</td><td class="num">{{money discount}}</td>
+      <td colspan="8">Total</td><td class="num">{{money amount}}</td><td class="num">{{money discount}}</td>
       <td class="num">{{money vat}}</td><td class="num">{{money total}}</td>
     </tr>
   </tbody>

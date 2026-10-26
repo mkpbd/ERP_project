@@ -14,8 +14,10 @@ export type ReceiveStatus = 'draft' | 'posted';
 
 export interface ReceiveLineInput {
   readonly productId: string;
-  /** Units (tablets, bottles), not packs. */
+  /** Units paid for (tablets, bottles), not packs. */
   readonly qty: number;
+  /** Free units the supplier adds: into stock, at no extra cost (the line cost is spread over all units). */
+  readonly bonusQty: number;
   /** Per unit, before discount and VAT. */
   readonly purchaseRate: number;
   /** Per unit: what the lot sells for. */
@@ -90,6 +92,7 @@ function validLines(lines: readonly ReceiveLineInput[]): ReceiveLine[] {
   return lines.map((line, index) => {
     const at = `Line ${index + 1}`;
     validUnits(line.qty, at);
+    validUnits(line.bonusQty, `${at} (bonus)`, true);
     validRate(line.purchaseRate, at);
     validAmount(line.saleRate, at);
     validPercent(line.discountPercent, at);
@@ -124,7 +127,7 @@ export interface ReceivableProduct {
 
 /**
  * Old pharmacy StockReceive (GRN): medicines taken into an outlet from a supplier, against a purchase order or
- * without one. A draft is edited freely; posting puts every line in stock in its lot (batch, expiry and sale
+ * without one; bonus units come in free. A draft is edited freely; posting puts every line in stock in its lot (batch, expiry and sale
  * rate) at its own unit cost, adds it to the order and posts the purchase to accounts on the supplier's
  * sub-ledger (the old pharmacy posted nothing).
  */

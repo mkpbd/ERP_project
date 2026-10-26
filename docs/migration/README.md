@@ -70,8 +70,9 @@ Order follows dependencies: later modules reference earlier ones.
 | 7i | Supply chain: fixed asset register, depreciation schedule, maintenance register, Code 39 asset stickers and labels | **Done** | [07i-scm-asset-reports.md](07i-scm-asset-reports.md) |
 | 8a | Pharmacy: medicine catalogue (generics, formations, strengths, units, manufacturers, brands, products), outlets, outlet users, reorder levels, price list | **Done** | [08a-pharmacy-catalogue.md](08a-pharmacy-catalogue.md) |
 | 8b | Pharmacy: purchase orders, stock receives by lot with posting to the supplier ledger, opening stock, outlet movement ledger, stock and stock card | **Done** | [08b-pharmacy-purchase-stock.md](08b-pharmacy-purchase-stock.md) |
-| 8c | Pharmacy: supplier payments and supplier returns | Next | |
-| 8d–8i | Pharmacy: outlet transfers, counter sales, patient returns, indoor patients, physical inventory, reports | Planned | |
+| 8c | Pharmacy: supplier payments over receives, supplier returns settled by replacements; bonus units and sale price on receives | **Done** | [08c-pharmacy-supplier-payments-returns.md](08c-pharmacy-supplier-payments-returns.md) |
+| 8d | Pharmacy: outlet indents and transfers | Next | |
+| 8e–8i | Pharmacy: counter sales, patient returns, indoor patients, physical inventory, reports | Planned | |
 | 9 | Hospital (registration, billing, IPD), OPD, `UHIDUsesRecords`, consultant and IPD patient ledgers, due collection | Planned | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |

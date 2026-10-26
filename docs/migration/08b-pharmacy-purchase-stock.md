@@ -1,7 +1,7 @@
 # Step 8b — Pharmacy: purchase orders, stock receives, opening stock, outlet stock
 
-Status: **done** (2026-10-26). Previous: [step 8a](08a-pharmacy-catalogue.md) · Next: step 8c (supplier payments
-and returns).
+Status: **done** (2026-10-26). Previous: [step 8a](08a-pharmacy-catalogue.md) · Next: [step 8c](08c-pharmacy-supplier-payments-returns.md) (supplier payments
+and returns; it also answers the questions below: bonus units yes, sale price from the receive yes, no order approval).
 
 ## Where the old logic lives
 
