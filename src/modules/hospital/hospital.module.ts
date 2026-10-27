@@ -1,6 +1,7 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
+import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
@@ -25,6 +26,7 @@ import {
   OpdBillRepository,
   PatientRepository,
 } from './domain/repositories.js';
+import { DrizzleInpatientRegister } from './infrastructure/persistence/drizzle-inpatient-register.js';
 import {
   DrizzleIpdBillingReadRepository,
   DrizzleIpdBillingRepository,
@@ -82,8 +84,10 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
  * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e); the
  * indoor bill: charges, advances, the final bill and its dues (step 9f); doctor payments, corporate collections
- * across OPD and indoor bills, statements and the UHID merge (step 9g).
+ * across OPD and indoor bills, statements and the UHID merge (step 9g). Global: it publishes the admissions other
+ * modules charge to (InpatientRegister), for the pharmacy's ward medicine.
  */
+@Global()
 @Module({
   controllers: [
     ...PATIENT_CONTROLLERS,
@@ -109,12 +113,14 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: AdmissionReadRepository, useClass: DrizzleAdmissionReadRepository },
     { provide: IpdBillingRepository, useClass: DrizzleIpdBillingRepository },
     { provide: IpdBillingReadRepository, useClass: DrizzleIpdBillingReadRepository },
+    { provide: InpatientRegister, useClass: DrizzleInpatientRegister },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
       useFactory: (config: AppConfig) => ({ timeZone: config.reports.timeZone }),
     },
   ],
+  exports: [InpatientRegister],
 })
 export class HospitalModule implements OnModuleInit {
   constructor(

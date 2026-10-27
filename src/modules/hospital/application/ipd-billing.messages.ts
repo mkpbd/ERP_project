@@ -19,6 +19,8 @@ export const IPD_INCOME_ROLES: Record<IpdBillHead | 'serviceCharge', string> = {
   bed: 'ipd_bed_income',
   round: 'ipd_round_income',
   service: 'ipd_service_income',
+  /** Not income here: the pharmacy took it as sales when it sent the medicine; the bill clears what the stay owed. */
+  medicine: 'ipd_medicine_unbilled',
   serviceCharge: 'ipd_service_charge_income',
 };
 
@@ -136,6 +138,8 @@ export interface IpdAccount {
   } | null;
   readonly charges: IpdChargeView[];
   readonly payments: IpdPaymentView[];
+  /** Ward indents the pharmacy has not answered yet (old: deleted at discharge; here a warning). */
+  readonly openIndents: number;
 }
 
 export interface IpdReceipt extends IpdPaymentView {

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
+import { InpatientMedicine } from '../../../shared/application/contracts/inpatient-medicine.js';
 import type { LedgerPostingLine } from '../../../shared/application/contracts/ledger-posting.js';
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import type { Admission } from '../domain/admission.js';
@@ -84,6 +85,7 @@ export class IpdCashier {
   constructor(
     readonly desk: IpdDesk,
     readonly read: IpdBillingReadRepository,
+    readonly medicine: InpatientMedicine,
   ) {}
 
   get opd() {
@@ -117,6 +119,7 @@ export class IpdCashier {
     const stays = await this.billing.stays(admission.id);
     const charges = await this.billing.activeCharges(admission.id);
     const policy = await this.billing.policy();
+    const medicine = await this.medicine.charges(admission.id);
     const runs = bedNights(stays, on);
     return {
       nights: runs.reduce((total, run) => total + run.nights, 0),
@@ -126,6 +129,7 @@ export class IpdCashier {
         roundFeePerNight: policy.roundFeePerNight,
         serviceChargePercent: policy.serviceChargePercent,
         charges,
+        medicine,
       }),
     };
   }
@@ -218,6 +222,7 @@ export class IpdCashier {
         : null,
       charges,
       payments,
+      openIndents: snapshot.status === 'admitted' ? await this.medicine.openIndents(admissionId) : 0,
     };
   }
 

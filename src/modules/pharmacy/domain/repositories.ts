@@ -9,6 +9,7 @@ import type { OutletTransfer } from './transfer.js';
 import type { PharmacyReceive } from './receive.js';
 import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
 import type { SupplierReturn } from './supplier-return.js';
+import type { WardIndent, WardIssue, WardReturnPart } from './ward.js';
 
 export abstract class PharmacySequences {
   abstract next(kind: string, year: number): Promise<number>;
@@ -24,7 +25,9 @@ export type MovementKind =
   | 'sale'
   | 'sale_cancel'
   | 'sale_return'
-  | 'count_adjustment';
+  | 'count_adjustment'
+  | 'ward_issue'
+  | 'ward_return';
 
 export interface NewMovement {
   readonly outletId: string;
@@ -238,4 +241,30 @@ export abstract class StockCountRepository {
   abstract lotsAsOf(outletId: string, asOf: string, productIds?: readonly string[]): Promise<HeldLot[]>;
   /** Units of the lots at the outlet as of the date. */
   abstract balancesAsOf(outletId: string, lotIds: readonly string[], asOf: string): Promise<Map<string, number>>;
+}
+
+export interface WardReturnRecord {
+  readonly id: string;
+  readonly number: string;
+  readonly issueId: string;
+  readonly returnedOn: string;
+  readonly reason: string | null;
+  readonly amount: number;
+  readonly discount: number;
+  readonly total: number;
+  readonly cost: number;
+  readonly voucherNumber: string | null;
+  readonly returnedBy: string;
+  readonly parts: readonly WardReturnPart[];
+}
+
+export abstract class WardRepository {
+  abstract indentForUpdate(id: string): Promise<WardIndent | null>;
+  abstract insertIndent(indent: WardIndent): Promise<void>;
+  abstract updateIndent(indent: WardIndent): Promise<void>;
+  abstract issueForUpdate(id: string): Promise<WardIssue | null>;
+  abstract insertIssue(issue: WardIssue): Promise<void>;
+  /** Saves the header and each line's returned units. */
+  abstract updateIssue(issue: WardIssue): Promise<void>;
+  abstract insertReturn(record: WardReturnRecord): Promise<void>;
 }

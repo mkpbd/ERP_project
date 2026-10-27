@@ -1,5 +1,7 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
+import { InpatientMedicine } from '../../shared/application/contracts/inpatient-medicine.js';
+import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
@@ -16,6 +18,16 @@ import { ReturnReadRepository } from './application/return.messages.js';
 import { SALE_HANDLERS } from './application/sale.handlers.js';
 import { SaleReadRepository } from './application/sale.messages.js';
 import { TRANSFER_HANDLERS } from './application/transfer.handlers.js';
+import { WARD_HANDLERS } from './application/ward.handlers.js';
+import { WardReadRepository } from './application/ward.messages.js';
+import { WardRepository } from './domain/repositories.js';
+import {
+  DrizzleInpatientMedicine,
+  DrizzleWardReadRepository,
+  DrizzleWardRepository,
+} from './infrastructure/persistence/drizzle-ward.repositories.js';
+import { wardMedicineReport } from './infrastructure/reports/ward.reports.js';
+import { WARD_CONTROLLERS } from './presentation/ward.controllers.js';
 import { TransferReadRepository } from './application/transfer.messages.js';
 import {
   OpeningRepository,
@@ -98,8 +110,11 @@ import {
  * receives into outlets by lot, opening stock, the outlet movement ledger and posting purchases (step 8b);
  * supplier payments over receives and supplier returns settled by replacements (step 8c); outlet indents and
  * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e);
- * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g); stock, trade and cash counter reports (step 8h).
+ * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g); stock, trade and cash counter reports (step 8h);
+ * ward indents, medicine sent to and back from the wards for admitted patients, charged to their indoor bills (step 8i).
+ * Global: it publishes the medicine charged to admissions (InpatientMedicine) for the hospital's indoor bill.
  */
+@Global()
 @Module({
   controllers: [
     ...PHARMACY_CONTROLLERS,
@@ -109,6 +124,7 @@ import {
     ...SALE_CONTROLLERS,
     ...RETURN_CONTROLLERS,
     ...COUNT_CONTROLLERS,
+    ...WARD_CONTROLLERS,
   ],
   providers: [
     ...CATALOGUE_HANDLERS,
@@ -118,6 +134,7 @@ import {
     ...SALE_HANDLERS,
     ...RETURN_HANDLERS,
     ...COUNT_HANDLERS,
+    ...WARD_HANDLERS,
     { provide: CatalogueReadRepository, useClass: DrizzleCatalogueReadRepository },
     { provide: PharmacyReadRepository, useClass: DrizzlePharmacyReadRepository },
     { provide: PharmacySequences, useClass: DrizzlePharmacySequences },
@@ -140,7 +157,11 @@ import {
     { provide: ReturnReadRepository, useClass: DrizzleReturnReadRepository },
     { provide: StockCountRepository, useClass: DrizzleStockCountRepository },
     { provide: CountReadRepository, useClass: DrizzleCountReadRepository },
+    { provide: WardRepository, useClass: DrizzleWardRepository },
+    { provide: WardReadRepository, useClass: DrizzleWardReadRepository },
+    { provide: InpatientMedicine, useClass: DrizzleInpatientMedicine },
   ],
+  exports: [InpatientMedicine],
 })
 export class PharmacyModule implements OnModuleInit {
   constructor(
@@ -156,6 +177,8 @@ export class PharmacyModule implements OnModuleInit {
     private readonly counts: CountReadRepository,
     private readonly supplierDirectory: SupplierDirectory,
     private readonly users: UserDirectory,
+    private readonly wards: WardReadRepository,
+    private readonly inpatients: InpatientRegister,
   ) {}
 
   onModuleInit(): void {
@@ -179,5 +202,6 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(purchaseSummaryReport(this.context, this.supplierDirectory));
     this.reports.register(salesSummaryReport(this.context, this.users));
     this.reports.register(cashCounterReport(this.context, this.users));
+    this.reports.register(wardMedicineReport(this.wards, this.inpatients));
   }
 }

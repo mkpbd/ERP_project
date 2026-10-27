@@ -1,7 +1,7 @@
 # Step 9g — Hospital: doctor payments, corporate collections, statements and the UHID merge
 
-Status: **done** (2026-10-27). Previous: [step 9f](09f-hospital-indoor-bill.md) · Next: step 8i (the pharmacy's
-indoor patients), then step 10.
+Status: **done** (2026-10-27). Previous: [step 9f](09f-hospital-indoor-bill.md) · Next: [step 8i](08i-pharmacy-ward-medicine.md)
+(the pharmacy's indoor patients), then step 10.
 
 This step closes the hospital's money:
 

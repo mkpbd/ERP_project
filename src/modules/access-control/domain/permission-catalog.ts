@@ -72,6 +72,10 @@ export const PERMISSION_CATALOG = [
     key: 'pharmacy:sell',
     description: 'Sell medicines over the counter at the outlets you work at and collect loyal member dues',
   },
+  {
+    key: 'pharmacy:ward',
+    description: 'Raise and cancel ward indents for admitted patients and see the medicine sent to the wards',
+  },
   { key: 'pharmacy:count', description: 'Open, count and cancel stock counts at the outlets you work at' },
   { key: 'ipd:read', description: 'See admissions, the bed board and the inpatient census' },
   {

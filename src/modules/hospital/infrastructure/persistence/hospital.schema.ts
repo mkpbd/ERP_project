@@ -847,7 +847,7 @@ export const ipdBillLines = pgTable(
       .notNull()
       .references(() => ipdBills.id, { onDelete: 'cascade' }),
     position: smallint('position').notNull(),
-    head: text('head', { enum: ['admission', 'bed', 'round', 'service'] }).notNull(),
+    head: text('head', { enum: ['admission', 'bed', 'round', 'service', 'medicine'] }).notNull(),
     description: text('description').notNull(),
     bedId: uuid('bed_id').references(() => beds.id, { onDelete: 'restrict' }),
     chargeId: uuid('charge_id').references(() => ipdCharges.id, { onDelete: 'restrict' }),

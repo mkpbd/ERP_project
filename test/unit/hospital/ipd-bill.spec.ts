@@ -170,7 +170,14 @@ describe('IpdBill', () => {
     expect(bill.toSnapshot()).toMatchObject({ gross: 6490, serviceCharge: 449, net: 6939, deposit: 5000, paid: 1000 });
     expect(bill.due).toBe(939);
     expect(bill.share).toBe(1000);
-    expect(bill.income).toEqual({ admission: 500, bed: 3000, round: 990, service: 2000, serviceCharge: 449 });
+    expect(bill.income).toEqual({
+      admission: 500,
+      bed: 3000,
+      round: 990,
+      service: 2000,
+      medicine: 0,
+      serviceCharge: 449,
+    });
   });
 
   it('refuses more advance than the bill, overpayment and a part payment by a cash client', () => {

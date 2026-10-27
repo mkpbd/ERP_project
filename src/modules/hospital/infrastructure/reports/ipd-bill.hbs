@@ -67,6 +67,7 @@
     {{/if}}
   </tbody>
 </table>
+{{#if account.openIndents}}<p><b>{{account.openIndents}} ward indent(s) not yet answered by the pharmacy.</b></p>{{/if}}
 {{#if account.bill}}<p>In words: {{amountInWords account.bill.net}}</p>{{/if}}
 {{#if payments.length}}
 <p style="margin: 12px 0 4px"><b>Money received and paid back</b></p>

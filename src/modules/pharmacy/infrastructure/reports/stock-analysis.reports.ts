@@ -32,6 +32,8 @@ const KIND_LABELS: Record<MovementKind, string> = {
   sale_cancel: 'Sale cancelled',
   sale_return: 'Returned by customer',
   count_adjustment: 'Stock count',
+  ward_issue: 'Sent to a ward',
+  ward_return: 'Returned from a ward',
 };
 
 function assertPeriod(from: string, to: string): void {
@@ -190,8 +192,10 @@ function bucketOf(kind: MovementKind, inward: boolean): Bucket {
       return 'transferIn';
     case 'sale_return':
     case 'sale_cancel':
+    case 'ward_return':
       return 'customerReturns';
     case 'sale':
+    case 'ward_issue':
       return 'sold';
     case 'transfer_out':
       return 'transferOut';

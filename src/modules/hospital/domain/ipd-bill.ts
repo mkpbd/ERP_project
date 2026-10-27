@@ -91,7 +91,16 @@ export function chargeOf(params: Omit<IpdCharge, 'amount'>): IpdCharge {
   return { ...params, amount: taka(Math.round(paisa(params.rate) * params.qty)) };
 }
 
-export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service';
+export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service' | 'medicine';
+
+/** A ward issue of the pharmacy as it stands on the bill (issued less what came back). */
+export interface MedicineIssue {
+  readonly issueId: string;
+  readonly number: string;
+  readonly issuedOn: string;
+  readonly outletName: string;
+  readonly amount: number;
+}
 
 export interface IpdBillLine {
   readonly head: IpdBillHead;
@@ -141,13 +150,17 @@ export interface IpdBillProps {
   updatedAt: Date;
 }
 
-/** What the bill is made of, before the discount: the bed nights, the admission fee and the charges. */
+/**
+ * What the bill is made of, before the discount: the bed nights, the admission fee, the charges and the medicine sent
+ * to the ward (no service charge on medicine, as before).
+ */
 export function billLines(params: {
   nights: readonly NightRun[];
   admissionFee: number;
   roundFeePerNight: number;
   serviceChargePercent: number;
   charges: readonly IpdCharge[];
+  medicine?: readonly MedicineIssue[];
 }): IpdBillLine[] {
   const none = { bedId: null, chargeId: null, serviceId: null, doctorId: null, fromOn: null, toOn: null };
   const charged = (amount: number) => ({ amount, serviceCharge: percentOf(amount, params.serviceChargePercent) });
@@ -203,6 +216,19 @@ export function billLines(params: {
       amount: charge.amount,
       serviceCharge: 0,
       shareAmount: percentOf(charge.amount, charge.sharePercent),
+    });
+  }
+  for (const issue of params.medicine ?? []) {
+    lines.push({
+      ...none,
+      head: 'medicine',
+      description: `Medicine ${issue.number} (${issue.outletName})`,
+      fromOn: issue.issuedOn,
+      qty: 1,
+      rate: issue.amount,
+      amount: issue.amount,
+      serviceCharge: 0,
+      shareAmount: 0,
     });
   }
   return lines;
@@ -343,6 +369,7 @@ export class IpdBill {
       bed: of('bed'),
       round: of('round'),
       service: of('service'),
+      medicine: of('medicine'),
       serviceCharge: this.props.serviceCharge,
     };
   }

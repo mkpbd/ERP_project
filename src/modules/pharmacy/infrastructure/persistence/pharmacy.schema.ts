@@ -16,6 +16,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { glAccounts, vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
+import { admissions } from '../../../hospital/infrastructure/persistence/hospital.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import { suppliers } from '../../../supply-chain/infrastructure/persistence/supply-chain.schema.js';
 
@@ -236,6 +237,8 @@ export const PHARMACY_MOVEMENT_KINDS = [
   'sale_cancel',
   'sale_return',
   'count_adjustment',
+  'ward_issue',
+  'ward_return',
 ] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
@@ -268,7 +271,7 @@ export const pharmacyMovements = pgTable(
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'pharmacy_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return', 'count_adjustment')`,
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return', 'count_adjustment', 'ward_issue', 'ward_return')`,
     ),
   ],
 );
@@ -1038,5 +1041,171 @@ export const stockCountLines = pgTable(
       'pharmacy_stock_count_lines_qty_ck',
       sql`${t.systemQty} >= 0 and (${t.countedQty} is null or ${t.countedQty} >= 0) and ${t.unitCost} >= 0`,
     ),
+  ],
+);
+
+// Old IPD medicine indents (nurse station to pharmacy): what a ward asks the pharmacy to send for an admitted patient.
+export const wardIndents = pgTable(
+  'pharmacy_ward_indents',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    requestedOn: day('requested_on').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['open', 'issued', 'cancelled'] }).notNull(),
+    cancelReason: text('cancel_reason'),
+    /** The ward issue that answered it. */
+    issueId: uuid('issue_id'),
+    requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    closedBy: uuid('closed_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_ward_indents_number_uq').on(t.number),
+    index('pharmacy_ward_indents_admission_idx').on(t.admissionId),
+    index('pharmacy_ward_indents_outlet_idx').on(t.outletId, t.status),
+  ],
+);
+
+export const wardIndentLines = pgTable(
+  'pharmacy_ward_indent_lines',
+  {
+    indentId: uuid('indent_id')
+      .notNull()
+      .references(() => wardIndents.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.indentId, t.position] }),
+    check('pharmacy_ward_indent_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old IPD pharmacy invoices (read by spGetIPDInvoiceDetailListByPatientId): medicine sent to a ward for an admitted
+// patient, charged to the admission's indoor bill instead of being paid at the counter.
+export const wardIssues = pgTable(
+  'pharmacy_ward_issues',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    outletId: uuid('outlet_id')
+      .notNull()
+      .references(() => outlets.id, { onDelete: 'restrict' }),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    indentId: uuid('indent_id').references(() => wardIndents.id, { onDelete: 'restrict' }),
+    issuedOn: day('issued_on').notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+    /** Taken back by returns from the ward. */
+    returned: money('returned').notNull().default(0),
+    cost: money('cost').notNull(),
+    voucherNumber: text('voucher_number'),
+    issuedBy: uuid('issued_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('pharmacy_ward_issues_number_uq').on(t.number),
+    index('pharmacy_ward_issues_admission_idx').on(t.admissionId),
+    index('pharmacy_ward_issues_issued_idx').on(t.outletId, t.issuedOn),
+    check(
+      'pharmacy_ward_issues_amounts_ck',
+      sql`${t.discount} >= 0 and ${t.total} = ${t.amount} - ${t.discount} and ${t.returned} between 0 and ${t.total}`,
+    ),
+  ],
+);
+
+export const wardIssueLines = pgTable(
+  'pharmacy_ward_issue_lines',
+  {
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => wardIssues.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    saleRate: money('sale_rate').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+    amount: money('amount').notNull(),
+    discountPercent: percent('discount_percent').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+    returnedQty: integer('returned_qty').notNull().default(0),
+  },
+  (t) => [
+    primaryKey({ columns: [t.issueId, t.position] }),
+    index('pharmacy_ward_issue_lines_product_idx').on(t.productId),
+    check('pharmacy_ward_issue_lines_qty_ck', sql`${t.qty} > 0 and ${t.returnedQty} between 0 and ${t.qty}`),
+  ],
+);
+
+// Old IPD medicine returns: unused medicine sent back from the ward before the final bill, taken off the charge and put
+// back into the outlet's stock.
+export const wardReturns = pgTable(
+  'pharmacy_ward_returns',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    issueId: uuid('issue_id')
+      .notNull()
+      .references(() => wardIssues.id, { onDelete: 'restrict' }),
+    returnedOn: day('returned_on').notNull(),
+    reason: text('reason'),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+    cost: money('cost').notNull(),
+    voucherNumber: text('voucher_number'),
+    returnedBy: uuid('returned_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_ward_returns_number_uq').on(t.number),
+    index('pharmacy_ward_returns_issue_idx').on(t.issueId),
+  ],
+);
+
+export const wardReturnLines = pgTable(
+  'pharmacy_ward_return_lines',
+  {
+    returnId: uuid('return_id')
+      .notNull()
+      .references(() => wardReturns.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    issueLine: smallint('issue_line').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    lotId: uuid('lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    qty: integer('qty').notNull(),
+    unitCost: unitCost('unit_cost').notNull(),
+    amount: money('amount').notNull(),
+    discount: money('discount').notNull(),
+    total: money('total').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.returnId, t.position] }),
+    check('pharmacy_ward_return_lines_qty_ck', sql`${t.qty} > 0`),
   ],
 );

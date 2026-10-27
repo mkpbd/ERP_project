@@ -38,7 +38,7 @@ const day = z.iso.date();
 const money = z.number().min(0).max(10_000_000).multipleOf(0.01);
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const reason = z.string().trim().min(1).max(300);
-const HEADS = ['admission', 'bed', 'round', 'service'] as const;
+const HEADS = ['admission', 'bed', 'round', 'service', 'medicine'] as const;
 const PAYMENT_KINDS = ['advance', 'refund', 'payment', 'collection'] as const;
 
 const moneyShape = {
@@ -202,6 +202,7 @@ class IpdAccountResponseDto extends responseDto({
     }),
   ),
   payments: z.array(z.object(paymentShape)),
+  openIndents: z.int(),
 }) {}
 
 @ApiTags('ipd')

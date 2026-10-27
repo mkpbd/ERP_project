@@ -171,6 +171,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | supplier payments | `pharmacy:payment` |
 | outlet indents (raise, edit, cancel, close) and transfers (send, accept, reject) | `pharmacy:transfer` + works at the outlet concerned |
 | counter sales and returns; collecting loyal member dues | `pharmacy:sell` (+ works at the outlet for sales and returns) |
+| ward indents for admitted patients (raise, cancel); seeing ward indents and issues | `pharmacy:ward` (or `pharmacy:read` to see) |
+| medicine sent to a ward and sent back; cancelling a ward indent at the outlet | `pharmacy:sell` + works at the outlet |
 | return periods | `pharmacy:manage` |
 | stock counts (open, count, add a lot found, cancel) | `pharmacy:count` + works at the outlet |
 | applying a stock count (someone other than who opened it) | `pharmacy:manage` |
