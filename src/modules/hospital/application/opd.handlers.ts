@@ -10,11 +10,13 @@ import { TransactionManager } from '../../../shared/application/ports/transactio
 import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { feeFor } from '../domain/appointment.js';
 import { StaffDirectory } from '../../../shared/application/contracts/staff-directory.js';
+import type { DiagnosticBill } from '../domain/diagnostic-bill.js';
 import type { IpdBill } from '../domain/ipd-bill.js';
 import { OpdBill, suggestedVisit, validMoney, type BillPayer } from '../domain/opd-bill.js';
 import { text } from '../domain/patient.js';
 import {
   AppointmentRepository,
+  DiagnosticBillRepository,
   IpdBillingRepository,
   OpdBillRepository,
   type BillableDoctor,
@@ -397,13 +399,14 @@ export class CollectOpdDueHandler implements ICommandHandler<CollectOpdDueComman
 
 /**
  * Old corporate client collection (diagnostics and pharmacy only; the OPD and the wards had none): what a company pays
- * settles its OPD and indoor bills together, oldest first, on one receipt and one voucher.
+ * settles its OPD, diagnostic and indoor bills together, oldest first, on one receipt and one voucher.
  */
 @CommandHandler(CollectCorporateDueCommand)
 export class CollectCorporateDueHandler implements ICommandHandler<CollectCorporateDueCommand> {
   constructor(
     private readonly desk: OpdDesk,
     private readonly indoor: IpdBillingRepository,
+    private readonly diagnostics: DiagnosticBillRepository,
   ) {}
 
   async execute({ actor, clientId, amount, method, reference }: CollectCorporateDueCommand) {
@@ -421,9 +424,10 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
       const now = desk.clock.now();
       const number = await desk.number('OR', today);
       let left = Math.round(amount * 100);
-      const settled: { kind: 'opd' | 'ipd'; billId: string; number: string; amount: number }[] = [];
+      const settled: { kind: 'opd' | 'ipd' | 'diag'; billId: string; number: string; amount: number }[] = [];
       const opd: OpdBill[] = [];
       const ipd: IpdBill[] = [];
+      const diag: DiagnosticBill[] = [];
       for (const due of await desk.bills.dueBills(clientId)) {
         if (left === 0) break;
         if (due.kind === 'opd') {
@@ -433,6 +437,14 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
           bill.collect({ number, method, reference, amount: part / 100, on: today, now });
           opd.push(bill);
           settled.push({ kind: 'opd', billId: bill.id, number: bill.number, amount: part / 100 });
+          left -= part;
+        } else if (due.kind === 'diag') {
+          const bill = (await this.diagnostics.findForUpdate(due.id))!;
+          const part = Math.min(left, Math.round(bill.due * 100));
+          if (part === 0) continue;
+          bill.collect(part / 100, today, now);
+          diag.push(bill);
+          settled.push({ kind: 'diag', billId: bill.id, number: bill.number, amount: part / 100 });
           left -= part;
         } else {
           const bill = (await this.indoor.billForUpdate(due.id))!;
@@ -456,6 +468,20 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
         actor,
       );
       for (const bill of opd) await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
+      for (const bill of diag) {
+        await this.diagnostics.update(bill);
+        await this.diagnostics.addPayment({
+          billId: bill.id,
+          kind: 'collection',
+          number,
+          method,
+          reference: text(reference, 100, 'payment reference'),
+          amount: settled.find((part) => part.billId === bill.id)!.amount,
+          paidOn: today,
+          receivedBy: actor.userId,
+          voucherNumber: voucher?.number ?? null,
+        });
+      }
       // An indoor bill's part gets its own receipt row (the account's money), under the company's receipt number.
       for (const [index, bill] of ipd.entries()) {
         await this.indoor.updateBill(bill);

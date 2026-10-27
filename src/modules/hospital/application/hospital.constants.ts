@@ -18,4 +18,16 @@ export const HOSPITAL_RECORDS = {
   ward: 'hospital_ward',
   bedCategory: 'hospital_bed_category',
   bed: 'hospital_bed',
+  diagnosticDepartment: 'hospital_diagnostic_department',
+  diagnosticTest: 'hospital_diagnostic_test',
+  diagnosticPackage: 'hospital_diagnostic_package',
 } as const;
+
+/** Seeing the test catalogue and diagnostic bills. */
+export const DIAG_READ = 'diag:read';
+/** Keeping the test catalogue, packages and the diagnostic policy; cancelling tests after the bill's day. */
+export const DIAG_MANAGE = 'diag:manage';
+/** Billing tests, collecting their dues and cancelling tests on the bill's day. */
+export const DIAG_BILL = 'diag:bill';
+/** A diagnostic discount above the counter's limit. */
+export const DIAG_DISCOUNT = 'diag:discount';

@@ -84,7 +84,11 @@ Order follows dependencies: later modules reference earlier ones.
 | 9e | Hospital: wards, bed categories and beds, admissions (one at a time, locked beds), bed transfers through housekeeping, consultant history, discharge types, census, register, occupancy | **Done** | [09e-hospital-admissions.md](09e-hospital-admissions.md) |
 | 9f | Hospital: the indoor bill: services and consultant visits charged on the wards, advances and refunds, the final bill (bed nights, admission and round fees, service charge, discount), discharge clearance, due collection, bill / receipt / collection prints | **Done** | [09f-hospital-indoor-bill.md](09f-hospital-indoor-bill.md) |
 | 9g | Hospital: paying doctors their shares (OPD and indoor), corporate collections across OPD and indoor bills with the credit limit at admission, doctor ledger and payables, patient statement, dues, discounts, income by head, UHID merge | **Done** | [09g-hospital-statements.md](09g-hospital-statements.md) |
-| 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Next | |
+| 10a | Diagnostics: departments, tests, packages, diagnostic policy; diagnostic bills (report times, discount on what may be discounted, referral commission, test cancellation with refund, dues, corporate collection); receipt, referral commission, income by department | **Done** | [10a-diagnostic-billing.md](10a-diagnostic-billing.md) |
+| 10b | Diagnostics: tests of admitted patients on the indoor bill; diagnostic bills in the dues, discounts, patient statement, income by head and corporate statement; user collections | Next | |
+| 10c | Lab: sample collection and lab numbers, result entry against parameters with reference ranges, pathologist verification, report printing and delivery | Planned | |
+| 10d | Radiology (RIS) reports, radiologists' reporting fees | Planned | |
+| 10e | Reagent management (consumption per test) and transfusion medicine (donors, components, cross-matching) | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

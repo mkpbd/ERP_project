@@ -189,6 +189,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
 | a corporate client's payment against its OPD and indoor bills (oldest first) | `opd:bill` |
 | paying a doctor their shares | `doctor:pay` |
+| `GET` diagnostic departments, tests, packages, the diagnostic policy and diagnostic bills | `diag:read` |
+| diagnostic departments, tests, packages and their tests, the diagnostic policy; cancelling tests after the bill's day | `diag:manage` |
+| diagnostic bills, collecting their dues, cancelling tests on the bill's day | `diag:bill` |
+| a diagnostic discount above the counter's limit | `diag:discount` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

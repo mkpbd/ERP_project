@@ -5,12 +5,21 @@ import {
   type RecordStoreOptions,
   type RecordTable,
 } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
-import { HOSPITAL_RECORDS as R, OPD_MANAGE, OPD_READ } from '../../application/hospital.constants.js';
+import {
+  DIAG_MANAGE,
+  DIAG_READ,
+  HOSPITAL_RECORDS as R,
+  OPD_MANAGE,
+  OPD_READ,
+} from '../../application/hospital.constants.js';
 import { IPD_MANAGE, IPD_READ } from '../../application/ipd.messages.js';
 import {
   bedCategories,
   beds,
   corporateClients,
+  diagnosticDepartments,
+  diagnosticPackages,
+  diagnosticTests,
   doctorClosures,
   doctors,
   doctorSchedules,
@@ -25,6 +34,7 @@ const taken = (code: string, message: string) => ({ code, message });
 
 export function hospitalRecordTypes(context: DbContext): RecordType[] {
   const ipd: [string, string] = [IPD_READ, IPD_MANAGE];
+  const diag: [string, string] = [DIAG_READ, DIAG_MANAGE];
   const record = (
     name: string,
     table: RecordTable,
@@ -139,6 +149,47 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
         },
       },
       ipd,
+    ),
+    record(
+      R.diagnosticDepartment,
+      diagnosticDepartments,
+      {
+        orderBy: [diagnosticDepartments.name],
+        filters: { kind: diagnosticDepartments.kind },
+        search: [diagnosticDepartments.name],
+        unique: {
+          hospital_diagnostic_departments_name_uq: taken('department_name_taken', 'This department exists'),
+        },
+      },
+      diag,
+    ),
+    record(
+      R.diagnosticTest,
+      diagnosticTests,
+      {
+        orderBy: [diagnosticTests.name],
+        filters: { departmentId: diagnosticTests.departmentId, isActive: diagnosticTests.isActive },
+        search: [diagnosticTests.name, diagnosticTests.shortName, diagnosticTests.code],
+        unique: {
+          hospital_diagnostic_tests_code_uq: taken('test_code_taken', 'Another test has this code'),
+          hospital_diagnostic_tests_name_uq: taken('test_name_taken', 'The department already has this test'),
+        },
+        references: {
+          [fk('hospital_diagnostic_tests', 'department_id', 'hospital_diagnostic_departments')]: R.diagnosticDepartment,
+        },
+      },
+      diag,
+    ),
+    record(
+      R.diagnosticPackage,
+      diagnosticPackages,
+      {
+        orderBy: [diagnosticPackages.name],
+        filters: { isActive: diagnosticPackages.isActive },
+        search: [diagnosticPackages.name],
+        unique: { hospital_diagnostic_packages_name_uq: taken('package_name_taken', 'This package exists') },
+      },
+      diag,
     ),
   ];
 }

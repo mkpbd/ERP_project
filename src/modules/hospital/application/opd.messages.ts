@@ -197,7 +197,7 @@ export class GetDoctorLedgerQuery extends Query<DoctorLedgerView> {
 
 export class CollectCorporateDueCommand extends Command<{
   number: string;
-  settled: { kind: 'opd' | 'ipd'; billId: string; number: string; amount: number }[];
+  settled: { kind: 'opd' | 'ipd' | 'diag'; billId: string; number: string; amount: number }[];
 }> {
   constructor(
     readonly actor: Actor,

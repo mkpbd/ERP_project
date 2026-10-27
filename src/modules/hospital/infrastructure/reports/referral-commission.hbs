@@ -1,0 +1,29 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Referring doctor</th><th class="num">Tests</th><th class="num">Billed</th><th class="num">Cancelled tests</th>
+      <th class="num">Cancelled</th><th class="num">Commission earned</th><th class="num">Taken back</th><th class="num">Net commission</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{doctorName}}</td><td class="num">{{tests}}</td><td class="num">{{money gross}}</td>
+      <td class="num">{{cancelledTests}}</td><td class="num">{{money cancelledGross}}</td>
+      <td class="num">{{money earned}}</td><td class="num">{{money reversed}}</td><td class="num"><b>{{money net}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td>Total</td><td class="num">{{total.tests}}</td><td class="num">{{money total.gross}}</td>
+      <td class="num">{{total.cancelledTests}}</td><td class="num">{{money total.cancelledGross}}</td>
+      <td class="num">{{money total.earned}}</td><td class="num">{{money total.reversed}}</td><td class="num">{{money total.net}}</td>
+    </tr>
+  </tbody>
+</table>
+<p class="muted">The commission is paid from each doctor's ledger (doctor payments).</p>
+{{else}}
+<p>No test was referred in this period.</p>
+{{/if}}
+{{/with}}

@@ -174,6 +174,8 @@ export const doctors = pgTable(
     reportFee: money('report_fee').notNull().default(0),
     /** The doctor's share of their fees; null takes the OPD policy's default. */
     sharePercent: percent('share_percent'),
+    /** The doctor's commission on tests they refer; null takes the test's (else the diagnostic policy's). */
+    referralPercent: percent('referral_percent'),
     userId: uuid('user_id').references(() => users.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: tz('created_at').notNull().defaultNow(),
@@ -433,6 +435,9 @@ export const doctorLedger = pgTable(
     kind: text('kind', { enum: ['share', 'reversal', 'payment'] }).notNull(),
     billId: uuid('bill_id').references(() => opdBills.id, { onDelete: 'restrict' }),
     ipdBillId: uuid('ipd_bill_id').references((): AnyPgColumn => ipdBills.id, { onDelete: 'restrict' }),
+    diagnosticBillId: uuid('diagnostic_bill_id').references((): AnyPgColumn => diagnosticBills.id, {
+      onDelete: 'restrict',
+    }),
     documentNumber: text('document_number').notNull(),
     /** Earned (+) or taken back (−). */
     amount: money('amount').notNull(),
@@ -897,5 +902,219 @@ export const ipdPayments = pgTable(
     index('hospital_ipd_payments_admission_idx').on(t.admissionId),
     index('hospital_ipd_payments_paid_idx').on(t.paidOn),
     check('hospital_ipd_payments_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// Old Diag.ParentGroup (Pathology, Radiology …) as the department a test is done in.
+export const diagnosticDepartments = pgTable(
+  'hospital_diagnostic_departments',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: ['lab', 'imaging', 'other'] }).notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_diagnostic_departments_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_diagnostic_departments_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Diag.TestItems (one rate for OPD and indoor; IsDiscountAllow; report day and hours): a test sold at the counter.
+export const diagnosticTests = pgTable(
+  'hospital_diagnostic_tests',
+  {
+    id: uuid('id').primaryKey(),
+    code: text('code'),
+    name: text('name').notNull(),
+    shortName: text('short_name'),
+    departmentId: uuid('department_id')
+      .notNull()
+      .references(() => diagnosticDepartments.id, { onDelete: 'restrict' }),
+    /** Blood, urine, swab … (old Specimen). */
+    specimen: text('specimen'),
+    /** Where the patient goes for it (old TestGroups.MovementRoomNo). */
+    roomNo: text('room_no'),
+    rate: money('rate').notNull(),
+    /** Hours from billing to the report (old DayNeededForReportDelivery and DeliveryTimeOnReportDay); null: none. */
+    reportHours: smallint('report_hours'),
+    /** Old IsDiscountAllow: tubes and government-rate tests are never discounted. */
+    discountAllowed: boolean('discount_allowed').notNull().default(true),
+    /** The referring doctor's commission; null takes the diagnostic policy's. */
+    referralPercent: percent('referral_percent'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_diagnostic_tests_code_uq').on(sql`upper(${t.code})`),
+    uniqueIndex('hospital_diagnostic_tests_name_uq').on(t.departmentId, sql`lower(${t.name})`),
+    check('hospital_diagnostic_tests_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+    check('hospital_diagnostic_tests_rate_ck', sql`${t.rate} >= 0`),
+    check('hospital_diagnostic_tests_hours_ck', sql`${t.reportHours} is null or ${t.reportHours} between 0 and 2000`),
+    check(
+      'hospital_diagnostic_tests_referral_ck',
+      sql`${t.referralPercent} is null or ${t.referralPercent} between 0 and 100`,
+    ),
+  ],
+);
+
+// Old Diag.OPDPackages / OPDPackageTestItems (PackageRage = the rate inside the package): tests sold together.
+export const diagnosticPackages = pgTable(
+  'hospital_diagnostic_packages',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_diagnostic_packages_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_diagnostic_packages_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+  ],
+);
+
+export const diagnosticPackageTests = pgTable(
+  'hospital_diagnostic_package_tests',
+  {
+    packageId: uuid('package_id')
+      .notNull()
+      .references(() => diagnosticPackages.id, { onDelete: 'cascade' }),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    /** The test's rate inside the package. */
+    rate: money('rate').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.packageId, t.testId] }),
+    check('hospital_diagnostic_package_tests_rate_ck', sql`${t.rate} >= 0`),
+  ],
+);
+
+// Diagnostic rules in one row (old: discount categories with a maximum each, commission groups per media).
+export const diagnosticPolicy = pgTable(
+  'hospital_diagnostic_policy',
+  {
+    id: smallint('id').primaryKey(),
+    /** The discount a counter may give without diag:discount, as a share of what may be discounted. */
+    counterDiscountPercent: percent('counter_discount_percent').notNull(),
+    /** The referring doctor's commission when neither the doctor nor the test has one. */
+    defaultReferralPercent: percent('default_referral_percent').notNull(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    check('hospital_diagnostic_policy_single_ck', sql`${t.id} = 1`),
+    check(
+      'hospital_diagnostic_policy_percent_ck',
+      sql`${t.counterDiscountPercent} between 0 and 100 and ${t.defaultReferralPercent} between 0 and 100`,
+    ),
+  ],
+);
+
+// Old Diag.InvestigationInvoices with their details and ledger (the due never stored, always worked out): tests billed
+// to a registered patient, each with when its report is due, and the commission of the doctor who referred them.
+export const diagnosticBills = pgTable(
+  'hospital_diagnostic_bills',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    billedOn: day('billed_on').notNull(),
+    billedAt: tz('billed_at').notNull(),
+    referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
+    gross: money('gross').notNull(),
+    discount: money('discount').notNull(),
+    discountReason: text('discount_reason'),
+    net: money('net').notNull(),
+    /** What the cancelled tests were worth after their part of the discount. */
+    cancelled: money('cancelled').notNull().default(0),
+    paid: money('paid').notNull(),
+    collected: money('collected').notNull().default(0),
+    refunded: money('refunded').notNull().default(0),
+    status: text('status', { enum: ['billed', 'cancelled'] }).notNull(),
+    voucherNumber: text('voucher_number'),
+    billedBy: uuid('billed_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_diagnostic_bills_number_uq').on(t.number),
+    index('hospital_diagnostic_bills_patient_idx').on(t.patientId),
+    index('hospital_diagnostic_bills_billed_idx').on(t.billedOn),
+    index('hospital_diagnostic_bills_corporate_idx').on(t.corporateClientId),
+    index('hospital_diagnostic_bills_referrer_idx').on(t.referredById),
+    check('hospital_diagnostic_bills_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
+    check(
+      'hospital_diagnostic_bills_amounts_ck',
+      sql`${t.discount} >= 0 and ${t.discount} <= ${t.gross} and ${t.net} = ${t.gross} - ${t.discount} and ${t.cancelled} between 0 and ${t.net} and ${t.paid} >= 0 and ${t.collected} >= 0 and ${t.refunded} >= 0 and ${t.paid} + ${t.collected} - ${t.refunded} <= ${t.net} - ${t.cancelled}`,
+    ),
+  ],
+);
+
+export const diagnosticBillLines = pgTable(
+  'hospital_diagnostic_bill_lines',
+  {
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => diagnosticBills.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    /** The package it was sold in, if any. */
+    packageId: uuid('package_id').references(() => diagnosticPackages.id, { onDelete: 'restrict' }),
+    rate: money('rate').notNull(),
+    discountAllowed: boolean('discount_allowed').notNull(),
+    /** Its part of the bill's discount. */
+    discount: money('discount').notNull(),
+    referralPercent: percent('referral_percent').notNull(),
+    referralAmount: money('referral_amount').notNull(),
+    /** When the report is due (old ProbableReportDeliveryDateTime); null: no report. */
+    reportDueAt: tz('report_due_at'),
+    status: text('status', { enum: ['billed', 'cancelled'] }).notNull(),
+    cancelledOn: day('cancelled_on'),
+    cancelReason: text('cancel_reason'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.billId, t.position] }),
+    index('hospital_diagnostic_bill_lines_test_idx').on(t.testId),
+    check(
+      'hospital_diagnostic_bill_lines_amounts_ck',
+      sql`${t.rate} >= 0 and ${t.discount} between 0 and ${t.rate} and ${t.referralAmount} between 0 and ${t.rate}`,
+    ),
+  ],
+);
+
+// Old InvestigationInvoiceLedgers payment rows (Payment, DueCollection, Refund): money in and out of a diagnostic bill.
+export const diagnosticPayments = pgTable(
+  'hospital_diagnostic_payments',
+  {
+    id: uuid('id').primaryKey(),
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => diagnosticBills.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: ['payment', 'collection', 'refund'] }).notNull(),
+    number: text('number'),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    amount: money('amount').notNull(),
+    paidOn: day('paid_on').notNull(),
+    receivedBy: uuid('received_by').references(() => users.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('hospital_diagnostic_payments_bill_idx').on(t.billId),
+    index('hospital_diagnostic_payments_paid_idx').on(t.paidOn),
+    check('hospital_diagnostic_payments_amount_ck', sql`${t.amount} > 0`),
   ],
 );

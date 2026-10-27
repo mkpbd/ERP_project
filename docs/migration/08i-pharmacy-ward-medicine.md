@@ -1,6 +1,6 @@
 # Step 8i — Pharmacy: ward medicine for admitted patients
 
-Status: **done** (2026-10-27). Previous: [step 9g](09g-hospital-statements.md) · Next: step 10 (diagnostics).
+Status: **done** (2026-10-27). Previous: [step 9g](09g-hospital-statements.md) · Next: [step 10a](10a-diagnostic-billing.md) (diagnostic billing).
 
 What this step adds:
 

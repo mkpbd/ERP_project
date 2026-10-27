@@ -10,6 +10,8 @@ import { ReportRegistry } from '../../shared/application/reports.js';
 import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
+import { DIAGNOSTIC_HANDLERS } from './application/diagnostic.handlers.js';
+import { DiagnosticBillReadRepository } from './application/diagnostic.messages.js';
 import { IPD_BILLING_HANDLERS, IpdCashier } from './application/ipd-billing.handlers.js';
 import { IpdBillingReadRepository } from './application/ipd-billing.messages.js';
 import { IPD_HANDLERS } from './application/ipd.handlers.js';
@@ -22,10 +24,21 @@ import { PatientReadRepository } from './application/patient.messages.js';
 import {
   AdmissionRepository,
   AppointmentRepository,
+  DiagnosticBillRepository,
   IpdBillingRepository,
   OpdBillRepository,
   PatientRepository,
 } from './domain/repositories.js';
+import {
+  DrizzleDiagnosticBillReadRepository,
+  DrizzleDiagnosticBillRepository,
+} from './infrastructure/persistence/drizzle-diagnostic.repositories.js';
+import {
+  diagnosticIncomeReport,
+  diagnosticReceiptReport,
+  referralCommissionReport,
+} from './infrastructure/reports/diagnostic.reports.js';
+import { DIAGNOSTIC_CONTROLLERS } from './presentation/diagnostic.controllers.js';
 import { DrizzleInpatientRegister } from './infrastructure/persistence/drizzle-inpatient-register.js';
 import {
   DrizzleIpdBillingReadRepository,
@@ -84,7 +97,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
  * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e); the
  * indoor bill: charges, advances, the final bill and its dues (step 9f); doctor payments, corporate collections
- * across OPD and indoor bills, statements and the UHID merge (step 9g). Global: it publishes the admissions other
+ * across OPD and indoor bills, statements and the UHID merge (step 9g); the test catalogue and diagnostic bills with
+ * the referring doctors' commission (step 10a). Global: it publishes the admissions other
  * modules charge to (InpatientRegister), for the pharmacy's ward medicine.
  */
 @Global()
@@ -96,6 +110,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     ...OPD_CONTROLLERS,
     ...IPD_CONTROLLERS,
     ...IPD_BILLING_CONTROLLERS,
+    ...DIAGNOSTIC_CONTROLLERS,
   ],
   providers: [
     ...PATIENT_HANDLERS,
@@ -103,6 +118,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     ...OPD_HANDLERS,
     ...IPD_HANDLERS,
     ...IPD_BILLING_HANDLERS,
+    ...DIAGNOSTIC_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
     { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
@@ -114,6 +130,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: IpdBillingRepository, useClass: DrizzleIpdBillingRepository },
     { provide: IpdBillingReadRepository, useClass: DrizzleIpdBillingReadRepository },
     { provide: InpatientRegister, useClass: DrizzleInpatientRegister },
+    { provide: DiagnosticBillRepository, useClass: DrizzleDiagnosticBillRepository },
+    { provide: DiagnosticBillReadRepository, useClass: DrizzleDiagnosticBillReadRepository },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -137,6 +155,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly admissions: AdmissionReadRepository,
     private readonly cashier: IpdCashier,
     private readonly ipdBills: IpdBillingReadRepository,
+    private readonly diagnostics: DiagnosticBillReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -163,5 +182,8 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(duesReport(this.context));
     this.reports.register(discountsReport(this.context, this.users));
     this.reports.register(incomeByHeadReport(this.context));
+    this.reports.register(diagnosticReceiptReport(this.diagnostics, this.organization, this.staff));
+    this.reports.register(referralCommissionReport(this.context));
+    this.reports.register(diagnosticIncomeReport(this.context));
   }
 }

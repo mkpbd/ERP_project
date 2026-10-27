@@ -23,6 +23,7 @@ import {
 } from '../../domain/repositories.js';
 import {
   corporateClients,
+  diagnosticBills,
   doctorLedger,
   doctorPayments,
   doctors,
@@ -156,6 +157,7 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
         followUpFee: doctors.followUpFee,
         reportFee: doctors.reportFee,
         sharePercent: doctors.sharePercent,
+        referralPercent: doctors.referralPercent,
       })
       .from(doctors)
       .where(inArray(doctors.id, [...new Set(ids)]));
@@ -200,7 +202,7 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
   }
 
   async dueBills(clientId: string): Promise<CorporateDueBill[]> {
-    const rows = await this.context.db.execute<{ kind: 'opd' | 'ipd'; id: string; due: string }>(sql`
+    const rows = await this.context.db.execute<{ kind: 'opd' | 'ipd' | 'diag'; id: string; due: string }>(sql`
       select 'opd' as kind, ${opdBills.id} as id, ${opdBills.billedOn} as billed_on, ${opdBills.number} as number,
         ${opdBills.net} - ${opdBills.paid} - ${opdBills.collected} as due
       from ${opdBills}
@@ -212,6 +214,12 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
       from ${ipdBills}
       where ${ipdBills.corporateClientId} = ${clientId} and ${ipdBills.status} = 'billed'
         and ${ipdBills.net} - ${ipdBills.deposit} - ${ipdBills.paid} - ${ipdBills.collected} > 0
+      union all
+      select 'diag', ${diagnosticBills.id}, ${diagnosticBills.billedOn}, ${diagnosticBills.number},
+        ${diagnosticDue}
+      from ${diagnosticBills}
+      where ${diagnosticBills.corporateClientId} = ${clientId} and ${diagnosticBills.status} = 'billed'
+        and ${diagnosticDue} > 0
       order by billed_on, number`);
     return rows.rows.map((row) => ({ kind: row.kind, id: row.id, due: Number(row.due) }));
   }
@@ -265,6 +273,8 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
 }
 
 const referrers = aliasedTable(doctors, 'referrers');
+/** What is still owed on a diagnostic bill: what is left of it less what was kept. */
+const diagnosticDue = sql`${diagnosticBills.net} - ${diagnosticBills.cancelled} - ${diagnosticBills.paid} - ${diagnosticBills.collected} + ${diagnosticBills.refunded}`;
 const due = sql<number>`${opdBills.net} - ${opdBills.paid} - ${opdBills.collected}`.mapWith(Number);
 
 @Injectable()

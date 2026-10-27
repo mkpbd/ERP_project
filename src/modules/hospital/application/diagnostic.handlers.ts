@@ -1,0 +1,446 @@
+import { randomUUID } from 'node:crypto';
+import { Injectable } from '@nestjs/common';
+import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
+import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
+import { DiagnosticBill, MAX_DIAGNOSTIC_LINES } from '../domain/diagnostic-bill.js';
+import { validMoney, type BillPayer } from '../domain/opd-bill.js';
+import { text } from '../domain/patient.js';
+import { DiagnosticBillRepository, type DiagnosticPolicy, type DoctorLedgerEntry } from '../domain/repositories.js';
+import { DIAG_BILL, DIAG_DISCOUNT, DIAG_MANAGE, DIAG_READ } from './hospital.constants.js';
+import {
+  CancelDiagnosticTestsCommand,
+  CollectDiagnosticDueCommand,
+  CreateDiagnosticBillCommand,
+  DIAGNOSTIC_DISCOUNT_ROLE,
+  DIAGNOSTIC_INCOME_ROLE,
+  DiagnosticBillReadRepository,
+  GetDiagnosticBillQuery,
+  GetDiagnosticPolicyQuery,
+  GetPackageTestsQuery,
+  ListDiagnosticBillsQuery,
+  REFERRAL_COMMISSION_ROLE,
+  SetDiagnosticPolicyCommand,
+  SetPackageTestsCommand,
+} from './diagnostic.messages.js';
+import { OpdDesk } from './opd.handlers.js';
+import {
+  CONSULTANT_PAYABLE_ROLE,
+  CORPORATE_RECEIVABLE_ROLE,
+  OPD_RECEIPT_ROLES,
+  STAFF_RECEIVABLE_ROLE,
+} from './opd.messages.js';
+
+/** What patients owe on their own diagnostic bills. */
+export const DIAGNOSTIC_RECEIVABLE_ROLE = 'diagnostic_receivable';
+
+function receivableRole(payer: BillPayer): string {
+  switch (payer.kind) {
+    case 'corporate':
+      return CORPORATE_RECEIVABLE_ROLE;
+    case 'staff':
+      return STAFF_RECEIVABLE_ROLE;
+    case 'patient':
+      return DIAGNOSTIC_RECEIVABLE_ROLE;
+  }
+}
+
+/** What the diagnostic handlers share on top of the OPD desk (patients, payers, numbers, posting). */
+@Injectable()
+export class DiagnosticDesk {
+  constructor(
+    readonly opd: OpdDesk,
+    readonly bills: DiagnosticBillRepository,
+    readonly read: DiagnosticBillReadRepository,
+  ) {}
+
+  record(action: string, actorUserId: string, id: string, metadata: Record<string, string | number | null> = {}) {
+    return this.opd.audit.record({
+      action: `hospital.diagnostic_bill_${action}`,
+      actorUserId,
+      resourceType: 'diagnostic_bill',
+      resourceId: id,
+      metadata,
+    });
+  }
+
+  /** The referring doctor's commission earned (+) or taken back (−) on the bill. */
+  ledger(bill: DiagnosticBill, doctorId: string | null, amount: number, on: string): DoctorLedgerEntry[] {
+    if (!doctorId || amount === 0) return [];
+    return [
+      {
+        doctorId,
+        entryOn: on,
+        kind: amount > 0 ? 'share' : 'reversal',
+        billId: null,
+        diagnosticBillId: bill.id,
+        documentNumber: bill.number,
+        amount,
+      },
+    ];
+  }
+}
+
+@CommandHandler(SetDiagnosticPolicyCommand)
+export class SetDiagnosticPolicyHandler implements ICommandHandler<SetDiagnosticPolicyCommand> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, policy }: SetDiagnosticPolicyCommand): Promise<void> {
+    const { opd } = this.desk;
+    await opd.access.authorize(actor.userId, { permissions: [DIAG_MANAGE] });
+    for (const percent of [policy.counterDiscountPercent, policy.defaultReferralPercent]) {
+      if (!(percent >= 0 && percent <= 100)) throw new DomainError('invalid_policy', 'Percentages are 0 to 100');
+    }
+    await opd.tx.run(async () => {
+      await this.desk.bills.savePolicy(policy, actor.userId, opd.clock.now());
+      await opd.audit.record({
+        action: 'hospital.diagnostic_policy_set',
+        actorUserId: actor.userId,
+        resourceType: 'diagnostic_policy',
+        resourceId: '1',
+        metadata: { ...policy },
+      });
+    });
+  }
+}
+
+@QueryHandler(GetDiagnosticPolicyQuery)
+export class GetDiagnosticPolicyHandler implements IQueryHandler<GetDiagnosticPolicyQuery> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor }: GetDiagnosticPolicyQuery): Promise<DiagnosticPolicy> {
+    await this.desk.opd.access.authorize(actor.userId, { permissions: [DIAG_READ] });
+    return this.desk.bills.policy();
+  }
+}
+
+/** Old OPD Package Item page: the package's tests, each at its rate inside the package. */
+@CommandHandler(SetPackageTestsCommand)
+export class SetPackageTestsHandler implements ICommandHandler<SetPackageTestsCommand> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, packageId, tests }: SetPackageTestsCommand): Promise<void> {
+    const { opd, bills } = this.desk;
+    await opd.access.authorize(actor.userId, { permissions: [DIAG_MANAGE] });
+    if (tests.length === 0 || tests.length > MAX_DIAGNOSTIC_LINES) {
+      throw new DomainError('invalid_lines', `A package has 1 to ${MAX_DIAGNOSTIC_LINES} tests`);
+    }
+    if (new Set(tests.map((test) => test.testId)).size !== tests.length) {
+      throw new DomainError('duplicate_test', 'A test is in the package twice');
+    }
+    tests.forEach((test) => validMoney(test.rate, 'rate'));
+    await opd.tx.run(async () => {
+      if (!(await bills.package(packageId))) throw new NotFoundError('diagnostic_package');
+      const found = await bills.tests(tests.map((test) => test.testId));
+      for (const test of tests) {
+        const known = found.get(test.testId);
+        if (!known) throw new NotFoundError('diagnostic_test');
+        if (!known.isActive) throw new DomainError('inactive_test', `${known.name} is not in use`);
+      }
+      await bills.setPackageTests(packageId, tests);
+      await opd.audit.record({
+        action: 'hospital.diagnostic_package_tests_set',
+        actorUserId: actor.userId,
+        resourceType: 'diagnostic_package',
+        resourceId: packageId,
+        metadata: { tests: tests.length },
+      });
+    });
+  }
+}
+
+@QueryHandler(GetPackageTestsQuery)
+export class GetPackageTestsHandler implements IQueryHandler<GetPackageTestsQuery> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, packageId }: GetPackageTestsQuery) {
+    await this.desk.opd.access.authorize(actor.userId, { permissions: [DIAG_READ] });
+    const found = await this.desk.read.packageTests(packageId);
+    if (!found) throw new NotFoundError('diagnostic_package');
+    return found;
+  }
+}
+
+/**
+ * Old Investigation Invoice (CreateInvestigationInvoiceFullCommand, with a walk-in registered on the spot and no
+ * voucher posted): tests and packages billed to a registered patient in one transaction. The referring doctor's
+ * commission is theirs at once (the doctor's own percentage, else the test's, else the policy's); one voucher posts
+ * the bill, the discount and the commission.
+ */
+@CommandHandler(CreateDiagnosticBillCommand)
+export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagnosticBillCommand> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, input }: CreateDiagnosticBillCommand) {
+    const { desk } = this;
+    const { opd, bills } = desk;
+    await opd.access.authorize(actor.userId, { permissions: [DIAG_BILL] });
+    if (input.discount !== null) validMoney(input.discount, 'discount');
+    if (input.corporateClientId && input.staffId) {
+      throw new DomainError('invalid_payer', 'A bill goes to a corporate client or to a staff member, not both');
+    }
+    const mayDiscountMore = await opd.access.isAllowed(actor.userId, { permissions: [DIAG_DISCOUNT] });
+    return opd.tx.run(async () => {
+      const patient = await opd.appointments.patientContact(input.patientId);
+      if (!patient) throw new NotFoundError('patient');
+      const referrer = input.referredById
+        ? (await opd.bills.doctors([input.referredById])).get(input.referredById)
+        : null;
+      if (input.referredById && !referrer) throw new NotFoundError('referring_doctor');
+      if (referrer && !referrer.isActive) throw new DomainError('not_bookable', `${referrer.name} is not active`);
+      const payer = await opd.payer(
+        input.corporateClientId === undefined && !input.staffId
+          ? patient.corporateClientId
+          : (input.corporateClientId ?? null),
+        input.staffId,
+      );
+      const policy = await bills.policy();
+      const picked: { testId: string; packageId: string | null; rate: number | null }[] = input.testIds.map(
+        (testId) => ({ testId, packageId: null, rate: null }),
+      );
+      for (const packageId of new Set(input.packageIds)) {
+        const found = await bills.package(packageId);
+        if (!found) throw new NotFoundError('diagnostic_package');
+        if (!found.isActive || found.tests.length === 0) {
+          throw new DomainError('inactive_package', `${found.name} is not sold`);
+        }
+        picked.push(...found.tests.map((test) => ({ testId: test.testId, packageId, rate: test.rate })));
+      }
+      const tests = await bills.tests(picked.map((line) => line.testId));
+      const lines = picked.map((line) => {
+        const test = tests.get(line.testId);
+        if (!test) throw new NotFoundError('diagnostic_test');
+        if (!test.isActive) throw new DomainError('inactive_test', `${test.name} is not done now`);
+        return {
+          testId: test.id,
+          packageId: line.packageId,
+          rate: line.rate ?? test.rate,
+          discountAllowed: test.discountAllowed,
+          referralPercent: referrer?.referralPercent ?? test.referralPercent ?? policy.defaultReferralPercent,
+          reportHours: test.reportHours,
+        };
+      });
+      // A corporate client's own discount is given on what may be discounted unless another is asked for.
+      const client = payer.kind === 'corporate' ? payer.client : null;
+      const discountable = lines
+        .filter((line) => line.discountAllowed)
+        .reduce((total, line) => total + Math.round(line.rate * 100), 0);
+      const clientDiscount = client ? Math.floor((discountable * client.discountPercent) / 100) / 100 : 0;
+      const today = opd.today();
+      const bill = DiagnosticBill.create({
+        id: randomUUID(),
+        number: await opd.number('DB', today),
+        patientId: patient.id,
+        billedOn: today,
+        referredById: referrer?.id ?? null,
+        payer: payer.payer,
+        lines,
+        discount: input.discount ?? clientDiscount,
+        discountReason:
+          input.discountReason ?? (input.discount === null && clientDiscount > 0 ? `Corporate: ${client!.name}` : null),
+        discountLimitPercent: Math.max(policy.counterDiscountPercent, client?.discountPercent ?? 0),
+        mayDiscountMore,
+        payment: input.payment,
+        by: actor.userId,
+        now: opd.clock.now(),
+      });
+      if (client?.payment === 'credit' && client.creditLimit !== null) {
+        const owed = await opd.bills.corporateDue(client.id);
+        if (owed + bill.due > client.creditLimit) {
+          throw new DomainError(
+            'credit_limit',
+            `${client.name} owes ${owed.toFixed(2)}; with ${bill.due.toFixed(2)} more it is over its limit of ${client.creditLimit.toFixed(2)}`,
+          );
+        }
+      }
+      const header = bill.toSnapshot();
+      const narration = `Diagnostic bill ${header.number}`;
+      const voucher = await opd.post(
+        narration,
+        today,
+        header.id,
+        [
+          ...(input.payment && header.paid > 0
+            ? [{ account: { role: OPD_RECEIPT_ROLES[input.payment.method] }, debit: header.paid, credit: 0, narration }]
+            : []),
+          { account: { role: receivableRole(bill.payer) }, debit: bill.due, credit: 0, narration },
+          { account: { role: DIAGNOSTIC_DISCOUNT_ROLE }, debit: header.discount, credit: 0, narration },
+          { account: { role: DIAGNOSTIC_INCOME_ROLE }, debit: 0, credit: header.gross, narration },
+          { account: { role: REFERRAL_COMMISSION_ROLE }, debit: bill.commission, credit: 0, narration },
+          { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: 0, credit: bill.commission, narration },
+        ],
+        actor,
+      );
+      bill.posted(voucher?.number ?? null);
+      await bills.insert(bill);
+      if (input.payment && header.paid > 0) {
+        await bills.addPayment({
+          billId: bill.id,
+          kind: 'payment',
+          number: null,
+          method: input.payment.method,
+          reference: text(input.payment.reference, 100, 'payment reference'),
+          amount: header.paid,
+          paidOn: today,
+          receivedBy: actor.userId,
+          voucherNumber: voucher?.number ?? null,
+        });
+      }
+      await opd.bills.addLedger(desk.ledger(bill, header.referredById, bill.commission, today));
+      await opd.bills.addUhidUse({
+        patientId: patient.id,
+        usedOn: today,
+        service: 'diagnostic',
+        documentNumber: header.number,
+      });
+      await desk.record('created', actor.userId, bill.id, {
+        number: header.number,
+        net: header.net,
+        tests: lines.length,
+        voucher: voucher?.number ?? null,
+      });
+      return { id: bill.id, number: header.number, net: header.net, due: bill.due };
+    });
+  }
+}
+
+/** Old Diagnostic Due Collection: a due collected later, with its own receipt number and voucher. */
+@CommandHandler(CollectDiagnosticDueCommand)
+export class CollectDiagnosticDueHandler implements ICommandHandler<CollectDiagnosticDueCommand> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, id, version, money }: CollectDiagnosticDueCommand) {
+    const { desk } = this;
+    const { opd } = desk;
+    await opd.access.authorize(actor.userId, { permissions: [DIAG_BILL] });
+    return opd.tx.run(async () => {
+      const bill = await desk.bills.findForUpdate(id);
+      if (!bill) throw new NotFoundError('diagnostic_bill');
+      bill.assertVersion(version);
+      const today = opd.today();
+      const amount = bill.collect(money.amount, today, opd.clock.now());
+      const number = await opd.number('DR', today);
+      const narration = `Due collected on ${bill.number} (${number})`;
+      const voucher = await opd.post(
+        narration,
+        today,
+        bill.id,
+        [
+          { account: { role: OPD_RECEIPT_ROLES[money.method] }, debit: amount, credit: 0, narration },
+          { account: { role: receivableRole(bill.payer) }, debit: 0, credit: amount, narration },
+        ],
+        actor,
+      );
+      await desk.bills.update(bill);
+      await desk.bills.addPayment({
+        billId: bill.id,
+        kind: 'collection',
+        number,
+        method: money.method,
+        reference: text(money.reference, 100, 'payment reference'),
+        amount,
+        paidOn: today,
+        receivedBy: actor.userId,
+        voucherNumber: voucher?.number ?? null,
+      });
+      await desk.record('collected', actor.userId, id, { number, amount, method: money.method });
+      return { number, due: bill.due };
+    });
+  }
+}
+
+/**
+ * Old investigation cancel (approved, then done; Cancel, DiscountAdjustment and Refund rows): named tests, or all,
+ * cancelled with a reason. Their income, discount and commission come back; what they were worth comes off the due,
+ * and money beyond what is left is given back by the method asked for.
+ */
+@CommandHandler(CancelDiagnosticTestsCommand)
+export class CancelDiagnosticTestsHandler implements ICommandHandler<CancelDiagnosticTestsCommand> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, id, version, lines, reason, refundMethod }: CancelDiagnosticTestsCommand) {
+    const { desk } = this;
+    const { opd } = desk;
+    await opd.access.authorize(actor.userId, { permissions: [DIAG_BILL] });
+    const mayCancelLater = await opd.access.isAllowed(actor.userId, { permissions: [DIAG_MANAGE] });
+    return opd.tx.run(async () => {
+      const bill = await desk.bills.findForUpdate(id);
+      if (!bill) throw new NotFoundError('diagnostic_bill');
+      bill.assertVersion(version);
+      const header = bill.toSnapshot();
+      const today = opd.today();
+      const cancelled = bill.cancelTests({ lines, reason, on: today, mayCancelLater, now: opd.clock.now() });
+      const narration = `Tests cancelled on ${header.number}`;
+      const voucher = await opd.post(
+        narration,
+        today,
+        bill.id,
+        [
+          { account: { role: DIAGNOSTIC_INCOME_ROLE }, debit: cancelled.gross, credit: 0, narration },
+          { account: { role: DIAGNOSTIC_DISCOUNT_ROLE }, debit: 0, credit: cancelled.discount, narration },
+          { account: { role: receivableRole(bill.payer) }, debit: 0, credit: cancelled.dueCleared, narration },
+          { account: { role: OPD_RECEIPT_ROLES[refundMethod] }, debit: 0, credit: cancelled.refund, narration },
+          { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: cancelled.commission, credit: 0, narration },
+          { account: { role: REFERRAL_COMMISSION_ROLE }, debit: 0, credit: cancelled.commission, narration },
+        ],
+        actor,
+      );
+      await desk.bills.update(bill);
+      if (cancelled.refund > 0) {
+        await desk.bills.addPayment({
+          billId: bill.id,
+          kind: 'refund',
+          number: null,
+          method: refundMethod,
+          reference: null,
+          amount: cancelled.refund,
+          paidOn: today,
+          receivedBy: actor.userId,
+          voucherNumber: voucher?.number ?? null,
+        });
+      }
+      await opd.bills.addLedger(desk.ledger(bill, header.referredById, -cancelled.commission, today));
+      await desk.record('tests_cancelled', actor.userId, id, {
+        lines: cancelled.positions.join(','),
+        reason,
+        refunded: cancelled.refund,
+        voucher: voucher?.number ?? null,
+      });
+      return { refunded: cancelled.refund, due: bill.due };
+    });
+  }
+}
+
+@QueryHandler(ListDiagnosticBillsQuery)
+export class ListDiagnosticBillsHandler implements IQueryHandler<ListDiagnosticBillsQuery> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, filter }: ListDiagnosticBillsQuery) {
+    await this.desk.opd.access.authorize(actor.userId, { permissions: [DIAG_READ] });
+    return this.desk.read.list(filter);
+  }
+}
+
+@QueryHandler(GetDiagnosticBillQuery)
+export class GetDiagnosticBillHandler implements IQueryHandler<GetDiagnosticBillQuery> {
+  constructor(private readonly desk: DiagnosticDesk) {}
+
+  async execute({ actor, id }: GetDiagnosticBillQuery) {
+    await this.desk.opd.access.authorize(actor.userId, { permissions: [DIAG_READ] });
+    const bill = await this.desk.read.get(id);
+    if (!bill) throw new NotFoundError('diagnostic_bill');
+    return bill;
+  }
+}
+
+export const DIAGNOSTIC_HANDLERS = [
+  DiagnosticDesk,
+  SetDiagnosticPolicyHandler,
+  GetDiagnosticPolicyHandler,
+  SetPackageTestsHandler,
+  GetPackageTestsHandler,
+  CreateDiagnosticBillHandler,
+  CollectDiagnosticDueHandler,
+  CancelDiagnosticTestsHandler,
+  ListDiagnosticBillsHandler,
+  GetDiagnosticBillHandler,
+];

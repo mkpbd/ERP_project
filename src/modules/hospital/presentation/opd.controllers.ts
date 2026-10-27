@@ -145,7 +145,7 @@ class DoctorLedgerResponseDto extends responseDto({
 class CorporateCollectedResponseDto extends responseDto({
   number: z.string(),
   settled: z.array(
-    z.object({ kind: z.enum(['opd', 'ipd']), billId: z.uuid(), number: z.string(), amount: z.number() }),
+    z.object({ kind: z.enum(['opd', 'ipd', 'diag']), billId: z.uuid(), number: z.string(), amount: z.number() }),
   ),
 }) {}
 class SuggestVisitQueryDto extends createZodDto(z.object({ patientId: z.uuid(), doctorId: z.uuid() })) {}

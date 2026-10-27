@@ -11,7 +11,7 @@ const flag = z.enum(['true', 'false']).optional();
 const search = z.string().trim().min(1).max(100).optional();
 
 /** Create (nullable fields default to null, others to the defaults given), update (all optional) and response. */
-function shapes<T extends z.ZodRawShape>(
+export function shapes<T extends z.ZodRawShape>(
   fields: T,
   nullable: (keyof T)[] = [],
   defaults: Partial<Record<keyof T, unknown>> = {},
@@ -52,10 +52,12 @@ const doctor = shapes(
     reportFee: fee,
     /** The doctor's share of their fees; null takes the OPD policy's default. */
     sharePercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
+    /** The doctor's commission on tests they refer; null takes the test's (else the diagnostic policy's). */
+    referralPercent: z.number().min(0).max(100).multipleOf(0.01).nullable(),
     userId: z.uuid().nullable(),
     isActive: z.boolean(),
   },
-  ['code', 'degrees', 'specialityId', 'phone', 'roomNo', 'sharePercent', 'userId'],
+  ['code', 'degrees', 'specialityId', 'phone', 'roomNo', 'sharePercent', 'referralPercent', 'userId'],
   { isConsultant: false, firstVisitFee: 0, newVisitFee: 0, followUpFee: 0, reportFee: 0, isActive: true },
 );
 class CreateDoctorDto extends createZodDto(doctor.create) {}

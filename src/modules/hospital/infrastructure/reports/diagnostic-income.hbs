@@ -1,0 +1,29 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Department</th><th class="num">Tests</th><th class="num">Billed</th><th class="num">Cancelled tests</th>
+      <th class="num">Cancelled</th><th class="num">Income</th><th class="num">Discount</th><th class="num">Net</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{department}}</td><td class="num">{{tests}}</td><td class="num">{{money billed}}</td>
+      <td class="num">{{cancelledTests}}</td><td class="num">{{money cancelled}}</td><td class="num">{{money gross}}</td>
+      <td class="num">{{money discount}}</td><td class="num"><b>{{money net}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td>Total</td><td class="num">{{total.tests}}</td><td class="num">{{money total.billed}}</td>
+      <td class="num">{{total.cancelledTests}}</td><td class="num">{{money total.cancelled}}</td><td class="num">{{money total.gross}}</td>
+      <td class="num">{{money total.discount}}</td><td class="num">{{money total.net}}</td>
+    </tr>
+  </tbody>
+</table>
+<p class="muted">Tests cancelled in the period are taken off on the day they were cancelled.</p>
+{{else}}
+<p>No test was billed or cancelled in this period.</p>
+{{/if}}
+{{/with}}

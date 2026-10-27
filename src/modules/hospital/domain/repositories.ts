@@ -1,6 +1,7 @@
 import type { StoredFile } from '../../../shared/domain/uploads.js';
 import type { Admission } from './admission.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
+import type { DiagnosticBill } from './diagnostic-bill.js';
 import type { IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
 import type { OpdBill, PaymentMethod } from './opd-bill.js';
 import type { IdType, Patient } from './patient.js';
@@ -79,6 +80,8 @@ export interface OpdPolicy {
 /** A doctor as billed: fees, own share (null = the policy's) and whether they see patients here. */
 export interface BillableDoctor extends BookableDoctor {
   readonly sharePercent: number | null;
+  /** The doctor's commission on tests they refer; null: the test's. */
+  readonly referralPercent: number | null;
 }
 
 export interface BillableService {
@@ -108,12 +111,13 @@ export interface DoctorLedgerEntry {
   /** The OPD bill, or the final indoor bill. */
   readonly billId: string | null;
   readonly ipdBillId?: string | null;
+  readonly diagnosticBillId?: string | null;
   readonly documentNumber: string;
   readonly amount: number;
 }
 
 export interface CorporateDueBill {
-  readonly kind: 'opd' | 'ipd';
+  readonly kind: 'opd' | 'ipd' | 'diag';
   readonly id: string;
   readonly due: number;
 }
@@ -231,4 +235,49 @@ export abstract class IpdBillingRepository {
   abstract billForUpdate(id: string): Promise<IpdBill | null>;
   abstract insertBill(bill: IpdBill): Promise<void>;
   abstract updateBill(bill: IpdBill): Promise<void>;
+}
+
+export interface DiagnosticPolicy {
+  readonly counterDiscountPercent: number;
+  readonly defaultReferralPercent: number;
+}
+
+/** A test as billed. */
+export interface BillableTest {
+  readonly id: string;
+  readonly name: string;
+  readonly rate: number;
+  readonly reportHours: number | null;
+  readonly discountAllowed: boolean;
+  /** Null: the policy's. */
+  readonly referralPercent: number | null;
+  readonly isActive: boolean;
+}
+
+export interface DiagnosticPayment {
+  readonly billId: string;
+  readonly kind: 'payment' | 'collection' | 'refund';
+  readonly number: string | null;
+  readonly method: PaymentMethod;
+  readonly reference: string | null;
+  readonly amount: number;
+  readonly paidOn: string;
+  readonly receivedBy: string;
+  readonly voucherNumber: string | null;
+}
+
+export abstract class DiagnosticBillRepository {
+  abstract policy(): Promise<DiagnosticPolicy>;
+  abstract savePolicy(policy: DiagnosticPolicy, by: string, now: Date): Promise<void>;
+  abstract tests(ids: readonly string[]): Promise<Map<string, BillableTest>>;
+  /** A package with its tests at their rates inside it, or null. */
+  abstract package(
+    id: string,
+  ): Promise<{ id: string; name: string; isActive: boolean; tests: { testId: string; rate: number }[] } | null>;
+  abstract setPackageTests(packageId: string, tests: readonly { testId: string; rate: number }[]): Promise<void>;
+  abstract findForUpdate(id: string): Promise<DiagnosticBill | null>;
+  abstract insert(bill: DiagnosticBill): Promise<void>;
+  /** Saves the header and each line's state. */
+  abstract update(bill: DiagnosticBill): Promise<void>;
+  abstract addPayment(payment: DiagnosticPayment): Promise<void>;
 }

@@ -97,6 +97,14 @@ export const PERMISSION_CATALOG = [
   { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
   { key: 'opd:bill', description: 'Bill consultations, collect their dues and cancel bills on their own day' },
   { key: 'opd:discount', description: "Give a consultation discount above the counter's limit" },
+  { key: 'diag:read', description: 'See the test catalogue, packages and diagnostic bills' },
+  {
+    key: 'diag:manage',
+    description:
+      "Keep diagnostic departments, tests, packages and the diagnostic policy; cancel tests after the bill's day",
+  },
+  { key: 'diag:bill', description: "Bill tests, collect their dues and cancel tests on the bill's day" },
+  { key: 'diag:discount', description: "Give a diagnostic discount above the counter's limit" },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },
