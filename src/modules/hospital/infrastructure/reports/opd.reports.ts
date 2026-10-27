@@ -15,6 +15,8 @@ import { ageOn, uhidLabel } from '../../domain/patient.js';
 import {
   corporateClients,
   doctorLedger,
+  diagnosticBills,
+  diagnosticPayments,
   doctors,
   ipdBills,
   ipdPayments,
@@ -94,9 +96,31 @@ const put = (target: ByMethod, method: PaymentMethod, value: number) => {
  * what was taken at billing and on dues, less what was paid back on cancellations — what each counter hands over.
  */
 export function opdCollectionReport(context: DbContext, users: UserDirectory): ReportDefinition {
-  return defineReport({
+  return collectionReport(context, users, {
     key: 'hospital.opd-collection',
     title: 'OPD collection',
+    payments: opdPayments,
+  });
+}
+
+/** Old DiagUserwiseCollectionSummary / DiagnosticCollectionSummary: the same sheet for diagnostic bills. */
+export function diagnosticCollectionReport(context: DbContext, users: UserDirectory): ReportDefinition {
+  return collectionReport(context, users, {
+    key: 'hospital.diagnostic-collection',
+    title: 'Diagnostic collection',
+    payments: diagnosticPayments,
+  });
+}
+
+function collectionReport(
+  context: DbContext,
+  users: UserDirectory,
+  sheet: { key: string; title: string; payments: typeof opdPayments | typeof diagnosticPayments },
+): ReportDefinition {
+  const payments = sheet.payments;
+  return defineReport({
+    key: sheet.key,
+    title: sheet.title,
     group: 'Hospital',
     description: 'Per user: taken at billing and on dues, paid back on cancellations, by cash, card and mobile wallet.',
     params: z.strictObject({ from: day, to: day }),
@@ -104,15 +128,15 @@ export function opdCollectionReport(context: DbContext, users: UserDirectory): R
       assertPeriod(params.from, params.to);
       const rows = await context.db
         .select({
-          userId: opdPayments.receivedBy,
-          kind: opdPayments.kind,
-          method: opdPayments.method,
+          userId: payments.receivedBy,
+          kind: payments.kind,
+          method: payments.method,
           count: sql<number>`count(*)`.mapWith(Number),
-          amount: sumOf(opdPayments.amount),
+          amount: sumOf(payments.amount),
         })
-        .from(opdPayments)
-        .where(and(gte(opdPayments.paidOn, params.from), lte(opdPayments.paidOn, params.to)))
-        .groupBy(opdPayments.receivedBy, opdPayments.kind, opdPayments.method);
+        .from(payments)
+        .where(and(gte(payments.paidOn, params.from), lte(payments.paidOn, params.to)))
+        .groupBy(payments.receivedBy, payments.kind, payments.method);
       const ids = [...new Set(rows.map((row) => row.userId).filter((id): id is string => id !== null))];
       const names = new Map(
         (ids.length ? await users.findSummaries(ids) : []).map((user) => [user.id, user.displayName]),
@@ -312,7 +336,7 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
     title: 'Corporate client statement',
     group: 'Hospital',
     description:
-      "A corporate client's OPD and indoor bills and payments over a period, with what it owed before and after.",
+      "A corporate client's OPD, indoor and diagnostic bills and payments over a period, with what it owed before and after.",
     params: z.strictObject({ clientId: z.uuid(), from: day, to: day }),
     async load(params) {
       assertPeriod(params.from, params.to);
@@ -356,7 +380,23 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
         .from(ipdBills)
         .innerJoin(patients, eq(patients.id, ipdBills.patientId))
         .where(and(eq(ipdBills.corporateClientId, params.clientId), lte(ipdBills.billedOn, params.to)));
-      const bills = [...outdoor, ...indoor].sort(
+      // A diagnostic bill: what is left of it after cancelled tests (an admitted patient's never goes to a company).
+      const tests = await context.db
+        .select({
+          id: diagnosticBills.id,
+          number: diagnosticBills.number,
+          billedOn: diagnosticBills.billedOn,
+          patientName: patients.fullName,
+          uhid: patients.uhid,
+          net: sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled}`.mapWith(Number),
+          paid: sql<number>`${diagnosticBills.paid} - ${diagnosticBills.refunded}`.mapWith(Number),
+          status: diagnosticBills.status,
+          cancelledOn: sql<string | null>`null`,
+        })
+        .from(diagnosticBills)
+        .innerJoin(patients, eq(patients.id, diagnosticBills.patientId))
+        .where(and(eq(diagnosticBills.corporateClientId, params.clientId), lte(diagnosticBills.billedOn, params.to)));
+      const bills = [...outdoor, ...indoor, ...tests].sort(
         (a, b) => a.billedOn.localeCompare(b.billedOn) || a.number.localeCompare(b.number),
       );
       const outdoorPayments = outdoor.length
@@ -403,7 +443,29 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
               ),
             )
         : [];
-      const payments = [...outdoorPayments, ...indoorPayments].sort(
+      const testPayments = tests.length
+        ? await context.db
+            .select({
+              billId: diagnosticPayments.billId,
+              number: sql<string>`coalesce(${diagnosticPayments.number}, '')`,
+              method: diagnosticPayments.method,
+              amount: diagnosticPayments.amount,
+              paidOn: diagnosticPayments.paidOn,
+              createdAt: diagnosticPayments.createdAt,
+            })
+            .from(diagnosticPayments)
+            .where(
+              and(
+                inArray(
+                  diagnosticPayments.billId,
+                  tests.map((bill) => bill.id),
+                ),
+                eq(diagnosticPayments.kind, 'collection'),
+                lte(diagnosticPayments.paidOn, params.to),
+              ),
+            )
+        : [];
+      const payments = [...outdoorPayments, ...indoorPayments, ...testPayments].sort(
         (a, b) => a.paidOn.localeCompare(b.paidOn) || a.createdAt.getTime() - b.createdAt.getTime(),
       );
       /** What the client owed at the end of a day. */

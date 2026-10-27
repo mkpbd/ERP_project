@@ -6,7 +6,12 @@ import { ConflictError, DomainError, ForbiddenError, NotFoundError } from '../..
 import { Admission } from '../domain/admission.js';
 import { validMoney } from '../domain/opd-bill.js';
 import { text } from '../domain/patient.js';
-import { AdmissionRepository, IpdBillingRepository, type AdmissionBed } from '../domain/repositories.js';
+import {
+  AdmissionRepository,
+  DiagnosticBillRepository,
+  IpdBillingRepository,
+  type AdmissionBed,
+} from '../domain/repositories.js';
 import { IPD_ADVANCE_ROLE, type MoneyInput } from './ipd-billing.messages.js';
 import {
   AdmissionReadRepository,
@@ -30,6 +35,7 @@ export class IpdDesk {
     readonly admissions: AdmissionRepository,
     readonly read: AdmissionReadRepository,
     readonly billing: IpdBillingRepository,
+    readonly tests: DiagnosticBillRepository,
   ) {}
 
   record(action: string, actor: Actor, id: string, metadata: Record<string, string | number | null> = {}) {
@@ -268,8 +274,8 @@ export class ChangeAdmissionHandler implements ICommandHandler<ChangeAdmissionCo
         }
         case 'cancel': {
           if (await desk.billing.liveBill(id)) throw new ConflictError('bill_made', 'Cancel the final bill first');
-          if ((await desk.billing.activeCharges(id)).length > 0) {
-            throw new ConflictError('has_charges', 'Cancel the charges first');
+          if ((await desk.billing.activeCharges(id)).length > 0 || (await desk.tests.indoorCharges(id)).length > 0) {
+            throw new ConflictError('has_charges', 'Cancel the charges and tests first');
           }
           const held = await desk.billing.received(id);
           if (held > 0) throw new ConflictError('has_advance', `Refund the advance held (${held.toFixed(2)}) first`);

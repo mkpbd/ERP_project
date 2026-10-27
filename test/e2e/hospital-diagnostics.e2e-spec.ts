@@ -159,6 +159,8 @@ beforeEach(async () => {
     ['income', '4', 'credit', '4401', 'Diagnostic income', 'diagnostic_income'],
     ['discount', '5', 'debit', '5401', 'Diagnostic discount', 'diagnostic_discount'],
     ['commission', '5', 'debit', '5402', 'Referral commission', 'referral_commission_expense'],
+    ['unbilled', '1', 'debit', '1260', 'Tests charged to stays', 'ipd_investigation_unbilled'],
+    ['charge', '4', 'credit', '4305', 'Service charge', 'ipd_service_charge_income'],
   ] as const) {
     gl[key] = await glAccount(nature, balance, code, name);
     await create('accounts/gl-roles', { role, glAccountId: gl[key] });
@@ -283,11 +285,33 @@ describe('diagnostic bills', () => {
     const income = await sheet('hospital.diagnostic-income', { from: today, to: today });
     expect(income.find((row) => row[0] === 'Pathology')).toEqual(['Pathology', 4, 1070, 0, 0, 1070, 40, 1030]);
     expect(income.find((row) => row[0] === 'Radiology')).toEqual(['Radiology', 1, 600, 1, 600, 0, 0, 0]);
+    // Paid 500 at billing, 120 back, 650 collected: 1030 cash to hand over.
+    const counter = await sheet('hospital.diagnostic-collection', { from: today, to: today });
+    const own = counter.find((row) => row[0] === 'cashier')!;
+    expect([own[1], own[5], own[9], own[13]]).toEqual([500, 650, -120, 1030]);
+    const statement = await sheet('hospital.income-by-head', { from: today, to: today });
+    expect(statement.find((row) => row[0] === 'Diagnostic tests')).toEqual([
+      'Diagnostic tests',
+      'Diagnostic',
+      1670,
+      600,
+      1070,
+    ]);
+    expect(
+      (
+        await request(http)
+          .post('/api/v1/reports/hospital.patient-statement/render')
+          .set(bearer(admin))
+          .send({ format: 'pdf', params: { patientId: rahima } })
+      ).status,
+    ).toBe(200);
   });
 
   it("puts a company patient's tests on the company and settles them with its other bills", async () => {
     const made = await api('post', 'diagnostic-bills', cashier, { patientId: karim, testIds: [test.xray] }).expect(201);
     expect(made.body.due).toBe(600);
+    const dues = await sheet('hospital.dues', { payer: 'corporate' });
+    expect(dues.find((row) => row[1] === `DB-${year}-00001`)?.slice(2, 3)).toEqual(['Diagnostic']);
     expect((await api('get', `diagnostic-bills/${made.body.id}`, cashier).expect(200)).body.corporateClientName).toBe(
       'Acme Ltd',
     );
@@ -297,5 +321,61 @@ describe('diagnostic bills', () => {
     ]);
     expect(await closing('corporate')).toBe(0);
     expect((await api('get', 'diagnostic-bills?withDue=true', cashier).expect(200)).body.total).toBe(0);
+    const statement = await sheet('hospital.corporate-statement', { clientId: acme, from: today, to: today });
+    expect(statement.some((row) => row[1] === `DB-${year}-00001`)).toBe(true);
+  });
+
+  it("charges an admitted patient's tests to the stay and puts them on the final bill with the service charge", async () => {
+    await api('put', 'ipd-policy', admin, {
+      roundFeePerNight: 0,
+      serviceChargePercent: 10,
+      counterDiscountPercent: 10,
+    }).expect(204);
+    const ward = await create('hospital/wards', { name: 'Medicine ward' });
+    const general = await create('hospital/bed-categories', { name: 'General', dailyRate: 1000 });
+    const bed = await create('hospital/beds', { code: 'W-1', wardId: ward, categoryId: general });
+    const doctor = await create('hospital/doctors', { name: 'Dr. Nusrat', isConsultant: true });
+    const admission = (
+      await api('post', 'admissions', admin, { patientId: rahima, bedId: bed, doctorId: doctor }).expect(201)
+    ).body.id as string;
+
+    const indoor = { patientId: rahima, admissionId: admission, referredById: rafiq, testIds: [test.cbc, test.xray] };
+    const paying = await api('post', 'diagnostic-bills', cashier, { ...indoor, payment: { amount: 100 } });
+    expect(paying.body.code).toBe('indoor_bill');
+    const other = await patient('Someone Else', '01911000000');
+    expect((await api('post', 'diagnostic-bills', cashier, { ...indoor, patientId: other })).body.code).toBe(
+      'admission_mismatch',
+    );
+    const made = await api('post', 'diagnostic-bills', cashier, indoor).expect(201);
+    expect(made.body).toMatchObject({ net: 1000, due: 1000 });
+    expect((await api('get', 'diagnostic-bills?withDue=true', cashier).expect(200)).body.total).toBe(0);
+    const collect = await api('post', `diagnostic-bills/${made.body.id}/collections`, cashier, {
+      version: 1,
+      amount: 10,
+    });
+    expect(collect.body.code).toBe('indoor_bill');
+    await api('post', `diagnostic-bills/${made.body.id}/cancel`, cashier, {
+      version: 1,
+      lines: [2],
+      reason: 'Done elsewhere',
+    }).expect(200);
+
+    const account = await api('get', `admissions/${admission}/account`, admin).expect(200);
+    expect(
+      account.body.lines.map((line: { head: string; amount: number; serviceCharge: number }) => [
+        line.head,
+        line.amount,
+        line.serviceCharge,
+      ]),
+    ).toEqual([['investigation', 400, 40]]);
+    const cancelAdmission = await api('post', `admissions/${admission}/cancel`, admin, { version: 1, reason: 'Wrong' });
+    expect(cancelAdmission.body.code).toBe('has_charges');
+
+    await api('post', `admissions/${admission}/final-bill`, admin, { payment: { amount: 440 } }).expect(201);
+    expect((await api('post', 'diagnostic-bills', cashier, indoor)).body.code).toBe('bill_made');
+    const late = await api('post', `diagnostic-bills/${made.body.id}/cancel`, cashier, { version: 2, reason: 'Late' });
+    expect(late.body.code).toBe('bill_made');
+    expect([await closing('unbilled'), await closing('income'), await closing('charge')]).toEqual([0, -400, -40]);
+    expect(await closing('cash')).toBe(440);
   });
 });

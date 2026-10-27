@@ -18,6 +18,7 @@ export interface DiagnosticBillFilter extends PageRequest {
   readonly status?: DiagnosticStatus | undefined;
   readonly withDue?: boolean | undefined;
   readonly corporateClientId?: string | undefined;
+  readonly admissionId?: string | undefined;
 }
 
 export interface DiagnosticBillSummary {
@@ -40,6 +41,7 @@ export interface DiagnosticBillSummary {
   readonly corporateClientId: string | null;
   readonly corporateClientName: string | null;
   readonly staffId: string | null;
+  readonly admissionId: string | null;
   readonly version: number;
 }
 
@@ -134,6 +136,8 @@ export class GetPackageTestsQuery extends Query<PackageTestsView> {
 
 export interface DiagnosticBillInput {
   readonly patientId: string;
+  /** An admitted patient's tests, charged to the stay (no payer, discount or payment). */
+  readonly admissionId: string | null;
   readonly referredById: string | null;
   /** Left out: the patient's own corporate client, if any. */
   readonly corporateClientId?: string | null | undefined;

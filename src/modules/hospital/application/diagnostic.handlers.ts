@@ -1,11 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
-import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
+import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { DiagnosticBill, MAX_DIAGNOSTIC_LINES } from '../domain/diagnostic-bill.js';
 import { validMoney, type BillPayer } from '../domain/opd-bill.js';
 import { text } from '../domain/patient.js';
-import { DiagnosticBillRepository, type DiagnosticPolicy, type DoctorLedgerEntry } from '../domain/repositories.js';
+import {
+  AdmissionRepository,
+  DiagnosticBillRepository,
+  IpdBillingRepository,
+  type DiagnosticPolicy,
+  type DoctorLedgerEntry,
+} from '../domain/repositories.js';
 import { DIAG_BILL, DIAG_DISCOUNT, DIAG_MANAGE, DIAG_READ } from './hospital.constants.js';
 import {
   CancelDiagnosticTestsCommand,
@@ -32,8 +38,12 @@ import {
 
 /** What patients owe on their own diagnostic bills. */
 export const DIAGNOSTIC_RECEIVABLE_ROLE = 'diagnostic_receivable';
+/** An admitted patient's tests, charged to the stay until its final bill takes them. */
+export const IPD_INVESTIGATION_ROLE = 'ipd_investigation_unbilled';
 
-function receivableRole(payer: BillPayer): string {
+function receivableRole(bill: { payer: BillPayer; admissionId: string | null }): string {
+  if (bill.admissionId) return IPD_INVESTIGATION_ROLE;
+  const { payer } = bill;
   switch (payer.kind) {
     case 'corporate':
       return CORPORATE_RECEIVABLE_ROLE;
@@ -51,7 +61,24 @@ export class DiagnosticDesk {
     readonly opd: OpdDesk,
     readonly bills: DiagnosticBillRepository,
     readonly read: DiagnosticBillReadRepository,
+    readonly admissions: AdmissionRepository,
+    readonly indoor: IpdBillingRepository,
   ) {}
+
+  /** The admission, locked as every charge to it and its final bill lock it: still in, and not billed. */
+  async chargeable(admissionId: string, patientId: string): Promise<void> {
+    const admission = await this.admissions.findForUpdate(admissionId);
+    if (!admission) throw new NotFoundError('admission');
+    if (admission.patientId !== patientId) {
+      throw new DomainError('admission_mismatch', 'The admission is of another patient');
+    }
+    if (admission.status !== 'admitted') {
+      throw new DomainError('admission_state', `Admission ${admission.number} is ${admission.status}`);
+    }
+    if (await this.indoor.liveBill(admissionId)) {
+      throw new ConflictError('bill_made', `The final bill of ${admission.number} is made; it must be cancelled first`);
+    }
+  }
 
   record(action: string, actorUserId: string, id: string, metadata: Record<string, string | number | null> = {}) {
     return this.opd.audit.record({
@@ -182,17 +209,21 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
     return opd.tx.run(async () => {
       const patient = await opd.appointments.patientContact(input.patientId);
       if (!patient) throw new NotFoundError('patient');
+      if (input.admissionId) await desk.chargeable(input.admissionId, patient.id);
       const referrer = input.referredById
         ? (await opd.bills.doctors([input.referredById])).get(input.referredById)
         : null;
       if (input.referredById && !referrer) throw new NotFoundError('referring_doctor');
       if (referrer && !referrer.isActive) throw new DomainError('not_bookable', `${referrer.name} is not active`);
-      const payer = await opd.payer(
-        input.corporateClientId === undefined && !input.staffId
-          ? patient.corporateClientId
-          : (input.corporateClientId ?? null),
-        input.staffId,
-      );
+      // An admitted patient's tests go on the stay, whoever pays its final bill.
+      const payer = input.admissionId
+        ? await opd.payer(null, null)
+        : await opd.payer(
+            input.corporateClientId === undefined && !input.staffId
+              ? patient.corporateClientId
+              : (input.corporateClientId ?? null),
+            input.staffId,
+          );
       const policy = await bills.policy();
       const picked: { testId: string; packageId: string | null; rate: number | null }[] = input.testIds.map(
         (testId) => ({ testId, packageId: null, rate: null }),
@@ -233,8 +264,9 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
         billedOn: today,
         referredById: referrer?.id ?? null,
         payer: payer.payer,
+        admissionId: input.admissionId,
         lines,
-        discount: input.discount ?? clientDiscount,
+        discount: input.discount ?? (input.admissionId ? 0 : clientDiscount),
         discountReason:
           input.discountReason ?? (input.discount === null && clientDiscount > 0 ? `Corporate: ${client!.name}` : null),
         discountLimitPercent: Math.max(policy.counterDiscountPercent, client?.discountPercent ?? 0),
@@ -262,7 +294,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
           ...(input.payment && header.paid > 0
             ? [{ account: { role: OPD_RECEIPT_ROLES[input.payment.method] }, debit: header.paid, credit: 0, narration }]
             : []),
-          { account: { role: receivableRole(bill.payer) }, debit: bill.due, credit: 0, narration },
+          { account: { role: receivableRole(bill) }, debit: bill.due, credit: 0, narration },
           { account: { role: DIAGNOSTIC_DISCOUNT_ROLE }, debit: header.discount, credit: 0, narration },
           { account: { role: DIAGNOSTIC_INCOME_ROLE }, debit: 0, credit: header.gross, narration },
           { account: { role: REFERRAL_COMMISSION_ROLE }, debit: bill.commission, credit: 0, narration },
@@ -326,7 +358,7 @@ export class CollectDiagnosticDueHandler implements ICommandHandler<CollectDiagn
         bill.id,
         [
           { account: { role: OPD_RECEIPT_ROLES[money.method] }, debit: amount, credit: 0, narration },
-          { account: { role: receivableRole(bill.payer) }, debit: 0, credit: amount, narration },
+          { account: { role: receivableRole(bill) }, debit: 0, credit: amount, narration },
         ],
         actor,
       );
@@ -367,6 +399,7 @@ export class CancelDiagnosticTestsHandler implements ICommandHandler<CancelDiagn
       if (!bill) throw new NotFoundError('diagnostic_bill');
       bill.assertVersion(version);
       const header = bill.toSnapshot();
+      if (header.admissionId) await desk.chargeable(header.admissionId, header.patientId);
       const today = opd.today();
       const cancelled = bill.cancelTests({ lines, reason, on: today, mayCancelLater, now: opd.clock.now() });
       const narration = `Tests cancelled on ${header.number}`;
@@ -377,7 +410,7 @@ export class CancelDiagnosticTestsHandler implements ICommandHandler<CancelDiagn
         [
           { account: { role: DIAGNOSTIC_INCOME_ROLE }, debit: cancelled.gross, credit: 0, narration },
           { account: { role: DIAGNOSTIC_DISCOUNT_ROLE }, debit: 0, credit: cancelled.discount, narration },
-          { account: { role: receivableRole(bill.payer) }, debit: 0, credit: cancelled.dueCleared, narration },
+          { account: { role: receivableRole(bill) }, debit: 0, credit: cancelled.dueCleared, narration },
           { account: { role: OPD_RECEIPT_ROLES[refundMethod] }, debit: 0, credit: cancelled.refund, narration },
           { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: cancelled.commission, credit: 0, narration },
           { account: { role: REFERRAL_COMMISSION_ROLE }, debit: 0, credit: cancelled.commission, narration },

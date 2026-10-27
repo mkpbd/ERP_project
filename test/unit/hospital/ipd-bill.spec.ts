@@ -147,6 +147,25 @@ describe('billLines', () => {
     ).toEqual([]);
   });
 
+  it("bills an admitted patient's tests with the service charge", () => {
+    const lines = billLines({
+      nights: [],
+      admissionFee: 0,
+      roundFeePerNight: 0,
+      serviceChargePercent: 10,
+      charges: [],
+      investigations: [{ billId: 'd', number: 'DB-2026-00001', billedOn: '2026-10-21', amount: 1250 }],
+    });
+    expect(lines).toEqual([
+      expect.objectContaining({
+        head: 'investigation',
+        description: 'Tests DB-2026-00001',
+        amount: 1250,
+        serviceCharge: 125,
+      }),
+    ]);
+  });
+
   it('needs the doctor of a charge that carries a share', () => {
     expect(() =>
       chargeOf({
@@ -176,6 +195,7 @@ describe('IpdBill', () => {
       round: 990,
       service: 2000,
       medicine: 0,
+      investigation: 0,
       serviceCharge: 449,
     });
   });

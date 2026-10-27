@@ -71,6 +71,7 @@ import {
 } from './infrastructure/persistence/drizzle-opd.repositories.js';
 import {
   corporateStatementReport,
+  diagnosticCollectionReport,
   doctorConsultationsReport,
   opdCollectionReport,
   opdReceiptReport,
@@ -98,7 +99,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e); the
  * indoor bill: charges, advances, the final bill and its dues (step 9f); doctor payments, corporate collections
  * across OPD and indoor bills, statements and the UHID merge (step 9g); the test catalogue and diagnostic bills with
- * the referring doctors' commission (step 10a). Global: it publishes the admissions other
+ * the referring doctors' commission (step 10a); admitted patients' tests on the indoor bill and diagnostic bills in
+ * the statements (step 10b). Global: it publishes the admissions other
  * modules charge to (InpatientRegister), for the pharmacy's ward medicine.
  */
 @Global()
@@ -185,5 +187,6 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(diagnosticReceiptReport(this.diagnostics, this.organization, this.staff));
     this.reports.register(referralCommissionReport(this.context));
     this.reports.register(diagnosticIncomeReport(this.context));
+    this.reports.register(diagnosticCollectionReport(this.context, this.users));
   }
 }

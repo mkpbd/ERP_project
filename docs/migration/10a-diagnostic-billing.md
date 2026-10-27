@@ -1,7 +1,7 @@
 # Step 10a — Diagnostics: test catalogue and diagnostic billing
 
-Status: **done** (2026-10-27). Previous: [step 8i](08i-pharmacy-ward-medicine.md) · Next: step 10b (tests of admitted
-patients and diagnostic bills in the hospital statements).
+Status: **done** (2026-10-27). Previous: [step 8i](08i-pharmacy-ward-medicine.md) · Next: [step 10b](10b-diagnostic-indoor-statements.md)
+(tests of admitted patients and diagnostic bills in the hospital statements).
 
 Step 10 is split:
 

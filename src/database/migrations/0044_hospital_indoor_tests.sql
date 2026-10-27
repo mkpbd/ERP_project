@@ -1,0 +1,4 @@
+ALTER TABLE "hospital_diagnostic_bills" ADD COLUMN "admission_id" uuid;--> statement-breakpoint
+ALTER TABLE "hospital_diagnostic_bills" ADD CONSTRAINT "hospital_diagnostic_bills_admission_id_hospital_admissions_id_fk" FOREIGN KEY ("admission_id") REFERENCES "public"."hospital_admissions"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "hospital_diagnostic_bills_admission_idx" ON "hospital_diagnostic_bills" USING btree ("admission_id");--> statement-breakpoint
+ALTER TABLE "hospital_diagnostic_bills" ADD CONSTRAINT "hospital_diagnostic_bills_indoor_ck" CHECK ("hospital_diagnostic_bills"."admission_id" is null or ("hospital_diagnostic_bills"."corporate_client_id" is null and "hospital_diagnostic_bills"."staff_id" is null and "hospital_diagnostic_bills"."discount" = 0 and "hospital_diagnostic_bills"."paid" = 0));

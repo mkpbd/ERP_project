@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'node:url';
-import { and, asc, eq, gt, gte, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm';
+import { and, asc, eq, gt, gte, isNull, lte, sql, type AnyColumn, type SQL } from 'drizzle-orm';
 import { z } from 'zod';
 import type { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import type { OrganizationProfile } from '../../../../shared/application/contracts/organization-profile.js';
@@ -11,6 +11,9 @@ import { localToday } from '../../application/patient.handlers.js';
 import { uhidLabel } from '../../domain/patient.js';
 import {
   corporateClients,
+  diagnosticBillLines,
+  diagnosticBills,
+  diagnosticPayments,
   doctorLedger,
   doctors,
   ipdBillLines,
@@ -28,6 +31,11 @@ const cents = (value: number) => Math.round(value * 100) / 100;
 const sumOf = (column: AnyColumn | SQL) => sql<number>`coalesce(sum(${column}), 0)`.mapWith(Number);
 const METHOD_LABELS = { cash: 'Cash', card: 'Card', mobile: 'Mobile wallet' } as const;
 const KIND_LABELS = { share: 'Share earned', reversal: 'Share taken back', payment: 'Paid' } as const;
+/** What is still owed on a diagnostic bill (never one of an admitted patient: the final bill takes those). */
+const testsDue =
+  sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled} - ${diagnosticBills.paid} - ${diagnosticBills.collected} + ${diagnosticBills.refunded}`.mapWith(
+    Number,
+  );
 const daysBetween = (from: string, to: string) =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86_400_000);
 
@@ -163,9 +171,26 @@ export function patientStatementReport(context: DbContext, organization: Organiz
         .from(ipdBills)
         .leftJoin(corporateClients, eq(corporateClients.id, ipdBills.corporateClientId))
         .where(eq(ipdBills.patientId, params.patientId));
+      const tests = await context.db
+        .select({
+          number: diagnosticBills.number,
+          billedOn: diagnosticBills.billedOn,
+          clientName: corporateClients.name,
+          staffId: diagnosticBills.staffId,
+          net: sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled}`.mapWith(Number),
+          paid: sql<number>`${diagnosticBills.paid} + ${diagnosticBills.collected} - ${diagnosticBills.refunded}`.mapWith(
+            Number,
+          ),
+          due: testsDue,
+          status: diagnosticBills.status,
+        })
+        .from(diagnosticBills)
+        .leftJoin(corporateClients, eq(corporateClients.id, diagnosticBills.corporateClientId))
+        .where(and(eq(diagnosticBills.patientId, params.patientId), isNull(diagnosticBills.admissionId)));
       const bills = [
         ...outdoor.map((bill) => ({ ...bill, place: 'OPD' })),
         ...indoor.map((bill) => ({ ...bill, place: 'Indoor' })),
+        ...tests.map((bill) => ({ ...bill, place: 'Diagnostic' })),
       ]
         .sort((a, b) => a.billedOn.localeCompare(b.billedOn) || a.number.localeCompare(b.number))
         .map((bill) => ({
@@ -198,6 +223,18 @@ export function patientStatementReport(context: DbContext, organization: Organiz
         .from(ipdPayments)
         .innerJoin(ipdBills, eq(ipdBills.id, ipdPayments.billId))
         .where(eq(ipdBills.patientId, params.patientId));
+      const testReceipts = await context.db
+        .select({
+          number: sql<string>`coalesce(${diagnosticPayments.number}, ${diagnosticBills.number})`,
+          kind: diagnosticPayments.kind,
+          method: diagnosticPayments.method,
+          amount: diagnosticPayments.amount,
+          paidOn: diagnosticPayments.paidOn,
+          createdAt: diagnosticPayments.createdAt,
+        })
+        .from(diagnosticPayments)
+        .innerJoin(diagnosticBills, eq(diagnosticBills.id, diagnosticPayments.billId))
+        .where(eq(diagnosticBills.patientId, params.patientId));
       // Advances and refunds belong to the admission, not yet to a bill.
       const advances = await context.db.execute<{
         number: string;
@@ -214,6 +251,7 @@ export function patientStatementReport(context: DbContext, organization: Organiz
       const receipts = [
         ...outdoorReceipts,
         ...indoorReceipts,
+        ...testReceipts,
         ...advances.rows.map((row) => ({
           number: row.number,
           kind: row.kind,
@@ -299,9 +337,27 @@ export function duesReport(context: DbContext): ReportDefinition {
         .innerJoin(patients, eq(patients.id, ipdBills.patientId))
         .leftJoin(corporateClients, eq(corporateClients.id, ipdBills.corporateClientId))
         .where(and(eq(ipdBills.status, 'billed'), gt(indoorDue, 0)));
+      const tests = await context.db
+        .select({
+          number: diagnosticBills.number,
+          billedOn: diagnosticBills.billedOn,
+          uhid: patients.uhid,
+          patientName: patients.fullName,
+          mobileNo: patients.mobileNo,
+          clientId: diagnosticBills.corporateClientId,
+          clientName: corporateClients.name,
+          payer: payerOf(diagnosticBills.corporateClientId, diagnosticBills.staffId),
+          net: sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled}`.mapWith(Number),
+          due: testsDue,
+        })
+        .from(diagnosticBills)
+        .innerJoin(patients, eq(patients.id, diagnosticBills.patientId))
+        .leftJoin(corporateClients, eq(corporateClients.id, diagnosticBills.corporateClientId))
+        .where(and(eq(diagnosticBills.status, 'billed'), isNull(diagnosticBills.admissionId), gt(testsDue, 0)));
       const rows = [
         ...outdoor.map((bill) => ({ ...bill, place: 'OPD' })),
         ...indoor.map((bill) => ({ ...bill, place: 'Indoor' })),
+        ...tests.map((bill) => ({ ...bill, place: 'Diagnostic' })),
       ]
         .filter((bill) => !params.payer || bill.payer === params.payer)
         .filter((bill) => !params.corporateClientId || bill.clientId === params.corporateClientId)
@@ -398,13 +454,39 @@ export function discountsReport(context: DbContext, users: UserDirectory): Repor
             lte(ipdBills.billedOn, params.to),
           ),
         );
-      const ids = [...new Set([...outdoor, ...indoor].flatMap((bill) => (bill.billedBy ? [bill.billedBy] : [])))];
+      const tests = await context.db
+        .select({
+          number: diagnosticBills.number,
+          billedOn: diagnosticBills.billedOn,
+          uhid: patients.uhid,
+          patientName: patients.fullName,
+          clientName: corporateClients.name,
+          gross: diagnosticBills.gross,
+          discount: diagnosticBills.discount,
+          discountReason: diagnosticBills.discountReason,
+          billedBy: diagnosticBills.billedBy,
+        })
+        .from(diagnosticBills)
+        .innerJoin(patients, eq(patients.id, diagnosticBills.patientId))
+        .leftJoin(corporateClients, eq(corporateClients.id, diagnosticBills.corporateClientId))
+        .where(
+          and(
+            eq(diagnosticBills.status, 'billed'),
+            gt(diagnosticBills.discount, 0),
+            gte(diagnosticBills.billedOn, params.from),
+            lte(diagnosticBills.billedOn, params.to),
+          ),
+        );
+      const ids = [
+        ...new Set([...outdoor, ...indoor, ...tests].flatMap((bill) => (bill.billedBy ? [bill.billedBy] : []))),
+      ];
       const names = new Map(
         (ids.length ? await users.findSummaries(ids) : []).map((user) => [user.id, user.displayName]),
       );
       const rows = [
         ...outdoor.map((bill) => ({ ...bill, place: 'OPD' })),
         ...indoor.map((bill) => ({ ...bill, place: 'Indoor' })),
+        ...tests.map((bill) => ({ ...bill, place: 'Diagnostic' })),
       ]
         .sort((a, b) => a.billedOn.localeCompare(b.billedOn) || a.number.localeCompare(b.number))
         .map((bill) => ({
@@ -452,6 +534,7 @@ const HEADS = [
   ['ipd:round', 'Round fees'],
   ['ipd:service', 'Indoor services and consultant visits'],
   ['ipd:serviceCharge', 'Service charge'],
+  ['diag:tests', 'Diagnostic tests'],
 ] as const;
 
 /**
@@ -463,7 +546,8 @@ export function incomeByHeadReport(context: DbContext): ReportDefinition {
     key: 'hospital.income-by-head',
     title: 'Income by head',
     group: 'Hospital',
-    description: 'OPD and indoor income by head over a period, less bills cancelled in it, and the discounts given.',
+    description:
+      'OPD, indoor and diagnostic income by head over a period, less what was cancelled in it, and the discounts given.',
     params: z.strictObject({ from: day, to: day }),
     async load(params) {
       assertPeriod(params.from, params.to);
@@ -497,15 +581,32 @@ export function incomeByHeadReport(context: DbContext): ReportDefinition {
           .where(and(within(dated), cancelled ? eq(bills.status, 'cancelled') : undefined));
         return row?.amount ?? 0;
       };
+      // A diagnostic test's income is taken when billed (an admitted patient's too) and given back when cancelled.
+      const tests = async (cancelledOnly: boolean) => {
+        const [row] = await context.db
+          .select({ amount: sumOf(diagnosticBillLines.rate), discount: sumOf(diagnosticBillLines.discount) })
+          .from(diagnosticBillLines)
+          .innerJoin(diagnosticBills, eq(diagnosticBills.id, diagnosticBillLines.billId))
+          .where(
+            cancelledOnly
+              ? and(eq(diagnosticBillLines.status, 'cancelled'), within(diagnosticBillLines.cancelledOn))
+              : within(diagnosticBills.billedOn),
+          );
+        return { head: 'diag:tests', amount: row?.amount ?? 0, discount: row?.discount ?? 0 };
+      };
+      const testsBilled = await tests(false);
+      const testsCancelled = await tests(true);
       const billed = [
         ...(await outdoor(opdBills.billedOn, false)),
         ...(await indoor(ipdBills.billedOn, false)),
         ...(await charge(ipdBills.billedOn, false)),
+        testsBilled,
       ];
       const cancelled = [
         ...(await outdoor(opdBills.cancelledOn, true)),
         ...(await indoor(ipdBills.cancelledOn, true)),
         ...(await charge(ipdBills.cancelledOn, true)),
+        testsCancelled,
       ];
       const of = (rows: { head: string; amount: number }[], head: string) =>
         cents(rows.filter((row) => row.head === head).reduce((total, row) => total + row.amount, 0));
@@ -514,7 +615,7 @@ export function incomeByHeadReport(context: DbContext): ReportDefinition {
         const back = of(cancelled, head);
         return {
           label,
-          place: head.startsWith('opd') ? 'OPD' : 'Indoor',
+          place: head.startsWith('opd') ? 'OPD' : head.startsWith('ipd') ? 'Indoor' : 'Diagnostic',
           billed: gross,
           cancelled: back,
           net: cents(gross - back),
@@ -522,11 +623,14 @@ export function incomeByHeadReport(context: DbContext): ReportDefinition {
       });
       const discounts = {
         billed: cents(
-          (await discount(opdBills, opdBills.billedOn, false)) + (await discount(ipdBills, ipdBills.billedOn, false)),
+          (await discount(opdBills, opdBills.billedOn, false)) +
+            (await discount(ipdBills, ipdBills.billedOn, false)) +
+            testsBilled.discount,
         ),
         cancelled: cents(
           (await discount(opdBills, opdBills.cancelledOn, true)) +
-            (await discount(ipdBills, ipdBills.cancelledOn, true)),
+            (await discount(ipdBills, ipdBills.cancelledOn, true)) +
+            testsCancelled.discount,
         ),
       };
       const total = (key: 'billed' | 'cancelled' | 'net') => cents(rows.reduce((sum, row) => sum + row[key], 0));

@@ -2,7 +2,7 @@ import type { StoredFile } from '../../../shared/domain/uploads.js';
 import type { Admission } from './admission.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
 import type { DiagnosticBill } from './diagnostic-bill.js';
-import type { IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
+import type { InvestigationBill, IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
 import type { OpdBill, PaymentMethod } from './opd-bill.js';
 import type { IdType, Patient } from './patient.js';
 
@@ -280,4 +280,6 @@ export abstract class DiagnosticBillRepository {
   /** Saves the header and each line's state. */
   abstract update(bill: DiagnosticBill): Promise<void>;
   abstract addPayment(payment: DiagnosticPayment): Promise<void>;
+  /** The admission's diagnostic bills with tests still billed, oldest first. */
+  abstract indoorCharges(admissionId: string): Promise<InvestigationBill[]>;
 }

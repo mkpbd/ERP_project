@@ -191,7 +191,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | paying a doctor their shares | `doctor:pay` |
 | `GET` diagnostic departments, tests, packages, the diagnostic policy and diagnostic bills | `diag:read` |
 | diagnostic departments, tests, packages and their tests, the diagnostic policy; cancelling tests after the bill's day | `diag:manage` |
-| diagnostic bills, collecting their dues, cancelling tests on the bill's day | `diag:bill` |
+| diagnostic bills (an admitted patient's charged to the stay), collecting their dues, cancelling tests on the bill's day | `diag:bill` |
 | a diagnostic discount above the counter's limit | `diag:discount` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |

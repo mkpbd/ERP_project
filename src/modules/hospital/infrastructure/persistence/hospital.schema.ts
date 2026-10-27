@@ -852,7 +852,7 @@ export const ipdBillLines = pgTable(
       .notNull()
       .references(() => ipdBills.id, { onDelete: 'cascade' }),
     position: smallint('position').notNull(),
-    head: text('head', { enum: ['admission', 'bed', 'round', 'service', 'medicine'] }).notNull(),
+    head: text('head', { enum: ['admission', 'bed', 'round', 'service', 'medicine', 'investigation'] }).notNull(),
     description: text('description').notNull(),
     bedId: uuid('bed_id').references(() => beds.id, { onDelete: 'restrict' }),
     chargeId: uuid('charge_id').references(() => ipdCharges.id, { onDelete: 'restrict' }),
@@ -1030,6 +1030,8 @@ export const diagnosticBills = pgTable(
     referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
     corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
     staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
+    /** Tests of an admitted patient: charged to the stay, paid with its final bill (old IPDPatientRecordId). */
+    admissionId: uuid('admission_id').references((): AnyPgColumn => admissions.id, { onDelete: 'restrict' }),
     gross: money('gross').notNull(),
     discount: money('discount').notNull(),
     discountReason: text('discount_reason'),
@@ -1052,6 +1054,11 @@ export const diagnosticBills = pgTable(
     index('hospital_diagnostic_bills_billed_idx').on(t.billedOn),
     index('hospital_diagnostic_bills_corporate_idx').on(t.corporateClientId),
     index('hospital_diagnostic_bills_referrer_idx').on(t.referredById),
+    index('hospital_diagnostic_bills_admission_idx').on(t.admissionId),
+    check(
+      'hospital_diagnostic_bills_indoor_ck',
+      sql`${t.admissionId} is null or (${t.corporateClientId} is null and ${t.staffId} is null and ${t.discount} = 0 and ${t.paid} = 0)`,
+    ),
     check('hospital_diagnostic_bills_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
     check(
       'hospital_diagnostic_bills_amounts_ck',

@@ -91,7 +91,15 @@ export function chargeOf(params: Omit<IpdCharge, 'amount'>): IpdCharge {
   return { ...params, amount: taka(Math.round(paisa(params.rate) * params.qty)) };
 }
 
-export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service' | 'medicine';
+export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service' | 'medicine' | 'investigation';
+
+/** A diagnostic bill of the stay as it stands on the final bill (tests not cancelled). */
+export interface InvestigationBill {
+  readonly billId: string;
+  readonly number: string;
+  readonly billedOn: string;
+  readonly amount: number;
+}
 
 /** A ward issue of the pharmacy as it stands on the bill (issued less what came back). */
 export interface MedicineIssue {
@@ -161,6 +169,8 @@ export function billLines(params: {
   serviceChargePercent: number;
   charges: readonly IpdCharge[];
   medicine?: readonly MedicineIssue[];
+  /** With the service charge, as the old final bill charged it on pathology and radiology. */
+  investigations?: readonly InvestigationBill[];
 }): IpdBillLine[] {
   const none = { bedId: null, chargeId: null, serviceId: null, doctorId: null, fromOn: null, toOn: null };
   const charged = (amount: number) => ({ amount, serviceCharge: percentOf(amount, params.serviceChargePercent) });
@@ -216,6 +226,18 @@ export function billLines(params: {
       amount: charge.amount,
       serviceCharge: 0,
       shareAmount: percentOf(charge.amount, charge.sharePercent),
+    });
+  }
+  for (const tests of params.investigations ?? []) {
+    lines.push({
+      ...none,
+      head: 'investigation',
+      description: `Tests ${tests.number}`,
+      fromOn: tests.billedOn,
+      qty: 1,
+      rate: tests.amount,
+      ...charged(tests.amount),
+      shareAmount: 0,
     });
   }
   for (const issue of params.medicine ?? []) {
@@ -370,6 +392,7 @@ export class IpdBill {
       round: of('round'),
       service: of('service'),
       medicine: of('medicine'),
+      investigation: of('investigation'),
       serviceCharge: this.props.serviceCharge,
     };
   }

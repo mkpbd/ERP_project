@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
-import { aliasedTable, and, asc, count, desc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
+import { aliasedTable, and, asc, count, desc, eq, gte, inArray, isNull, lte, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
 import {
@@ -11,6 +11,7 @@ import {
   type PackageTestsView,
 } from '../../application/diagnostic.messages.js';
 import { DiagnosticBill } from '../../domain/diagnostic-bill.js';
+import type { InvestigationBill } from '../../domain/ipd-bill.js';
 import {
   DiagnosticBillRepository,
   type BillableTest,
@@ -146,6 +147,20 @@ export class DrizzleDiagnosticBillRepository extends DiagnosticBillRepository {
   async addPayment(payment: DiagnosticPayment): Promise<void> {
     await this.context.db.insert(diagnosticPayments).values({ ...payment, id: randomUUID() });
   }
+
+  async indoorCharges(admissionId: string): Promise<InvestigationBill[]> {
+    const live = sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled}`.mapWith(Number);
+    return this.context.db
+      .select({
+        billId: diagnosticBills.id,
+        number: diagnosticBills.number,
+        billedOn: diagnosticBills.billedOn,
+        amount: live,
+      })
+      .from(diagnosticBills)
+      .where(and(eq(diagnosticBills.admissionId, admissionId), eq(diagnosticBills.status, 'billed'), sql`${live} > 0`))
+      .orderBy(asc(diagnosticBills.billedOn), asc(diagnosticBills.number));
+  }
 }
 
 const referrers = aliasedTable(doctors, 'referrers');
@@ -178,6 +193,7 @@ export class DrizzleDiagnosticBillReadRepository extends DiagnosticBillReadRepos
         corporateClientId: diagnosticBills.corporateClientId,
         corporateClientName: corporateClients.name,
         staffId: diagnosticBills.staffId,
+        admissionId: diagnosticBills.admissionId,
         version: diagnosticBills.version,
       })
       .from(diagnosticBills)
@@ -193,7 +209,11 @@ export class DrizzleDiagnosticBillReadRepository extends DiagnosticBillReadRepos
       filter.from ? gte(diagnosticBills.billedOn, filter.from) : undefined,
       filter.to ? lte(diagnosticBills.billedOn, filter.to) : undefined,
       filter.status ? eq(diagnosticBills.status, filter.status) : undefined,
-      filter.withDue ? and(eq(diagnosticBills.status, 'billed'), sql`${due} > 0`) : undefined,
+      // An admitted patient's tests are paid with the final bill, never a due of their own.
+      filter.withDue
+        ? and(eq(diagnosticBills.status, 'billed'), isNull(diagnosticBills.admissionId), sql`${due} > 0`)
+        : undefined,
+      filter.admissionId ? eq(diagnosticBills.admissionId, filter.admissionId) : undefined,
       filter.corporateClientId ? eq(diagnosticBills.corporateClientId, filter.corporateClientId) : undefined,
     );
     const rows = await this.summaries()

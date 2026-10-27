@@ -27,6 +27,7 @@ const HEADS: { head: IpdBillHead; label: string }[] = [
   { head: 'bed', label: 'Bed charges' },
   { head: 'round', label: 'Round fee' },
   { head: 'service', label: 'Services and consultant visits' },
+  { head: 'investigation', label: 'Investigations' },
   { head: 'medicine', label: 'Medicine' },
 ];
 const KIND_LABELS: Record<IpdPaymentKind, string> = {

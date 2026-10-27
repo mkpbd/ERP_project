@@ -9,7 +9,7 @@ import type { Admission } from '../domain/admission.js';
 import { bedNights, billLines, chargeOf, IpdBill, type IpdBillLine } from '../domain/ipd-bill.js';
 import type { BillPayer } from '../domain/opd-bill.js';
 import { text } from '../domain/patient.js';
-import type { DoctorLedgerEntry, IpdPolicy } from '../domain/repositories.js';
+import { DiagnosticBillRepository, type DoctorLedgerEntry, type IpdPolicy } from '../domain/repositories.js';
 import {
   AddIpdChargeCommand,
   CancelIpdBillCommand,
@@ -86,6 +86,7 @@ export class IpdCashier {
     readonly desk: IpdDesk,
     readonly read: IpdBillingReadRepository,
     readonly medicine: InpatientMedicine,
+    readonly tests: DiagnosticBillRepository,
   ) {}
 
   get opd() {
@@ -120,6 +121,7 @@ export class IpdCashier {
     const charges = await this.billing.activeCharges(admission.id);
     const policy = await this.billing.policy();
     const medicine = await this.medicine.charges(admission.id);
+    const investigations = await this.tests.indoorCharges(admission.id);
     const runs = bedNights(stays, on);
     return {
       nights: runs.reduce((total, run) => total + run.nights, 0),
@@ -130,6 +132,7 @@ export class IpdCashier {
         serviceChargePercent: policy.serviceChargePercent,
         charges,
         medicine,
+        investigations,
       }),
     };
   }

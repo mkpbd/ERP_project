@@ -35,6 +35,7 @@ export interface DiagnosticBillProps {
   referredById: string | null;
   corporateClientId: string | null;
   staffId: string | null;
+  admissionId: string | null;
   gross: number;
   discount: number;
   discountReason: string | null;
@@ -88,6 +89,8 @@ export class DiagnosticBill {
     billedOn: string;
     referredById: string | null;
     payer: BillPayer;
+    /** An admitted patient's tests: charged to the stay, with no discount or payment here. */
+    admissionId?: string | null;
     lines: readonly {
       testId: string;
       packageId: string | null;
@@ -112,6 +115,13 @@ export class DiagnosticBill {
       if (seen.has(line.testId)) throw new DomainError('duplicate_test', `Test ${index + 1} is on the bill already`);
       seen.add(line.testId);
       validMoney(line.rate, 'rate');
+    }
+    const admissionId = params.admissionId ?? null;
+    if (admissionId && (params.payer.kind !== 'patient' || params.discount > 0 || params.payment)) {
+      throw new DomainError(
+        'indoor_bill',
+        "An admitted patient's tests are charged to the stay: no payer, discount or payment here",
+      );
     }
     const gross = sum(params.lines.map((line) => line.rate));
     const discountable = sum(params.lines.filter((line) => line.discountAllowed).map((line) => line.rate));
@@ -164,6 +174,7 @@ export class DiagnosticBill {
       referredById: params.referredById,
       corporateClientId: params.payer.kind === 'corporate' ? params.payer.clientId : null,
       staffId: params.payer.kind === 'staff' ? params.payer.staffId : null,
+      admissionId,
       gross,
       discount,
       discountReason,
@@ -195,6 +206,13 @@ export class DiagnosticBill {
   get lines(): readonly DiagnosticLine[] {
     return this.props.lines;
   }
+  get admissionId(): string | null {
+    return this.props.admissionId;
+  }
+  /** What the tests still billed are worth. */
+  get live(): number {
+    return taka(paisa(this.props.net) - paisa(this.props.cancelled));
+  }
   get payer(): BillPayer {
     if (this.props.corporateClientId) return { kind: 'corporate', clientId: this.props.corporateClientId, cash: false };
     if (this.props.staffId) return { kind: 'staff', staffId: this.props.staffId };
@@ -215,6 +233,9 @@ export class DiagnosticBill {
   /** Old Diagnostic Due Collection (DueCollection ledger rows by channel). */
   collect(amount: number, on: string, now: Date): number {
     this.assertBilled('collected on');
+    if (this.props.admissionId) {
+      throw new DomainError('indoor_bill', "An admitted patient's tests are paid with the final bill");
+    }
     validMoney(amount, 'amount');
     if (amount === 0) throw new DomainError('invalid_amount', 'Collect more than nothing');
     if (amount > this.due) throw new DomainError('overpayment', `Only ${this.due.toFixed(2)} is due`);

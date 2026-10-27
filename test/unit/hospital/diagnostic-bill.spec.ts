@@ -78,6 +78,24 @@ describe('DiagnosticBill', () => {
     expect(() => made.collect(10, '2026-10-28', now)).toThrow(expect.objectContaining({ code: 'bill_state' }));
   });
 
+  it("charges an admitted patient's tests to the stay: no payer, discount, payment or collection here", () => {
+    const indoor = bill({ admissionId: 'a', discount: 0, discountReason: null, payment: null });
+    expect([indoor.admissionId, indoor.live, indoor.due]).toEqual(['a', 1020, 1020]);
+    expect(() => indoor.collect(10, '2026-10-27', now)).toThrow(expect.objectContaining({ code: 'indoor_bill' }));
+    expect(() => bill({ admissionId: 'a' })).toThrow(expect.objectContaining({ code: 'indoor_bill' }));
+    expect(() =>
+      bill({
+        admissionId: 'a',
+        discount: 0,
+        discountReason: null,
+        payment: null,
+        payer: { kind: 'staff', staffId: 's' },
+      }),
+    ).toThrow(expect.objectContaining({ code: 'indoor_bill' }));
+    indoor.cancelTests({ lines: [1], reason: 'Not needed', on: '2026-10-27', mayCancelLater: false, now });
+    expect([indoor.live, indoor.due]).toEqual([620, 620]);
+  });
+
   it('collects dues, never more than due', () => {
     const made = bill();
     expect(() => made.collect(500, '2026-10-27', now)).toThrow(expect.objectContaining({ code: 'overpayment' }));

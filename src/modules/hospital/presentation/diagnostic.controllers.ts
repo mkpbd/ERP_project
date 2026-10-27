@@ -149,6 +149,8 @@ class CreateDiagnosticBillDto extends createZodDto(
   z
     .strictObject({
       patientId: z.uuid(),
+      /** An admitted patient's tests, charged to the stay (no payer, discount or payment). */
+      admissionId: z.uuid().nullable().default(null),
       referredById: z.uuid().nullable().default(null),
       /** Left out: the patient's own corporate client, if any; null: the patient pays. */
       corporateClientId: z.uuid().nullable().optional(),
@@ -184,6 +186,7 @@ class DiagnosticBillListQueryDto extends createZodDto(
       .transform((value) => value === 'true')
       .optional(),
     corporateClientId: z.uuid().optional(),
+    admissionId: z.uuid().optional(),
   }),
 ) {}
 
@@ -207,6 +210,7 @@ const summaryShape = {
   corporateClientId: z.uuid().nullable(),
   corporateClientName: z.string().nullable(),
   staffId: z.uuid().nullable(),
+  admissionId: z.uuid().nullable(),
   version: z.int(),
 };
 class DiagnosticBillCreatedResponseDto extends responseDto({
