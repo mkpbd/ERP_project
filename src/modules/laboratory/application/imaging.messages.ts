@@ -33,6 +33,7 @@ export interface StudyRecord extends StudySummary {
   readonly reportingFee: number;
   readonly deliveredTo: string | null;
   readonly deliveredAt: Date | null;
+  readonly reagents: 'used' | 'short' | null;
 }
 
 export abstract class ImagingReadRepository {

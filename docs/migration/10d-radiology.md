@@ -1,7 +1,7 @@
 # Step 10d — Radiology: imaging studies, reports and reporting fees
 
-Status: **done** (2026-10-28). Previous: [step 10c](10c-laboratory.md) · Next: step 10e (reagents and transfusion
-medicine).
+Status: **done** (2026-10-28). Previous: [step 10c](10c-laboratory.md) · Next: [step 10e](10e-lab-reagents.md)
+(reagents); transfusion medicine follows as 10f.
 
 Radiology is added to the **laboratory module**:
 

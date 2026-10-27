@@ -1,0 +1,15 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead><tr><th>Item</th><th>Unit</th><th class="num">Tests</th><th class="num">Used up</th><th class="num">Short</th></tr></thead>
+  <tbody>
+    {{#each rows}}
+    <tr><td>{{name}}</td><td>{{unit}}</td><td class="num">{{tests}}</td><td class="num">{{used}}</td><td class="num">{{#if short}}<b>{{short}}</b>{{/if}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<p class="muted">Short: the store department held too little when the test was reported; enter it as a department consumption.</p>
+{{else}}
+<p>Nothing was used up in this period.</p>
+{{/if}}
+{{/with}}

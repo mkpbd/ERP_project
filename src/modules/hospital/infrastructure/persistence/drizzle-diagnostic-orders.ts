@@ -98,6 +98,15 @@ export class DrizzleDiagnosticOrders extends DiagnosticOrders {
     return order ?? null;
   }
 
+  async departments(ids: readonly string[]) {
+    if (ids.length === 0) return new Map();
+    const rows = await this.context.db
+      .select({ id: diagnosticDepartments.id, name: diagnosticDepartments.name, kind: diagnosticDepartments.kind })
+      .from(diagnosticDepartments)
+      .where(inArray(diagnosticDepartments.id, [...new Set(ids)]));
+    return new Map(rows.map((row) => [row.id, row]));
+  }
+
   async doctors(ids: readonly string[]) {
     if (ids.length === 0) return new Map();
     const rows = await this.context.db

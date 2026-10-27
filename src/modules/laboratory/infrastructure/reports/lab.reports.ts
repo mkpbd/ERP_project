@@ -1,5 +1,8 @@
 import { fileURLToPath } from 'node:url';
+import { and, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import type { DbContext } from '../../../../database/drizzle-transaction-manager.js';
+import type { DepartmentStock } from '../../../../shared/application/contracts/department-stock.js';
 import type { DiagnosticOrders } from '../../../../shared/application/contracts/diagnostic-orders.js';
 import type { OrganizationProfile } from '../../../../shared/application/contracts/organization-profile.js';
 import type { UserDirectory } from '../../../../shared/application/contracts/user-directory.js';
@@ -9,6 +12,7 @@ import { code39Svg } from '../../../../shared/infrastructure/reports/code39.js';
 import type { ImagingReadRepository } from '../../application/imaging.messages.js';
 import type { LabReadRepository } from '../../application/lab.messages.js';
 import { ageInDays } from '../../domain/lab.js';
+import { labReagentUses } from '../persistence/laboratory.schema.js';
 
 const template = (name: string) => fileURLToPath(new URL(`./${name}.hbs`, import.meta.url));
 
@@ -122,5 +126,59 @@ export function imagingReport(
     },
     describe: (_params, data) => `${data.study.accessionNumber} · ${data.order.patient.name}`,
     pdf: { engine: 'html', template: template('imaging-report'), bare: true },
+  });
+}
+
+/**
+ * Old ReAgentManagement usage (ReAgentManualUses and the auto-consumption): what the tests used up over a period, item
+ * by item, and what the store was short of (to be entered by hand).
+ */
+export function reagentUsageReport(context: DbContext, stock: DepartmentStock): ReportDefinition {
+  return defineReport({
+    key: 'laboratory.reagent-usage',
+    title: 'Reagent usage',
+    group: 'Laboratory',
+    description: 'Per store item: tests that used it, the quantity used up and the quantity short, over a period.',
+    params: z.strictObject({ from: z.iso.date(), to: z.iso.date() }),
+    async load(params) {
+      if (params.from > params.to) throw new DomainError('invalid_period', 'The start date is after the end date');
+      const rows = await context.db
+        .select({
+          variantId: labReagentUses.variantId,
+          tests: sql<number>`count(distinct ${labReagentUses.sourceId})`.mapWith(Number),
+          used: sql<number>`coalesce(sum(case when ${labReagentUses.consumptionNumber} is not null then ${labReagentUses.qty} end), 0)`.mapWith(
+            Number,
+          ),
+          short:
+            sql<number>`coalesce(sum(case when ${labReagentUses.consumptionNumber} is null then ${labReagentUses.qty} end), 0)`.mapWith(
+              Number,
+            ),
+        })
+        .from(labReagentUses)
+        .where(and(gte(labReagentUses.usedOn, params.from), lte(labReagentUses.usedOn, params.to)))
+        .groupBy(labReagentUses.variantId);
+      const items = await stock.items(rows.map((row) => row.variantId));
+      return {
+        rows: rows
+          .map((row) => ({
+            ...row,
+            name: items.get(row.variantId)?.name ?? '—',
+            unit: items.get(row.variantId)?.unit ?? null,
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    },
+    describe: (params) => `${params.from} to ${params.to}`,
+    pdf: { engine: 'html', template: template('reagent-usage') },
+    xlsx: (data) => ({
+      columns: [
+        { key: 'name', header: 'Item', width: 34 },
+        { key: 'unit', header: 'Unit', width: 10 },
+        { key: 'tests', header: 'Tests', format: 'integer' },
+        { key: 'used', header: 'Used up', format: 'decimal' },
+        { key: 'short', header: 'Short', format: 'decimal' },
+      ],
+      rows: data.rows,
+    }),
   });
 }

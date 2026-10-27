@@ -54,6 +54,8 @@ export interface StudyProps {
   deliveredTo: string | null;
   deliveredBy: string | null;
   deliveredAt: Date | null;
+  /** Films and reagents used up when first signed (short: the store held too little); null before. */
+  reagents: 'used' | 'short' | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -98,6 +100,7 @@ export class ImagingStudy {
       deliveredTo: null,
       deliveredBy: null,
       deliveredAt: null,
+      reagents: null,
       version: 1,
       createdAt: params.at,
       updatedAt: params.at,
@@ -151,6 +154,14 @@ export class ImagingStudy {
     this.props.signedBy = by;
     this.props.signedAt = at;
     this.touch(at);
+  }
+
+  get reagents(): 'used' | 'short' | null {
+    return this.props.reagents;
+  }
+
+  reagentsApplied(state: 'used' | 'short' | null): void {
+    this.props.reagents = state;
   }
 
   feeCredited(amount: number): void {

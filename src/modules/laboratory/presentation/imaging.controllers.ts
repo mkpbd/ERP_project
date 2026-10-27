@@ -94,6 +94,7 @@ class ImagingStudyResponseDto extends responseDto({
   reportingFee: z.number(),
   deliveredTo: z.string().nullable(),
   deliveredAt: z.date().nullable(),
+  reagents: z.enum(['used', 'short']).nullable(),
   templates: z.array(z.object(templateShape)),
 }) {}
 

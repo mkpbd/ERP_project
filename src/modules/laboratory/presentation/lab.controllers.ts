@@ -174,6 +174,7 @@ const recordShape = {
   verifiedAt: z.date().nullable(),
   deliveredTo: z.string().nullable(),
   deliveredAt: z.date().nullable(),
+  reagents: z.enum(['used', 'short']).nullable(),
   values: z.array(z.object(valueShape)),
 };
 class CollectedResponseDto extends responseDto({ id: z.uuid(), labNumber: z.string(), tests: z.int() }) {}

@@ -21,6 +21,10 @@ import {
   patients,
 } from '../../../hospital/infrastructure/persistence/hospital.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
+import {
+  itemVariants,
+  storeDepartments,
+} from '../../../supply-chain/infrastructure/persistence/supply-chain.schema.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
 const day = (name: string) => date(name, { mode: 'string' });
@@ -146,6 +150,8 @@ export const labResults = pgTable(
     deliveredTo: text('delivered_to'),
     deliveredBy: uuid('delivered_by').references(() => users.id, { onDelete: 'set null' }),
     deliveredAt: tz('delivered_at'),
+    /** Reagents used up when verified (short: the lab's store held too little). */
+    reagents: text('reagents', { enum: ['used', 'short'] }),
     version: integer('version').notNull(),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -242,6 +248,8 @@ export const imagingStudies = pgTable(
     deliveredTo: text('delivered_to'),
     deliveredBy: uuid('delivered_by').references(() => users.id, { onDelete: 'set null' }),
     deliveredAt: tz('delivered_at'),
+    /** Films and reagents used up when signed (short: the store held too little). */
+    reagents: text('reagents', { enum: ['used', 'short'] }),
     version: integer('version').notNull(),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -250,5 +258,58 @@ export const imagingStudies = pgTable(
     uniqueIndex('lab_imaging_studies_accession_uq').on(t.accessionNumber),
     uniqueIndex('lab_imaging_studies_line_uq').on(t.billId, t.line),
     index('lab_imaging_studies_done_idx').on(t.doneOn, t.status),
+  ],
+);
+
+// Which store department's stock a diagnostic department uses up (old ReAgentManagement: the lab's own store).
+export const labStockDepartments = pgTable('lab_stock_departments', {
+  diagnosticDepartmentId: uuid('diagnostic_department_id')
+    .primaryKey()
+    .references(() => diagnosticDepartments.id, { onDelete: 'cascade' }),
+  storeDepartmentId: uuid('store_department_id')
+    .notNull()
+    .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+});
+
+// Old ReAgentManagement.TestAndRegAgentMappings and SupplyChain.XrayFilmTestMappings: what one test uses up.
+export const labTestReagents = pgTable(
+  'lab_test_reagents',
+  {
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'cascade' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: numeric('qty', { precision: 12, scale: 3, mode: 'number' }).notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.testId, t.variantId] }), check('lab_test_reagents_qty_ck', sql`${t.qty} > 0`)],
+);
+
+// What a verified result or a signed imaging report used up, with the department consumption that took it (none:
+// the department held too little, to be entered by hand).
+export const labReagentUses = pgTable(
+  'lab_reagent_uses',
+  {
+    id: uuid('id').primaryKey(),
+    sourceKind: text('source_kind', { enum: ['result', 'study'] }).notNull(),
+    sourceId: uuid('source_id').notNull(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    storeDepartmentId: uuid('store_department_id')
+      .notNull()
+      .references(() => storeDepartments.id, { onDelete: 'restrict' }),
+    variantId: uuid('variant_id')
+      .notNull()
+      .references(() => itemVariants.id, { onDelete: 'restrict' }),
+    qty: numeric('qty', { precision: 12, scale: 3, mode: 'number' }).notNull(),
+    usedOn: day('used_on').notNull(),
+    consumptionNumber: text('consumption_number'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('lab_reagent_uses_source_idx').on(t.sourceKind, t.sourceId),
+    index('lab_reagent_uses_used_idx').on(t.usedOn),
   ],
 );

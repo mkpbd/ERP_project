@@ -3,6 +3,12 @@ import type { Actor } from '../../../shared/application/actor.js';
 import type { Page, PageRequest } from '../../../shared/application/pagination.js';
 import type { Parameter, ResultStatus, ResultValue, SampleStatus } from '../domain/lab.js';
 
+/** The organisation's time zone, for the lab's days. */
+export const LAB_SETTINGS = Symbol('LAB_SETTINGS');
+export interface LabSettings {
+  readonly timeZone: string;
+}
+
 /** Seeing samples, worklists and results. */
 export const LAB_READ = 'lab:read';
 /** Keeping the tests' parameters and ranges; handing over a report while the patient still owes. */
@@ -63,6 +69,8 @@ export interface ResultRecord extends ResultSummary {
   readonly verifiedAt: Date | null;
   readonly deliveredTo: string | null;
   readonly deliveredAt: Date | null;
+  /** Reagents used up when verified (short: to enter by hand); null: none set. */
+  readonly reagents: 'used' | 'short' | null;
   readonly values: ResultValue[];
 }
 

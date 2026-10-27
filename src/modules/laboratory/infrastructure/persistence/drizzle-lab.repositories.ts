@@ -286,6 +286,7 @@ export class DrizzleLabReadRepository extends LabReadRepository {
         verifiedAt: labResults.verifiedAt,
         deliveredTo: labResults.deliveredTo,
         deliveredAt: labResults.deliveredAt,
+        reagents: labResults.reagents,
       })
       .from(labResults)
       .innerJoin(labSamples, eq(labSamples.id, labResults.sampleId))

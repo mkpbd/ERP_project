@@ -16,6 +16,7 @@ import {
   type StudySummary,
 } from './imaging.messages.js';
 import { LabDesk } from './lab.handlers.js';
+import { ReagentUser } from './reagent-use.js';
 import { LAB_MANAGE, LAB_READ, LAB_RESULT, LAB_VERIFY } from './lab.messages.js';
 
 /** What the imaging handlers share on top of the lab desk. */
@@ -26,6 +27,7 @@ export class ImagingDesk {
     readonly imaging: ImagingRepository,
     readonly read: ImagingReadRepository,
     readonly fees: ReportingFees,
+    readonly reagents: ReagentUser,
   ) {}
 
   /** The bill, patient and test of each study, and its radiologist's name. */
@@ -158,6 +160,21 @@ export class ChangeStudyHandler implements ICommandHandler<ChangeStudyCommand> {
             by: actor.userId,
           });
           study.feeCredited(fee);
+          // Films and reagents are used up once: a report signed again after a correction uses none.
+          if (study.reagents === null) {
+            const order = await lab.order(study.billId);
+            const test = order.tests.find((item) => item.line === study.line)!;
+            study.reagentsApplied(
+              await this.desk.reagents.useUp({
+                sourceKind: 'study',
+                sourceId: study.id,
+                testId: test.testId,
+                diagnosticDepartmentId: test.departmentId,
+                reference: `${test.testName} ${study.accessionNumber}`,
+                by: actor.userId,
+              }),
+            );
+          }
           break;
         }
         case 'unsign': {

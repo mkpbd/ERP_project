@@ -24,16 +24,13 @@ import {
   LAB_VERIFY,
   LabReadRepository,
   ListResultsQuery,
+  LAB_SETTINGS,
   ListSamplesQuery,
   SetTestParametersCommand,
+  type LabSettings,
   type OrderRef,
 } from './lab.messages.js';
-
-/** The organisation's time zone, for the lab's days. */
-export const LAB_SETTINGS = Symbol('LAB_SETTINGS');
-export interface LabSettings {
-  readonly timeZone: string;
-}
+import { ReagentUser } from './reagent-use.js';
 
 @Injectable()
 export class LabDesk {
@@ -258,7 +255,10 @@ export class ChangeSampleHandler implements ICommandHandler<ChangeSampleCommand>
 /** Old pathology result entry and finalisation: values entered against the template, verified by someone else. */
 @CommandHandler(ChangeResultCommand)
 export class ChangeResultHandler implements ICommandHandler<ChangeResultCommand> {
-  constructor(private readonly desk: LabDesk) {}
+  constructor(
+    private readonly desk: LabDesk,
+    private readonly reagents: ReagentUser,
+  ) {}
 
   async execute({ actor, id, version, change }: ChangeResultCommand): Promise<void> {
     const { desk } = this;
@@ -285,9 +285,25 @@ export class ChangeResultHandler implements ICommandHandler<ChangeResultCommand>
           result.enter(values, change.comment, actor.userId, now);
           break;
         }
-        case 'verify':
+        case 'verify': {
           result.verify(actor.userId, now);
+          // The reagents are used up once: a result verified again after a correction uses none.
+          if (result.reagents === null) {
+            const order = await desk.order(snapshot.billId);
+            const test = order.tests.find((item) => item.line === snapshot.line)!;
+            result.reagentsApplied(
+              await this.reagents.useUp({
+                sourceKind: 'result',
+                sourceId: id,
+                testId: snapshot.testId,
+                diagnosticDepartmentId: test.departmentId,
+                reference: `${test.testName} of ${order.billNumber}`,
+                by: actor.userId,
+              }),
+            );
+          }
           break;
+        }
         case 'unverify':
           result.unverify(now);
           break;

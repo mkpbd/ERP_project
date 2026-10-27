@@ -246,6 +246,8 @@ export interface ResultProps {
   deliveredTo: string | null;
   deliveredBy: string | null;
   deliveredAt: Date | null;
+  /** Reagents used up when first verified (short: the store held too little); null before. */
+  reagents: 'used' | 'short' | null;
   values: ResultValue[];
   version: number;
   createdAt: Date;
@@ -279,6 +281,7 @@ export class LabResult {
       deliveredTo: null,
       deliveredBy: null,
       deliveredAt: null,
+      reagents: null,
       values: [],
       version: 1,
       createdAt: params.at,
@@ -327,6 +330,15 @@ export class LabResult {
     this.props.verifiedBy = by;
     this.props.verifiedAt = at;
     this.touch(at);
+  }
+
+  get reagents(): 'used' | 'short' | null {
+    return this.props.reagents;
+  }
+
+  /** What became of its reagents the first time it was verified (a correction uses none again). */
+  reagentsApplied(state: 'used' | 'short' | null): void {
+    this.props.reagents = state;
   }
 
   /** Back to entered for a correction (not once handed over). */

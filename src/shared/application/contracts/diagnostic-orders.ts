@@ -43,6 +43,10 @@ export abstract class DiagnosticOrders {
   abstract find(billIds: readonly string[]): Promise<DiagnosticOrder[]>;
   /** The bill with this number (any case), or null. */
   abstract byNumber(number: string): Promise<DiagnosticOrder | null>;
+  /** Diagnostic departments by id. */
+  abstract departments(
+    ids: readonly string[],
+  ): Promise<Map<string, { id: string; name: string; kind: 'lab' | 'imaging' | 'other' }>>;
   /** Doctors by id (a radiologist signing a report). */
   abstract doctors(ids: readonly string[]): Promise<Map<string, { id: string; name: string; isActive: boolean }>>;
   /** Tests of the catalogue by id, for the lab's parameter templates. */

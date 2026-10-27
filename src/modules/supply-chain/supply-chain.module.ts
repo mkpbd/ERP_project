@@ -1,6 +1,8 @@
 import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
+import { DepartmentStock } from '../../shared/application/contracts/department-stock.js';
+import { DrizzleDepartmentStock } from './infrastructure/persistence/drizzle-department-stock.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { ASSET_HANDLERS, AssetReadRepository } from './application/asset.handlers.js';
@@ -164,8 +166,9 @@ import { SCM_RECORD_CONTROLLERS } from './presentation/supply-chain.controllers.
     { provide: OrderRepository, useClass: DrizzleOrderRepository },
     { provide: PurchaseReadRepository, useClass: DrizzlePurchaseReadRepository },
     { provide: SupplierDirectory, useClass: DrizzleSupplierDirectory },
+    { provide: DepartmentStock, useClass: DrizzleDepartmentStock },
   ],
-  exports: [SupplierDirectory],
+  exports: [SupplierDirectory, DepartmentStock],
 })
 export class SupplyChainModule implements OnModuleInit {
   constructor(

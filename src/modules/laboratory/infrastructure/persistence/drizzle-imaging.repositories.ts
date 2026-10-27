@@ -122,6 +122,7 @@ export class DrizzleImagingReadRepository extends ImagingReadRepository {
         reportingFee: imagingStudies.reportingFee,
         deliveredTo: imagingStudies.deliveredTo,
         deliveredAt: imagingStudies.deliveredAt,
+        reagents: imagingStudies.reagents,
       })
       .from(imagingStudies)
       .where(eq(imagingStudies.id, id));

@@ -32,3 +32,27 @@ export abstract class ImagingRepository {
   abstract studyForUpdate(id: string): Promise<ImagingStudy | null>;
   abstract updateStudy(study: ImagingStudy): Promise<void>;
 }
+
+export interface ReagentUse {
+  readonly sourceKind: 'result' | 'study';
+  readonly sourceId: string;
+  readonly testId: string;
+  readonly storeDepartmentId: string;
+  readonly variantId: string;
+  readonly qty: number;
+  readonly usedOn: string;
+  readonly consumptionNumber: string | null;
+}
+
+export abstract class ReagentRepository {
+  /** What one test uses up. */
+  abstract recipe(testId: string): Promise<{ variantId: string; qty: number }[]>;
+  abstract setRecipe(testId: string, lines: readonly { variantId: string; qty: number }[]): Promise<void>;
+  abstract stockDepartments(): Promise<{ diagnosticDepartmentId: string; storeDepartmentId: string }[]>;
+  abstract setStockDepartments(
+    pairs: readonly { diagnosticDepartmentId: string; storeDepartmentId: string }[],
+  ): Promise<void>;
+  /** The store department a diagnostic department uses up stock from, if set. */
+  abstract storeOf(diagnosticDepartmentId: string): Promise<string | null>;
+  abstract addUses(uses: readonly ReagentUse[]): Promise<void>;
+}

@@ -194,7 +194,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | diagnostic bills (an admitted patient's charged to the stay), collecting their dues, cancelling tests on the bill's day | `diag:bill` |
 | a diagnostic discount above the counter's limit | `diag:discount` |
 | `GET /lab/*` (test parameters and imaging templates, samples, the worklist, results, imaging studies) | `lab:read` |
-| lab test parameters and normal ranges, imaging report templates; handing a report over while the patient still owes | `lab:manage` |
+| lab test parameters and normal ranges, imaging report templates, what each test uses up and which store department each lab uses; handing a report over while the patient still owes | `lab:manage` |
 | collecting samples | `lab:collect` |
 | taking samples in or rejecting them, entering results, marking imaging studies done and writing their reports, handing reports over | `lab:result` |
 | verifying results (not one's own), signing imaging reports for the radiologist (crediting the reporting fee), taking either back | `lab:verify` |
