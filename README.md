@@ -193,11 +193,11 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | diagnostic departments, tests, packages and their tests, the diagnostic policy; cancelling tests after the bill's day | `diag:manage` |
 | diagnostic bills (an admitted patient's charged to the stay), collecting their dues, cancelling tests on the bill's day | `diag:bill` |
 | a diagnostic discount above the counter's limit | `diag:discount` |
-| `GET /lab/*` (test parameters, samples, the worklist, results) | `lab:read` |
-| lab test parameters and normal ranges; handing a report over while the patient still owes | `lab:manage` |
+| `GET /lab/*` (test parameters and imaging templates, samples, the worklist, results, imaging studies) | `lab:read` |
+| lab test parameters and normal ranges, imaging report templates; handing a report over while the patient still owes | `lab:manage` |
 | collecting samples | `lab:collect` |
-| taking samples in or rejecting them, entering results, handing reports over | `lab:result` |
-| verifying results (not one's own) and taking a verification back | `lab:verify` |
+| taking samples in or rejecting them, entering results, marking imaging studies done and writing their reports, handing reports over | `lab:result` |
+| verifying results (not one's own), signing imaging reports for the radiologist (crediting the reporting fee), taking either back | `lab:verify` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

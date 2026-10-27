@@ -943,11 +943,18 @@ export const diagnosticTests = pgTable(
     discountAllowed: boolean('discount_allowed').notNull().default(true),
     /** The referring doctor's commission; null takes the diagnostic policy's. */
     referralPercent: percent('referral_percent'),
+    /** The reporting doctor's fee (old TestWiseReportingFees): a share of the rate, or an amount when set. */
+    reportingFeePercent: percent('reporting_fee_percent'),
+    reportingFeeAmount: money('reporting_fee_amount'),
     isActive: boolean('is_active').notNull().default(true),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
   },
   (t) => [
+    check(
+      'hospital_diagnostic_tests_reporting_ck',
+      sql`(${t.reportingFeePercent} is null or ${t.reportingFeePercent} between 0 and 100) and (${t.reportingFeeAmount} is null or ${t.reportingFeeAmount} >= 0)`,
+    ),
     uniqueIndex('hospital_diagnostic_tests_code_uq').on(sql`upper(${t.code})`),
     uniqueIndex('hospital_diagnostic_tests_name_uq').on(t.departmentId, sql`lower(${t.name})`),
     check('hospital_diagnostic_tests_name_ck', sql`char_length(${t.name}) between 1 and 150`),

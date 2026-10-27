@@ -17,6 +17,7 @@ import {
   diagnosticBills,
   diagnosticDepartments,
   diagnosticTests,
+  doctors,
   patients,
 } from '../../../hospital/infrastructure/persistence/hospital.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
@@ -180,4 +181,74 @@ export const labResultValues = pgTable(
     flag: text('flag', { enum: ['low', 'high'] }),
   },
   (t) => [primaryKey({ columns: [t.resultId, t.position] })],
+);
+
+// Old UNP.GetNextAccessionNumber: one counter per day for the imaging studies' accession numbers.
+export const imagingSequences = pgTable('lab_imaging_sequences', {
+  day: day('day').primaryKey(),
+  last: integer('last').notNull(),
+});
+
+// Old Diag.RadiologyTemplates: the usual wording of an imaging report (a normal chest, a normal abdomen …) to start
+// from.
+export const imagingTemplates = pgTable(
+  'lab_imaging_templates',
+  {
+    id: uuid('id').primaryKey(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    position: smallint('position').notNull(),
+    name: text('name').notNull(),
+    findings: text('findings').notNull(),
+    impression: text('impression').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lab_imaging_templates_position_uq').on(t.testId, t.position),
+    check('lab_imaging_templates_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Diag.RadiologyReports with the detail's AccessionNumber: an imaging test done for a bill, its report written,
+// signed by the radiologist (who earns the reporting fee) and handed over.
+export const imagingStudies = pgTable(
+  'lab_imaging_studies',
+  {
+    id: uuid('id').primaryKey(),
+    accessionNumber: text('accession_number').notNull(),
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => diagnosticBills.id, { onDelete: 'restrict' }),
+    line: smallint('line').notNull(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    doneOn: day('done_on').notNull(),
+    doneAt: tz('done_at').notNull(),
+    doneBy: uuid('done_by').references(() => users.id, { onDelete: 'set null' }),
+    status: text('status', { enum: ['done', 'signed', 'delivered'] }).notNull(),
+    findings: text('findings'),
+    impression: text('impression'),
+    /** The radiologist (a doctor of the hospital) the report is signed for. */
+    radiologistId: uuid('radiologist_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    signedBy: uuid('signed_by').references(() => users.id, { onDelete: 'set null' }),
+    signedAt: tz('signed_at'),
+    /** The reporting fee credited to the radiologist when signed. */
+    reportingFee: numeric('reporting_fee', { precision: 12, scale: 2, mode: 'number' }).notNull().default(0),
+    deliveredTo: text('delivered_to'),
+    deliveredBy: uuid('delivered_by').references(() => users.id, { onDelete: 'set null' }),
+    deliveredAt: tz('delivered_at'),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lab_imaging_studies_accession_uq').on(t.accessionNumber),
+    uniqueIndex('lab_imaging_studies_line_uq').on(t.billId, t.line),
+    index('lab_imaging_studies_done_idx').on(t.doneOn, t.status),
+  ],
 );

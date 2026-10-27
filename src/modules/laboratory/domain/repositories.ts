@@ -1,3 +1,4 @@
+import type { ImagingStudy, ImagingTemplate } from './imaging.js';
 import type { LabResult, LabSample, Parameter } from './lab.js';
 
 export abstract class LabRepository {
@@ -17,4 +18,17 @@ export abstract class LabRepository {
   abstract resultForUpdate(id: string): Promise<LabResult | null>;
   /** Saves the header and replaces the values. */
   abstract updateResult(result: LabResult): Promise<void>;
+}
+
+export abstract class ImagingRepository {
+  abstract templates(testId: string): Promise<ImagingTemplate[]>;
+  /** Replaces the test's report templates. */
+  abstract setTemplates(testId: string, templates: readonly ImagingTemplate[]): Promise<void>;
+  /** The next accession number serial of the day, counted under a row lock. */
+  abstract nextAccession(day: string): Promise<number>;
+  /** The study of a bill's line, if it was done. */
+  abstract studyOfLine(billId: string, line: number): Promise<string | null>;
+  abstract insertStudy(study: ImagingStudy): Promise<void>;
+  abstract studyForUpdate(id: string): Promise<ImagingStudy | null>;
+  abstract updateStudy(study: ImagingStudy): Promise<void>;
 }

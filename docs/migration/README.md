@@ -87,8 +87,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 10a | Diagnostics: departments, tests, packages, diagnostic policy; diagnostic bills (report times, discount on what may be discounted, referral commission, test cancellation with refund, dues, corporate collection); receipt, referral commission, income by department | **Done** | [10a-diagnostic-billing.md](10a-diagnostic-billing.md) |
 | 10b | Diagnostics: tests of admitted patients on the indoor bill (with the service charge); diagnostic bills in the dues, discounts, patient statement, income by head and corporate statement; diagnostic collection by user | **Done** | [10b-diagnostic-indoor-statements.md](10b-diagnostic-indoor-statements.md) |
 | 10c | Laboratory: test parameters with normal ranges by sex and age; samples with lab numbers; results entered, flagged and verified by someone else; the lab report; delivery held while the patient owes | **Done** | [10c-laboratory.md](10c-laboratory.md) |
-| 10d | Radiology (RIS) reports, radiologists' reporting fees | Next | |
-| 10e | Reagent management (consumption per test) and transfusion medicine (donors, components, cross-matching) | Planned | |
+| 10d | Radiology: report templates per imaging test, studies with accession numbers, reports written and signed by the radiologist, reporting fees on the doctor ledger, the imaging report, delivery held while the patient owes | **Done** | [10d-radiology.md](10d-radiology.md) |
+| 10e | Reagent management (consumption per test) and transfusion medicine (donors, components, cross-matching) | Next | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

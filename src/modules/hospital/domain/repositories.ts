@@ -280,6 +280,11 @@ export abstract class DiagnosticBillRepository {
   /** Saves the header and each line's state. */
   abstract update(bill: DiagnosticBill): Promise<void>;
   abstract addPayment(payment: DiagnosticPayment): Promise<void>;
+  /** A bill line's rate and its test's reporting fee rule, or null. */
+  abstract reportingFee(
+    billId: string,
+    line: number,
+  ): Promise<{ rate: number; percent: number | null; amount: number | null } | null>;
   /** The admission's diagnostic bills with tests still billed, oldest first. */
   abstract indoorCharges(admissionId: string): Promise<InvestigationBill[]>;
 }

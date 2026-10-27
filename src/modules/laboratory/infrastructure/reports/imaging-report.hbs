@@ -1,0 +1,39 @@
+<style>
+  .lab { font-size: 10pt; }
+  .lab .head { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 2mm; margin-bottom: 3mm; }
+  .lab .head .org { font-size: 15pt; font-weight: 700; }
+  .lab .head .kind { font-size: 11pt; font-weight: 700; margin-top: 1mm; letter-spacing: 1pt; }
+  .lab .who { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+  .lab .who td { padding: 0.8mm 1.5mm; vertical-align: top; }
+  .lab .bars { width: 55mm; height: 9mm; }
+  .lab .bars svg { width: 100%; height: 100%; display: block; }
+  .lab h3 { font-size: 11pt; margin: 4mm 0 1.5mm; }
+  .lab .body { white-space: pre-wrap; line-height: 1.5; }
+  .lab .impression { white-space: pre-wrap; font-weight: 700; line-height: 1.5; }
+  .lab .sign { margin-top: 22mm; display: flex; justify-content: flex-end; }
+  .lab .sign div { text-align: center; min-width: 60mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="lab">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div class="kind">{{study.testName}}</div>
+  </div>
+  <table class="who">
+    <tr>
+      <td style="width: 16%">Patient</td><td><b>{{order.patient.name}}</b></td>
+      <td style="width: 16%">Accession</td><td><b>{{study.accessionNumber}}</b></td>
+      <td rowspan="4" style="width: 30%; text-align: right"><div class="bars">{{{barcode}}}</div></td>
+    </tr>
+    <tr><td>UHID</td><td>{{order.uhidLabel}}</td><td>Bill</td><td>{{order.billNumber}}</td></tr>
+    <tr><td>Age · sex</td><td>{{order.age}} · {{order.patient.sex}}</td><td>Done</td><td>{{datetime study.doneAt}}</td></tr>
+    <tr><td>Referred by</td><td>{{#if order.referredByName}}{{order.referredByName}}{{else}}Self{{/if}}</td><td>Signed</td><td>{{datetime study.signedAt}}</td></tr>
+  </table>
+  <h3>Findings</h3>
+  <div class="body">{{study.findings}}</div>
+  <h3>Impression</h3>
+  <div class="impression">{{study.impression}}</div>
+  <div class="sign"><div>{{radiologist}}<br />Radiologist</div></div>
+</div>
+{{/with}}

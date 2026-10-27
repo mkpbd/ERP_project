@@ -1,7 +1,7 @@
 # Step 10c — Laboratory: samples, results, verification and the lab report
 
-Status: **done** (2026-10-28). Previous: [step 10b](10b-diagnostic-indoor-statements.md) · Next: step 10d (radiology
-reports and reporting fees).
+Status: **done** (2026-10-28). Previous: [step 10b](10b-diagnostic-indoor-statements.md) · Next: [step 10d](10d-radiology.md)
+(radiology reports and reporting fees).
 
 This step adds a new **`laboratory` module**:
 

@@ -148,6 +148,19 @@ export class DrizzleDiagnosticBillRepository extends DiagnosticBillRepository {
     await this.context.db.insert(diagnosticPayments).values({ ...payment, id: randomUUID() });
   }
 
+  async reportingFee(billId: string, line: number) {
+    const [row] = await this.context.db
+      .select({
+        rate: diagnosticBillLines.rate,
+        percent: diagnosticTests.reportingFeePercent,
+        amount: diagnosticTests.reportingFeeAmount,
+      })
+      .from(diagnosticBillLines)
+      .innerJoin(diagnosticTests, eq(diagnosticTests.id, diagnosticBillLines.testId))
+      .where(and(eq(diagnosticBillLines.billId, billId), eq(diagnosticBillLines.position, line)));
+    return row ?? null;
+  }
+
   async indoorCharges(admissionId: string): Promise<InvestigationBill[]> {
     const live = sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled}`.mapWith(Number);
     return this.context.db

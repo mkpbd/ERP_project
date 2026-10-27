@@ -67,9 +67,21 @@ const test = shapes(
     discountAllowed: z.boolean(),
     /** The referring doctor's commission; null takes the diagnostic policy's. */
     referralPercent: percent.nullable(),
+    /** The reporting doctor's fee (a radiologist's): a share of the rate, or this amount when set. */
+    reportingFeePercent: percent.nullable(),
+    reportingFeeAmount: money.nullable(),
     isActive: z.boolean(),
   },
-  ['code', 'shortName', 'specimen', 'roomNo', 'reportHours', 'referralPercent'],
+  [
+    'code',
+    'shortName',
+    'specimen',
+    'roomNo',
+    'reportHours',
+    'referralPercent',
+    'reportingFeePercent',
+    'reportingFeeAmount',
+  ],
   { discountAllowed: true, isActive: true },
 );
 class CreateTestDto extends createZodDto(test.create) {}
