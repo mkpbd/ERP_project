@@ -217,6 +217,7 @@ export interface PatientProps extends PatientDetails {
   registeredBy: string | null;
   isActive: boolean;
   inactiveReason: string | null;
+  mergedIntoId: string | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -242,6 +243,7 @@ export class Patient {
       registeredBy: params.by,
       isActive: true,
       inactiveReason: null,
+      mergedIntoId: null,
       version: 1,
       createdAt: params.now,
       updatedAt: params.now,
@@ -279,7 +281,25 @@ export class Patient {
     this.touch(now);
   }
 
+  /**
+   * A duplicate merged into the record kept (the old system had no merge: duplicates were deactivated and their bills
+   * stayed apart). It is out of use for good.
+   */
+  mergeInto(kept: { id: string; uhid: number }, reason: string, now: Date): void {
+    this.assertActive('merged');
+    if (kept.id === this.props.id) throw new DomainError('same_patient', 'A record is not merged into itself');
+    const why = text(reason, 250, 'reason');
+    if (!why) throw new DomainError('invalid_remarks', 'Give a reason');
+    this.props.isActive = false;
+    this.props.inactiveReason = `Merged into UHID ${kept.uhid}: ${why}`;
+    this.props.mergedIntoId = kept.id;
+    this.touch(now);
+  }
+
   reactivate(now: Date): void {
+    if (this.props.mergedIntoId) {
+      throw new DomainError('patient_merged', 'A record merged into another is not used again');
+    }
     if (this.props.isActive) throw new DomainError('patient_state', 'The patient is active already');
     this.props.isActive = true;
     this.props.inactiveReason = null;

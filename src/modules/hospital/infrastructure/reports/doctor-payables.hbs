@@ -1,0 +1,26 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Doctor</th><th class="num">Owed before</th><th class="num">Earned</th><th class="num">Taken back</th>
+      <th class="num">Paid</th><th class="num">Owed after</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{doctorName}}</td><td class="num">{{money opening}}</td><td class="num">{{money earned}}</td>
+      <td class="num">{{money reversed}}</td><td class="num">{{money paid}}</td><td class="num"><b>{{money closing}}</b></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td>Total</td><td class="num">{{money total.opening}}</td><td class="num">{{money total.earned}}</td>
+      <td class="num">{{money total.reversed}}</td><td class="num">{{money total.paid}}</td><td class="num">{{money total.closing}}</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No doctor earned or was paid anything up to the end of this period.</p>
+{{/if}}
+{{/with}}

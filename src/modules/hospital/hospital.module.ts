@@ -39,6 +39,14 @@ import {
   bedOccupancyReport,
   inpatientCensusReport,
 } from './infrastructure/reports/ipd.reports.js';
+import {
+  discountsReport,
+  doctorLedgerReport,
+  doctorPayablesReport,
+  duesReport,
+  incomeByHeadReport,
+  patientStatementReport,
+} from './infrastructure/reports/statement.reports.js';
 import { IPD_BILLING_CONTROLLERS } from './presentation/ipd-billing.controllers.js';
 import { IPD_CONTROLLERS } from './presentation/ipd.controllers.js';
 import { ipdBillReport, ipdCollectionReport, ipdReceiptReport } from './infrastructure/reports/ipd-billing.reports.js';
@@ -73,7 +81,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
  * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
  * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e); the
- * indoor bill: charges, advances, the final bill and its dues (step 9f).
+ * indoor bill: charges, advances, the final bill and its dues (step 9f); doctor payments, corporate collections
+ * across OPD and indoor bills, statements and the UHID merge (step 9g).
  */
 @Module({
   controllers: [
@@ -142,5 +151,11 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(ipdBillReport(this.cashier, this.admissions, this.organization, this.staff));
     this.reports.register(ipdReceiptReport(this.ipdBills, this.organization, this.users));
     this.reports.register(ipdCollectionReport(this.context, this.users));
+    this.reports.register(doctorPayablesReport(this.context));
+    this.reports.register(doctorLedgerReport(this.bills));
+    this.reports.register(patientStatementReport(this.context, this.organization));
+    this.reports.register(duesReport(this.context));
+    this.reports.register(discountsReport(this.context, this.users));
+    this.reports.register(incomeByHeadReport(this.context));
   }
 }

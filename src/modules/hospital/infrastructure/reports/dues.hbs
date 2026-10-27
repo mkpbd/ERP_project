@@ -1,0 +1,31 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Billed on</th><th>Bill</th><th>Where</th><th>UHID</th><th>Patient</th><th>Mobile</th><th>Bill to</th>
+      <th class="num">Bill</th><th class="num">Due</th><th class="num">Days</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{date billedOn}}</td><td>{{number}}</td><td>{{place}}</td><td>{{uhid}}</td><td>{{patientName}}</td>
+      <td>{{mobileNo}}</td><td>{{billTo}}</td><td class="num">{{money net}}</td><td class="num"><b>{{money due}}</b></td>
+      <td class="num">{{days}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="report" style="margin-top: 10px; width: 40%; margin-left: auto">
+  <tbody>
+    <tr><td>Owed by patients</td><td class="num">{{money patient}}</td></tr>
+    <tr><td>Owed by corporate clients</td><td class="num">{{money corporate}}</td></tr>
+    <tr><td>Owed by staff</td><td class="num">{{money staff}}</td></tr>
+    <tr><td><b>Total due</b></td><td class="num"><b>{{money total}}</b></td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>Nothing is due.</p>
+{{/if}}
+{{/with}}

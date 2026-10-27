@@ -76,14 +76,14 @@ Order follows dependencies: later modules reference earlier ones.
 | 8f | Pharmacy: returns from customers within the return period (refund off the due first, then cash), return receipt | **Done** | [08f-pharmacy-returns.md](08f-pharmacy-returns.md) |
 | 8g | Pharmacy: physical inventory — stock counts lot by lot, applied against the ledger as of the count date, count sheet and result | **Done** | [08g-pharmacy-stock-counts.md](08g-pharmacy-stock-counts.md) |
 | 8h | Pharmacy: reports — product ledger, stock movement, expiry, physical inventory summary, purchase and sales summaries, cash counter | **Done** | [08h-pharmacy-reports.md](08h-pharmacy-reports.md) |
-| 8i | Pharmacy: indoor patients (indents, IPD sales and returns, dues) — after the admissions of step 9 | Planned | |
+| 8i | Pharmacy: indoor patients (indents, IPD sales and returns, dues) — after the admissions of step 9 | Next | |
 | 9a | Hospital: patient registration with UHID, duplicate check, age or birth date, photo, patient card with barcode, registration register | **Done** | [09a-hospital-patient-registration.md](09a-hospital-patient-registration.md) |
 | 9b | Hospital: doctors, specialities, chamber schedules and days off, appointments by serial, doctor board, appointment list and slip | **Done** | [09b-hospital-doctors-appointments.md](09b-hospital-doctors-appointments.md) |
 | 9c | Hospital: OPD consultation billing with the doctor's share, discount limit, accounts posting, due collection, cancel and refund, `UHIDUsesRecords`, receipt and collection reports | **Done** | [09c-hospital-opd-billing.md](09c-hospital-opd-billing.md) |
 | 9d | Hospital: OPD and emergency services (service master with doctor share), corporate clients (credit limit, discount, collections, statement), staff billing, service income | **Done** | [09d-hospital-services-corporate.md](09d-hospital-services-corporate.md) |
 | 9e | Hospital: wards, bed categories and beds, admissions (one at a time, locked beds), bed transfers through housekeeping, consultant history, discharge types, census, register, occupancy | **Done** | [09e-hospital-admissions.md](09e-hospital-admissions.md) |
 | 9f | Hospital: the indoor bill: services and consultant visits charged on the wards, advances and refunds, the final bill (bed nights, admission and round fees, service charge, discount), discharge clearance, due collection, bill / receipt / collection prints | **Done** | [09f-hospital-indoor-bill.md](09f-hospital-indoor-bill.md) |
-| 9g | Hospital: paying doctors their shares (OPD and indoor), corporate collections and the credit limit across OPD and indoor bills, patient and doctor ledgers, dues and discount statements, income by head, UHID merge | Next | |
+| 9g | Hospital: paying doctors their shares (OPD and indoor), corporate collections across OPD and indoor bills with the credit limit at admission, doctor ledger and payables, patient statement, dues, discounts, income by head, UHID merge | **Done** | [09g-hospital-statements.md](09g-hospital-statements.md) |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

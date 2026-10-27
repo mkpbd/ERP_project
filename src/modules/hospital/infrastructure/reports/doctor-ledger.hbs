@@ -1,0 +1,31 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px; width: 70%">
+  <tbody>
+    <tr><td style="width: 30%">Doctor</td><td><b>{{doctorName}}</b></td></tr>
+    <tr><td>Owed before {{date from}}</td><td class="num">{{money opening}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr><th>Date</th><th>Document</th><th>Entry</th><th class="num">Amount</th><th class="num">Owed</th></tr>
+  </thead>
+  <tbody>
+    {{#each entries}}
+    <tr>
+      <td>{{date entryOn}}</td><td>{{documentNumber}}</td><td>{{kindLabel}}</td>
+      <td class="num">{{money amount}}</td><td class="num">{{money balance}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="5" class="empty">Nothing in this period.</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="report" style="margin-top: 10px; width: 46%; margin-left: auto">
+  <tbody>
+    <tr><td>Earned</td><td class="num">{{money earned}}</td></tr>
+    <tr><td>Taken back</td><td class="num">{{#if reversed}}−{{/if}}{{money reversed}}</td></tr>
+    <tr><td>Paid</td><td class="num">{{#if paid}}−{{/if}}{{money paid}}</td></tr>
+    <tr><td><b>Owed on {{date to}}</b></td><td class="num"><b>{{money closing}}</b></td></tr>
+  </tbody>
+</table>
+{{/with}}

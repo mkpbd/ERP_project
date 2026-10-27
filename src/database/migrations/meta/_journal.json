@@ -288,6 +288,13 @@
       "when": 1793067549399,
       "tag": "0040_hospital_ipd_billing",
       "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1793079461172,
+      "tag": "0041_hospital_doctor_payments_merge",
+      "breakpoints": true
     }
   ]
 }

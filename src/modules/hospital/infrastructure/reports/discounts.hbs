@@ -1,0 +1,33 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Billed on</th><th>Bill</th><th>Where</th><th>UHID</th><th>Patient</th><th>Corporate</th>
+      <th class="num">Bill</th><th class="num">Discount</th><th class="num">%</th><th>Reason</th><th>Given by</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{date billedOn}}</td><td>{{number}}</td><td>{{place}}</td><td>{{uhid}}</td><td>{{patientName}}</td>
+      <td>{{clientName}}</td><td class="num">{{money gross}}</td><td class="num">{{money discount}}</td>
+      <td class="num">{{money percent}}</td><td>{{discountReason}}</td><td>{{by}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="6">Total</td><td class="num">{{money gross}}</td><td class="num">{{money discount}}</td><td colspan="3"></td></tr>
+  </tbody>
+</table>
+<h3 style="margin: 12px 0 6px">By who gave them</h3>
+<table class="report" style="width: 50%">
+  <thead><tr><th>Given by</th><th class="num">Bills</th><th class="num">Discount</th></tr></thead>
+  <tbody>
+    {{#each byUser}}
+    <tr><td>{{by}}</td><td class="num">{{bills}}</td><td class="num">{{money discount}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No discount was given in this period.</p>
+{{/if}}
+{{/with}}

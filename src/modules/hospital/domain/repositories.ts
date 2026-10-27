@@ -14,6 +14,14 @@ export interface PatientMatch {
   readonly contactMobileNo: string | null;
 }
 
+export interface MovedRecords {
+  readonly appointments: number;
+  readonly opdBills: number;
+  readonly admissions: number;
+  readonly ipdBills: number;
+  readonly visits: number;
+}
+
 export abstract class PatientRepository {
   abstract findForUpdate(id: string): Promise<Patient | null>;
   abstract insert(patient: Patient): Promise<void>;
@@ -30,6 +38,10 @@ export abstract class PatientRepository {
   /** The UHID of the active patient holding this ID document, if any. */
   abstract holderOf(idType: IdType, idNo: string, excludeId?: string): Promise<number | null>;
   abstract corporateClientActive(id: string): Promise<boolean>;
+  /** Whether the patient has an admission still open. */
+  abstract openAdmission(patientId: string): Promise<boolean>;
+  /** Moves everything recorded against one patient to another; returns how many of each moved. */
+  abstract moveRecords(fromId: string, toId: string): Promise<MovedRecords>;
   abstract savePhoto(patientId: string, photo: StoredFile, by: string, now: Date): Promise<void>;
   abstract removePhoto(patientId: string): Promise<boolean>;
 }
@@ -92,12 +104,30 @@ export interface CorporateClient {
 export interface DoctorLedgerEntry {
   readonly doctorId: string;
   readonly entryOn: string;
-  readonly kind: 'share' | 'reversal';
+  readonly kind: 'share' | 'reversal' | 'payment';
   /** The OPD bill, or the final indoor bill. */
   readonly billId: string | null;
   readonly ipdBillId?: string | null;
   readonly documentNumber: string;
   readonly amount: number;
+}
+
+export interface CorporateDueBill {
+  readonly kind: 'opd' | 'ipd';
+  readonly id: string;
+  readonly due: number;
+}
+
+export interface DoctorPayment {
+  readonly number: string;
+  readonly doctorId: string;
+  readonly paidOn: string;
+  readonly amount: number;
+  readonly method: PaymentMethod;
+  readonly reference: string | null;
+  readonly note: string | null;
+  readonly voucherNumber: string | null;
+  readonly paidBy: string;
 }
 
 export abstract class OpdBillRepository {
@@ -112,10 +142,14 @@ export abstract class OpdBillRepository {
   abstract doctors(ids: readonly string[]): Promise<Map<string, BillableDoctor>>;
   abstract services(ids: readonly string[]): Promise<Map<string, BillableService>>;
   abstract corporateClient(id: string): Promise<CorporateClient | null>;
-  /** What the client owes on bills not cancelled. */
+  /** What the client owes on OPD and indoor bills not cancelled. */
   abstract corporateDue(clientId: string): Promise<number>;
-  /** The client's bills with something due, oldest first. */
-  abstract dueBillIds(clientId: string): Promise<string[]>;
+  /** The client's OPD and indoor bills with something due, oldest first. */
+  abstract dueBills(clientId: string): Promise<CorporateDueBill[]>;
+  /** What the doctor is owed of their shares, less what they were paid. */
+  abstract doctorBalance(doctorId: string): Promise<number>;
+  /** Saves the payment and takes it off the doctor's ledger. */
+  abstract addDoctorPayment(payment: DoctorPayment): Promise<void>;
   /** The last day the patient was billed for this doctor (bills not cancelled). */
   abstract lastVisitOn(patientId: string, doctorId: string): Promise<string | null>;
   abstract addLedger(entries: readonly DoctorLedgerEntry[]): Promise<void>;

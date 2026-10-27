@@ -160,6 +160,17 @@ export class AdmitPatientHandler implements ICommandHandler<AdmitPatientCommand>
           : (input.corporateClientId ?? null),
         input.staffId,
       );
+      // A credit client at or over its limit takes no more admissions (the final bill is never refused, so a
+      // discharge is never held up by it).
+      if (payer.kind === 'corporate' && payer.client.payment === 'credit' && payer.client.creditLimit !== null) {
+        const owed = await opd.bills.corporateDue(payer.client.id);
+        if (owed >= payer.client.creditLimit) {
+          throw new DomainError(
+            'credit_limit',
+            `${payer.client.name} owes ${owed.toFixed(2)}, at or over its limit of ${payer.client.creditLimit.toFixed(2)}`,
+          );
+        }
+      }
       const bed = await desk.freeBed(input.bedId);
       const now = opd.clock.now();
       const admission = Admission.admit({

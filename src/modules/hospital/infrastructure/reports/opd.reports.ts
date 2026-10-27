@@ -16,6 +16,8 @@ import {
   corporateClients,
   doctorLedger,
   doctors,
+  ipdBills,
+  ipdPayments,
   opdBillLines,
   opdBills,
   opdPayments,
@@ -270,7 +272,7 @@ export function doctorConsultationsReport(context: DbContext): ReportDefinition 
           row.netFees = cents(row.fees - row.cancelledFees);
           for (const entry of shares.filter((item) => item.doctorId === doctor.id)) {
             if (entry.kind === 'share') row.shareEarned = cents(row.shareEarned + entry.amount);
-            else row.shareReversed = cents(row.shareReversed - entry.amount);
+            else if (entry.kind === 'reversal') row.shareReversed = cents(row.shareReversed - entry.amount);
           }
           row.netShare = cents(row.shareEarned - row.shareReversed);
           for (const key of Object.keys(total) as (keyof typeof total)[]) total[key] = cents(total[key] + row[key]);
@@ -309,7 +311,8 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
     key: 'hospital.corporate-statement',
     title: 'Corporate client statement',
     group: 'Hospital',
-    description: "A corporate client's bills and payments over a period, with what it owed before and after.",
+    description:
+      "A corporate client's OPD and indoor bills and payments over a period, with what it owed before and after.",
     params: z.strictObject({ clientId: z.uuid(), from: day, to: day }),
     async load(params) {
       assertPeriod(params.from, params.to);
@@ -322,7 +325,7 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
         .from(corporateClients)
         .where(eq(corporateClients.id, params.clientId));
       if (!client) throw new NotFoundError('corporate_client');
-      const bills = await context.db
+      const outdoor = await context.db
         .select({
           id: opdBills.id,
           number: opdBills.number,
@@ -336,9 +339,27 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
         })
         .from(opdBills)
         .innerJoin(patients, eq(patients.id, opdBills.patientId))
-        .where(and(eq(opdBills.corporateClientId, params.clientId), lte(opdBills.billedOn, params.to)))
-        .orderBy(asc(opdBills.billedOn), asc(opdBills.number));
-      const payments = bills.length
+        .where(and(eq(opdBills.corporateClientId, params.clientId), lte(opdBills.billedOn, params.to)));
+      // An indoor bill: what the patient put in (advance taken and paid on the bill) is not the client's.
+      const indoor = await context.db
+        .select({
+          id: ipdBills.id,
+          number: ipdBills.number,
+          billedOn: ipdBills.billedOn,
+          patientName: patients.fullName,
+          uhid: patients.uhid,
+          net: ipdBills.net,
+          paid: sql<number>`${ipdBills.deposit} + ${ipdBills.paid}`.mapWith(Number),
+          status: ipdBills.status,
+          cancelledOn: ipdBills.cancelledOn,
+        })
+        .from(ipdBills)
+        .innerJoin(patients, eq(patients.id, ipdBills.patientId))
+        .where(and(eq(ipdBills.corporateClientId, params.clientId), lte(ipdBills.billedOn, params.to)));
+      const bills = [...outdoor, ...indoor].sort(
+        (a, b) => a.billedOn.localeCompare(b.billedOn) || a.number.localeCompare(b.number),
+      );
+      const outdoorPayments = outdoor.length
         ? await context.db
             .select({
               billId: opdPayments.billId,
@@ -346,20 +367,45 @@ export function corporateStatementReport(context: DbContext): ReportDefinition {
               method: opdPayments.method,
               amount: opdPayments.amount,
               paidOn: opdPayments.paidOn,
+              createdAt: opdPayments.createdAt,
             })
             .from(opdPayments)
             .where(
               and(
                 inArray(
                   opdPayments.billId,
-                  bills.map((bill) => bill.id),
+                  outdoor.map((bill) => bill.id),
                 ),
                 eq(opdPayments.kind, 'collection'),
                 lte(opdPayments.paidOn, params.to),
               ),
             )
-            .orderBy(asc(opdPayments.paidOn), asc(opdPayments.createdAt))
         : [];
+      const indoorPayments = indoor.length
+        ? await context.db
+            .select({
+              billId: sql<string>`${ipdPayments.billId}`,
+              number: ipdPayments.number,
+              method: ipdPayments.method,
+              amount: ipdPayments.amount,
+              paidOn: ipdPayments.paidOn,
+              createdAt: ipdPayments.createdAt,
+            })
+            .from(ipdPayments)
+            .where(
+              and(
+                inArray(
+                  ipdPayments.billId,
+                  indoor.map((bill) => bill.id),
+                ),
+                eq(ipdPayments.kind, 'collection'),
+                lte(ipdPayments.paidOn, params.to),
+              ),
+            )
+        : [];
+      const payments = [...outdoorPayments, ...indoorPayments].sort(
+        (a, b) => a.paidOn.localeCompare(b.paidOn) || a.createdAt.getTime() - b.createdAt.getTime(),
+      );
       /** What the client owed at the end of a day. */
       const owedAt = (date: string) =>
         cents(

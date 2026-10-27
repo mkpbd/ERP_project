@@ -39,6 +39,7 @@ import { createZodDto } from '../../../shared/presentation/zod/zod-dto.js';
 import {
   ChangePatientCommand,
   DeactivatePatientCommand,
+  MergePatientCommand,
   FindPatientMatchesQuery,
   GetPatientByUhidQuery,
   GetPatientPhotoQuery,
@@ -101,6 +102,21 @@ class RegisterPatientDto extends createZodDto(
   z.strictObject({ ...patientShape, allowDuplicate: z.boolean().default(false) }),
 ) {}
 class ChangePatientDto extends createZodDto(z.strictObject({ ...patientShape, version })) {}
+class MergePatientDto extends createZodDto(
+  z.strictObject({
+    version: z.int().min(1),
+    /** The record kept. */
+    intoId: z.uuid(),
+    reason: z.string().trim().min(1).max(250),
+  }),
+) {}
+class MergedResponseDto extends responseDto({
+  appointments: z.int(),
+  opdBills: z.int(),
+  admissions: z.int(),
+  ipdBills: z.int(),
+  visits: z.int(),
+}) {}
 class DeactivatePatientDto extends createZodDto(
   z.strictObject({ version, reason: z.string().trim().min(1).max(300) }),
 ) {}
@@ -181,6 +197,7 @@ class PatientResponseDto extends responseDto({
   corporateClientId: z.uuid().nullable(),
   registeredBy: z.uuid().nullable(),
   inactiveReason: z.string().nullable(),
+  mergedIntoId: z.uuid().nullable(),
   hasPhoto: z.boolean(),
   version: z.int(),
 }) {}
@@ -263,6 +280,17 @@ export class PatientsController {
   @ApiNoContentResponse()
   async deactivate(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: DeactivatePatientDto) {
     await this.commandBus.execute(new DeactivatePatientCommand(actor, params.id, dto.version, dto.reason));
+  }
+
+  @Post(':id/merge')
+  @RequirePermissions('patient:manage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Merge a duplicate into the record kept: its bills, admissions, appointments and visits move there',
+  })
+  @ApiOkResponse({ type: MergedResponseDto })
+  merge(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: MergePatientDto) {
+    return this.commandBus.execute(new MergePatientCommand(actor, params.id, dto.version, dto.intoId, dto.reason));
   }
 
   @Post(':id/reactivate')

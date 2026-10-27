@@ -139,4 +139,21 @@ describe('Patient', () => {
     expect(patient.toSnapshot()).toMatchObject({ isActive: true, inactiveReason: null, version: 4 });
     expect(() => patient.reactivate(now)).toThrow(/active already/);
   });
+
+  it('is merged into another record with a reason, for good', () => {
+    const patient = registered();
+    expect(() => patient.mergeInto({ id: 'p', uhid: 26_000_001 }, 'Twice', now)).toThrow(
+      expect.objectContaining({ code: 'same_patient' }),
+    );
+    expect(() => patient.mergeInto({ id: 'q', uhid: 26_000_002 }, ' ', now)).toThrow(/reason/);
+    patient.mergeInto({ id: 'q', uhid: 26_000_002 }, 'Registered twice', now);
+    expect(patient.toSnapshot()).toMatchObject({
+      isActive: false,
+      mergedIntoId: 'q',
+      inactiveReason: 'Merged into UHID 26000002: Registered twice',
+      version: 2,
+    });
+    expect(() => patient.reactivate(now)).toThrow(expect.objectContaining({ code: 'patient_merged' }));
+    expect(() => patient.mergeInto({ id: 'r', uhid: 26_000_003 }, 'Again', now)).toThrow(/inactive/);
+  });
 });

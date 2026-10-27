@@ -1,0 +1,17 @@
+{{#with data}}
+<table class="report">
+  <thead>
+    <tr><th>Head</th><th>Where</th><th class="num">Billed</th><th class="num">Cancelled</th><th class="num">Net</th></tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr><td>{{label}}</td><td>{{place}}</td><td class="num">{{money billed}}</td><td class="num">{{money cancelled}}</td><td class="num">{{money net}}</td></tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="2">Income</td><td class="num">{{money income.billed}}</td><td class="num">{{money income.cancelled}}</td><td class="num">{{money income.net}}</td></tr>
+    <tr><td colspan="2">Less discounts</td><td class="num">{{money discounts.billed}}</td><td class="num">{{money discounts.cancelled}}</td><td class="num">{{money discounts.net}}</td></tr>
+    <tr class="group-row"><td colspan="4">Net income</td><td class="num">{{money netIncome}}</td></tr>
+  </tbody>
+</table>
+<p class="muted">Bills cancelled in the period are taken off on the day they were cancelled. Medicine and investigations are
+  reported by the pharmacy and diagnostics.</p>
+{{/with}}

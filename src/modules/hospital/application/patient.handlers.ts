@@ -25,6 +25,7 @@ import { PatientRepository } from '../domain/repositories.js';
 import {
   ChangePatientCommand,
   DeactivatePatientCommand,
+  MergePatientCommand,
   FindPatientMatchesQuery,
   GetPatientByUhidQuery,
   GetPatientPhotoQuery,
@@ -187,6 +188,37 @@ export class DeactivatePatientHandler implements ICommandHandler<DeactivatePatie
   }
 }
 
+/**
+ * No merge existed in the old system (a duplicate was only deactivated, and its history stayed apart under its own
+ * UHID): the duplicate's appointments, OPD bills, admissions, indoor bills and visit log move to the record kept, and
+ * the duplicate is out of use for good. Both records are locked, in a fixed order; a merge that would leave the kept
+ * record with two open admissions is refused.
+ */
+@CommandHandler(MergePatientCommand)
+export class MergePatientHandler implements ICommandHandler<MergePatientCommand> {
+  constructor(private readonly desk: PatientDesk) {}
+
+  async execute({ actor, id, version, intoId, reason }: MergePatientCommand) {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [PATIENT_MANAGE] });
+    return desk.tx.run(async () => {
+      for (const key of [id, intoId].sort()) await desk.tx.lock(`hospital:admission:${key}`);
+      const duplicate = await desk.patient(id, version);
+      const kept = await desk.patients.findForUpdate(intoId);
+      if (!kept) throw new NotFoundError('patient');
+      if (!kept.isActive) throw new DomainError('patient_state', 'The record kept must be in use');
+      if ((await desk.patients.openAdmission(id)) && (await desk.patients.openAdmission(intoId))) {
+        throw new ConflictError('both_admitted', 'Both records have an open admission; discharge one first');
+      }
+      duplicate.mergeInto({ id: kept.id, uhid: kept.uhid }, reason, desk.clock.now());
+      const moved = await desk.patients.moveRecords(id, intoId);
+      await desk.patients.update(duplicate);
+      await desk.record('merged', actor, id, { uhid: duplicate.uhid, into: kept.uhid, ...moved });
+      return moved;
+    });
+  }
+}
+
 @CommandHandler(ReactivatePatientCommand)
 export class ReactivatePatientHandler implements ICommandHandler<ReactivatePatientCommand> {
   constructor(private readonly desk: PatientDesk) {}
@@ -329,6 +361,7 @@ export const PATIENT_HANDLERS = [
   ChangePatientHandler,
   DeactivatePatientHandler,
   ReactivatePatientHandler,
+  MergePatientHandler,
   SetPatientPhotoHandler,
   RemovePatientPhotoHandler,
   ListPatientsHandler,

@@ -1,0 +1,39 @@
+{{#with data}}
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 18%">UHID</td><td><b>{{patient.uhidLabel}}</b></td><td style="width: 18%">Patient</td><td>{{patient.fullName}}</td></tr>
+    <tr><td>Billed (not cancelled)</td><td class="num">{{money billed}}</td><td>Mobile</td><td>{{patient.mobileNo}}</td></tr>
+    <tr><td>Owed by the patient</td><td class="num"><b>{{money ownDue}}</b></td><td>Owed by others</td><td class="num">{{money othersDue}}</td></tr>
+  </tbody>
+</table>
+<h3 style="margin: 8px 0 6px">Bills</h3>
+<table class="report">
+  <thead>
+    <tr>
+      <th>Billed on</th><th>Bill</th><th>Where</th><th>Bill to</th><th class="num">Bill</th><th class="num">Paid</th>
+      <th class="num">Due</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each bills}}
+    <tr>
+      <td>{{date billedOn}}</td><td>{{number}}</td><td>{{place}}</td><td>{{billTo}}</td><td class="num">{{money net}}</td>
+      <td class="num">{{money paid}}</td><td class="num">{{money due}}</td><td>{{state}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="8" class="empty">No bills.</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if receipts.length}}
+<h3 style="margin: 12px 0 6px">Money received and paid back</h3>
+<table class="report">
+  <thead><tr><th>Date</th><th>Receipt</th><th>What</th><th>Method</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+    {{#each receipts}}
+    <tr><td>{{date paidOn}}</td><td>{{number}}</td><td>{{what}}</td><td>{{methodLabel}}</td><td class="num">{{money signed}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{/with}}

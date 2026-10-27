@@ -11,8 +11,18 @@ import {
   type PatientView,
 } from '../../application/patient.messages.js';
 import { Patient, type IdType } from '../../domain/patient.js';
-import { PatientRepository, type PatientMatch } from '../../domain/repositories.js';
-import { corporateClients, hospitalSequences, patientPhotos, patients } from './hospital.schema.js';
+import { PatientRepository, type MovedRecords, type PatientMatch } from '../../domain/repositories.js';
+import {
+  admissions,
+  appointments,
+  corporateClients,
+  hospitalSequences,
+  ipdBills,
+  opdBills,
+  patientPhotos,
+  patients,
+  uhidUses,
+} from './hospital.schema.js';
 
 const UHID_KIND = 'uhid';
 
@@ -34,6 +44,31 @@ export class DrizzlePatientRepository extends PatientRepository {
   async update(patient: Patient): Promise<void> {
     const { id, ...row } = patient.toSnapshot();
     await this.context.db.update(patients).set(row).where(eq(patients.id, id));
+  }
+
+  async openAdmission(patientId: string): Promise<boolean> {
+    const [row] = await this.context.db
+      .select({ id: admissions.id })
+      .from(admissions)
+      .where(and(eq(admissions.patientId, patientId), eq(admissions.status, 'admitted')));
+    return row !== undefined;
+  }
+
+  async moveRecords(fromId: string, toId: string): Promise<MovedRecords> {
+    const { db } = this.context;
+    // One statement at a time: this runs inside the merge's transaction.
+    const moved = async (
+      table: typeof appointments | typeof opdBills | typeof admissions | typeof ipdBills | typeof uhidUses,
+    ) =>
+      (await db.update(table).set({ patientId: toId }).where(eq(table.patientId, fromId)).returning({ id: table.id }))
+        .length;
+    return {
+      appointments: await moved(appointments),
+      opdBills: await moved(opdBills),
+      admissions: await moved(admissions),
+      ipdBills: await moved(ipdBills),
+      visits: await moved(uhidUses),
+    };
   }
 
   async nextSerial(year: number): Promise<number> {

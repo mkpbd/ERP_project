@@ -5,6 +5,7 @@ import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
 import {
   OpdBillReadRepository,
+  type DoctorLedgerView,
   type OpdBillFilter,
   type OpdBillSummary,
   type OpdBillView,
@@ -15,14 +16,18 @@ import {
   type BillableDoctor,
   type BillableService,
   type CorporateClient,
+  type CorporateDueBill,
+  type DoctorPayment,
   type DoctorLedgerEntry,
   type OpdPolicy,
 } from '../../domain/repositories.js';
 import {
   corporateClients,
   doctorLedger,
+  doctorPayments,
   doctors,
   hospitalSequences,
+  ipdBills,
   opdBillLines,
   opdBills,
   opdPayments,
@@ -190,28 +195,46 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
   }
 
   async corporateDue(clientId: string): Promise<number> {
-    const [row] = await this.context.db
-      .select({
-        owed: sql<number>`coalesce(sum(${opdBills.net} - ${opdBills.paid} - ${opdBills.collected}), 0)`.mapWith(Number),
-      })
-      .from(opdBills)
-      .where(and(eq(opdBills.corporateClientId, clientId), eq(opdBills.status, 'billed')));
-    return Math.round((row?.owed ?? 0) * 100) / 100;
+    const owed = (await this.dueBills(clientId)).reduce((total, bill) => total + Math.round(bill.due * 100), 0);
+    return owed / 100;
   }
 
-  async dueBillIds(clientId: string): Promise<string[]> {
-    const rows = await this.context.db
-      .select({ id: opdBills.id })
-      .from(opdBills)
-      .where(
-        and(
-          eq(opdBills.corporateClientId, clientId),
-          eq(opdBills.status, 'billed'),
-          sql`${opdBills.net} - ${opdBills.paid} - ${opdBills.collected} > 0`,
-        ),
-      )
-      .orderBy(asc(opdBills.billedOn), asc(opdBills.number));
-    return rows.map((row) => row.id);
+  async dueBills(clientId: string): Promise<CorporateDueBill[]> {
+    const rows = await this.context.db.execute<{ kind: 'opd' | 'ipd'; id: string; due: string }>(sql`
+      select 'opd' as kind, ${opdBills.id} as id, ${opdBills.billedOn} as billed_on, ${opdBills.number} as number,
+        ${opdBills.net} - ${opdBills.paid} - ${opdBills.collected} as due
+      from ${opdBills}
+      where ${opdBills.corporateClientId} = ${clientId} and ${opdBills.status} = 'billed'
+        and ${opdBills.net} - ${opdBills.paid} - ${opdBills.collected} > 0
+      union all
+      select 'ipd', ${ipdBills.id}, ${ipdBills.billedOn}, ${ipdBills.number},
+        ${ipdBills.net} - ${ipdBills.deposit} - ${ipdBills.paid} - ${ipdBills.collected}
+      from ${ipdBills}
+      where ${ipdBills.corporateClientId} = ${clientId} and ${ipdBills.status} = 'billed'
+        and ${ipdBills.net} - ${ipdBills.deposit} - ${ipdBills.paid} - ${ipdBills.collected} > 0
+      order by billed_on, number`);
+    return rows.rows.map((row) => ({ kind: row.kind, id: row.id, due: Number(row.due) }));
+  }
+
+  async doctorBalance(doctorId: string): Promise<number> {
+    const [row] = await this.context.db
+      .select({ balance: sql<number>`coalesce(sum(${doctorLedger.amount}), 0)`.mapWith(Number) })
+      .from(doctorLedger)
+      .where(eq(doctorLedger.doctorId, doctorId));
+    return Math.round((row?.balance ?? 0) * 100) / 100;
+  }
+
+  async addDoctorPayment(payment: DoctorPayment): Promise<void> {
+    await this.context.db.insert(doctorPayments).values({ ...payment, id: randomUUID() });
+    await this.context.db.insert(doctorLedger).values({
+      id: randomUUID(),
+      doctorId: payment.doctorId,
+      entryOn: payment.paidOn,
+      kind: 'payment',
+      billId: null,
+      documentNumber: payment.number,
+      amount: -payment.amount,
+    });
   }
 
   async lastVisitOn(patientId: string, doctorId: string): Promise<string | null> {
@@ -248,6 +271,45 @@ const due = sql<number>`${opdBills.net} - ${opdBills.paid} - ${opdBills.collecte
 export class DrizzleOpdBillReadRepository extends OpdBillReadRepository {
   constructor(private readonly context: DbContext) {
     super();
+  }
+
+  async doctorLedger(doctorId: string, from: string, to: string): Promise<DoctorLedgerView | null> {
+    const [doctor] = await this.context.db.select({ name: doctors.name }).from(doctors).where(eq(doctors.id, doctorId));
+    if (!doctor) return null;
+    const [before] = await this.context.db
+      .select({ amount: sql<number>`coalesce(sum(${doctorLedger.amount}), 0)`.mapWith(Number) })
+      .from(doctorLedger)
+      .where(and(eq(doctorLedger.doctorId, doctorId), sql`${doctorLedger.entryOn} < ${from}`));
+    const rows = await this.context.db
+      .select({
+        entryOn: doctorLedger.entryOn,
+        kind: doctorLedger.kind,
+        documentNumber: doctorLedger.documentNumber,
+        amount: doctorLedger.amount,
+      })
+      .from(doctorLedger)
+      .where(and(eq(doctorLedger.doctorId, doctorId), gte(doctorLedger.entryOn, from), lte(doctorLedger.entryOn, to)))
+      .orderBy(asc(doctorLedger.entryOn), asc(doctorLedger.createdAt));
+    const cents = (value: number) => Math.round(value * 100);
+    let balance = cents(before?.amount ?? 0);
+    const totals = { share: 0, reversal: 0, payment: 0 };
+    const entries = rows.map((row) => {
+      balance += cents(row.amount);
+      totals[row.kind] += cents(row.amount);
+      return { ...row, balance: balance / 100 };
+    });
+    return {
+      doctorId,
+      doctorName: doctor.name,
+      from,
+      to,
+      opening: cents(before?.amount ?? 0) / 100,
+      entries,
+      earned: totals.share / 100,
+      reversed: -totals.reversal / 100,
+      paid: -totals.payment / 100,
+      closing: balance / 100,
+    };
   }
 
   private summaries() {

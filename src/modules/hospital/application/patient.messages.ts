@@ -58,6 +58,7 @@ export interface PatientView extends PatientSummary {
   readonly corporateClientId: string | null;
   readonly registeredBy: string | null;
   readonly inactiveReason: string | null;
+  readonly mergedIntoId: string | null;
   readonly hasPhoto: boolean;
   readonly version: number;
 }
@@ -102,6 +103,25 @@ export class DeactivatePatientCommand extends Command<void> {
     readonly actor: Actor,
     readonly id: string,
     readonly version: number,
+    readonly reason: string,
+  ) {
+    super();
+  }
+}
+
+/** A duplicate record merged into the one kept: its bills, admissions, appointments and visits move there. */
+export class MergePatientCommand extends Command<{
+  appointments: number;
+  opdBills: number;
+  admissions: number;
+  ipdBills: number;
+  visits: number;
+}> {
+  constructor(
+    readonly actor: Actor,
+    readonly id: string,
+    readonly version: number,
+    readonly intoId: string,
     readonly reason: string,
   ) {
     super();

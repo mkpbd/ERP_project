@@ -10,21 +10,26 @@ import { TransactionManager } from '../../../shared/application/ports/transactio
 import { DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { feeFor } from '../domain/appointment.js';
 import { StaffDirectory } from '../../../shared/application/contracts/staff-directory.js';
+import type { IpdBill } from '../domain/ipd-bill.js';
 import { OpdBill, suggestedVisit, validMoney, type BillPayer } from '../domain/opd-bill.js';
+import { text } from '../domain/patient.js';
 import {
   AppointmentRepository,
+  IpdBillingRepository,
   OpdBillRepository,
   type BillableDoctor,
   type CorporateClient,
   type DoctorLedgerEntry,
   type OpdPolicy,
 } from '../domain/repositories.js';
-import { OPD_MANAGE, OPD_READ } from './hospital.constants.js';
+import { DOCTOR_PAY, OPD_MANAGE, OPD_READ } from './hospital.constants.js';
 import {
   CancelOpdBillCommand,
   CollectCorporateDueCommand,
   CollectOpdDueCommand,
   CONSULTANT_PAYABLE_ROLE,
+  GetDoctorLedgerQuery,
+  PayDoctorCommand,
   CORPORATE_RECEIVABLE_ROLE,
   CreateOpdBillCommand,
   DOCTOR_FEE_ROLE,
@@ -391,12 +396,15 @@ export class CollectOpdDueHandler implements ICommandHandler<CollectOpdDueComman
 }
 
 /**
- * Old corporate client collection (diagnostics and pharmacy only; the OPD had none): what a company pays settles its
- * bills oldest first, on one receipt and one voucher.
+ * Old corporate client collection (diagnostics and pharmacy only; the OPD and the wards had none): what a company pays
+ * settles its OPD and indoor bills together, oldest first, on one receipt and one voucher.
  */
 @CommandHandler(CollectCorporateDueCommand)
 export class CollectCorporateDueHandler implements ICommandHandler<CollectCorporateDueCommand> {
-  constructor(private readonly desk: OpdDesk) {}
+  constructor(
+    private readonly desk: OpdDesk,
+    private readonly indoor: IpdBillingRepository,
+  ) {}
 
   async execute({ actor, clientId, amount, method, reference }: CollectCorporateDueCommand) {
     const { desk } = this;
@@ -413,15 +421,28 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
       const now = desk.clock.now();
       const number = await desk.number('OR', today);
       let left = Math.round(amount * 100);
-      const settled: { bill: OpdBill; amount: number }[] = [];
-      for (const billId of await desk.bills.dueBillIds(clientId)) {
+      const settled: { kind: 'opd' | 'ipd'; billId: string; number: string; amount: number }[] = [];
+      const opd: OpdBill[] = [];
+      const ipd: IpdBill[] = [];
+      for (const due of await desk.bills.dueBills(clientId)) {
         if (left === 0) break;
-        const bill = (await desk.bills.findForUpdate(billId))!;
-        const part = Math.min(left, Math.round(bill.due * 100));
-        if (part === 0) continue;
-        bill.collect({ number, method, reference, amount: part / 100, on: today, now });
-        settled.push({ bill, amount: part / 100 });
-        left -= part;
+        if (due.kind === 'opd') {
+          const bill = (await desk.bills.findForUpdate(due.id))!;
+          const part = Math.min(left, Math.round(bill.due * 100));
+          if (part === 0) continue;
+          bill.collect({ number, method, reference, amount: part / 100, on: today, now });
+          opd.push(bill);
+          settled.push({ kind: 'opd', billId: bill.id, number: bill.number, amount: part / 100 });
+          left -= part;
+        } else {
+          const bill = (await this.indoor.billForUpdate(due.id))!;
+          const part = Math.min(left, Math.round(bill.due * 100));
+          if (part === 0) continue;
+          bill.collect(part / 100, today, now);
+          ipd.push(bill);
+          settled.push({ kind: 'ipd', billId: bill.id, number: bill.number, amount: part / 100 });
+          left -= part;
+        }
       }
       const narration = `${client.name} paid ${number}`;
       const voucher = await desk.post(
@@ -434,7 +455,23 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
         ],
         actor,
       );
-      for (const { bill } of settled) await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
+      for (const bill of opd) await desk.bills.update(bill, actor.userId, voucher?.number ?? null);
+      // An indoor bill's part gets its own receipt row (the account's money), under the company's receipt number.
+      for (const [index, bill] of ipd.entries()) {
+        await this.indoor.updateBill(bill);
+        await this.indoor.addPayment({
+          admissionId: bill.admissionId,
+          billId: bill.id,
+          kind: 'collection',
+          number: index === 0 ? number : `${number}/${index + 1}`,
+          method,
+          reference: text(reference, 100, 'payment reference'),
+          amount: settled.find((part) => part.billId === bill.id)!.amount,
+          paidOn: today,
+          receivedBy: actor.userId,
+          voucherNumber: voucher?.number ?? null,
+        });
+      }
       await desk.audit.record({
         action: 'hospital.corporate_collected',
         actorUserId: actor.userId,
@@ -442,10 +479,7 @@ export class CollectCorporateDueHandler implements ICommandHandler<CollectCorpor
         resourceId: clientId,
         metadata: { number, amount, method, bills: settled.length },
       });
-      return {
-        number,
-        settled: settled.map(({ bill, amount: part }) => ({ billId: bill.id, number: bill.number, amount: part })),
-      };
+      return { number, settled };
     });
   }
 }
@@ -505,6 +539,77 @@ export class CancelOpdBillHandler implements ICommandHandler<CancelOpdBillComman
   }
 }
 
+/**
+ * Old SaveConsultancyPaymentRecords (worked out in SPGetDoctorPayment per service, never posted; no page left): a doctor
+ * paid any part of what their ledger says they are owed, with a receipt number and a voucher.
+ */
+@CommandHandler(PayDoctorCommand)
+export class PayDoctorHandler implements ICommandHandler<PayDoctorCommand> {
+  constructor(private readonly desk: OpdDesk) {}
+
+  async execute({ actor, doctorId, payment }: PayDoctorCommand) {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [DOCTOR_PAY] });
+    validMoney(payment.amount, 'amount');
+    if (payment.amount === 0) throw new DomainError('invalid_amount', 'Pay more than nothing');
+    return desk.tx.run(async () => {
+      await desk.tx.lock(`hospital:doctor:${doctorId}`);
+      const doctor = (await desk.bills.doctors([doctorId])).get(doctorId);
+      if (!doctor) throw new NotFoundError('doctor');
+      const owed = await desk.bills.doctorBalance(doctorId);
+      if (payment.amount > owed) {
+        throw new DomainError('overpayment', `${doctor.name} is owed ${owed.toFixed(2)}`);
+      }
+      const today = desk.today();
+      const number = await desk.number('DP', today);
+      const narration = `${doctor.name} paid ${number}`;
+      const voucher = await desk.post(
+        narration,
+        today,
+        doctorId,
+        [
+          { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: payment.amount, credit: 0, narration },
+          { account: { role: OPD_RECEIPT_ROLES[payment.method] }, debit: 0, credit: payment.amount, narration },
+        ],
+        actor,
+      );
+      await desk.bills.addDoctorPayment({
+        number,
+        doctorId,
+        paidOn: today,
+        amount: payment.amount,
+        method: payment.method,
+        reference: text(payment.reference, 100, 'payment reference'),
+        note: text(payment.note, 200, 'note'),
+        voucherNumber: voucher?.number ?? null,
+        paidBy: actor.userId,
+      });
+      await desk.audit.record({
+        action: 'hospital.doctor_paid',
+        actorUserId: actor.userId,
+        resourceType: 'doctor',
+        resourceId: doctorId,
+        metadata: { number, amount: payment.amount, method: payment.method },
+      });
+      return { number, balance: (Math.round(owed * 100) - Math.round(payment.amount * 100)) / 100 };
+    });
+  }
+}
+
+/** Old DoctorPaymentSheet: what a doctor earned, had taken back and was paid, with what they are owed. */
+@QueryHandler(GetDoctorLedgerQuery)
+export class GetDoctorLedgerHandler implements IQueryHandler<GetDoctorLedgerQuery> {
+  constructor(private readonly desk: OpdDesk) {}
+
+  async execute({ actor, doctorId, from, to }: GetDoctorLedgerQuery) {
+    await this.desk.access.authorize(actor.userId, { permissions: [OPD_READ] });
+    if (from > to) throw new DomainError('invalid_period', 'The start date is after the end date');
+    const ledger = await this.desk.read.doctorLedger(doctorId, from, to);
+    if (!ledger) throw new NotFoundError('doctor');
+    return ledger;
+  }
+}
+
 @QueryHandler(GetOpdPolicyQuery)
 export class GetOpdPolicyHandler implements IQueryHandler<GetOpdPolicyQuery> {
   constructor(private readonly desk: OpdDesk) {}
@@ -559,6 +664,8 @@ export const OPD_HANDLERS = [
   CollectOpdDueHandler,
   CollectCorporateDueHandler,
   CancelOpdBillHandler,
+  PayDoctorHandler,
+  GetDoctorLedgerHandler,
   GetOpdPolicyHandler,
   SuggestVisitHandler,
   ListOpdBillsHandler,

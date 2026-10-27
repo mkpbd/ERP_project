@@ -91,7 +91,29 @@ export interface OpdBillView extends OpdBillSummary {
   readonly payments: (BillPayment & { readonly receivedBy: string | null })[];
 }
 
+export interface DoctorLedgerView {
+  readonly doctorId: string;
+  readonly doctorName: string;
+  readonly from: string;
+  readonly to: string;
+  /** Owed to the doctor before the period. */
+  readonly opening: number;
+  readonly entries: {
+    readonly entryOn: string;
+    readonly kind: 'share' | 'reversal' | 'payment';
+    readonly documentNumber: string;
+    readonly amount: number;
+    /** Owed after this entry. */
+    readonly balance: number;
+  }[];
+  readonly earned: number;
+  readonly reversed: number;
+  readonly paid: number;
+  readonly closing: number;
+}
+
 export abstract class OpdBillReadRepository {
+  abstract doctorLedger(doctorId: string, from: string, to: string): Promise<DoctorLedgerView | null>;
   abstract list(filter: OpdBillFilter): Promise<Page<OpdBillSummary>>;
   abstract get(id: string): Promise<OpdBillView | null>;
 }
@@ -151,9 +173,31 @@ export class CollectOpdDueCommand extends Command<{ number: string }> {
 }
 
 /** Old corporate collection: a company pays, oldest bills first, on one receipt. */
+/** Old SaveConsultancyPaymentRecord: a doctor paid of what they are owed. */
+export class PayDoctorCommand extends Command<{ number: string; balance: number }> {
+  constructor(
+    readonly actor: Actor,
+    readonly doctorId: string,
+    readonly payment: { amount: number; method: PaymentMethod; reference: string | null; note: string | null },
+  ) {
+    super();
+  }
+}
+
+export class GetDoctorLedgerQuery extends Query<DoctorLedgerView> {
+  constructor(
+    readonly actor: Actor,
+    readonly doctorId: string,
+    readonly from: string,
+    readonly to: string,
+  ) {
+    super();
+  }
+}
+
 export class CollectCorporateDueCommand extends Command<{
   number: string;
-  settled: { billId: string; number: string; amount: number }[];
+  settled: { kind: 'opd' | 'ipd'; billId: string; number: string; amount: number }[];
 }> {
   constructor(
     readonly actor: Actor,

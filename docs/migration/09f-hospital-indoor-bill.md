@@ -1,7 +1,7 @@
 # Step 9f — Hospital: the indoor bill
 
-Status: **done** (2026-10-27). Previous: [step 9e](09e-hospital-admissions.md) · Next: step 9g (doctor payments,
-corporate collections across OPD and indoor bills, ledgers and statements, UHID merge).
+Status: **done** (2026-10-27). Previous: [step 9e](09e-hospital-admissions.md) · Next: [step 9g](09g-hospital-statements.md)
+(doctor payments, corporate collections across OPD and indoor bills, ledgers and statements, UHID merge).
 
 This step bills the stay:
 

@@ -21,6 +21,8 @@ import { createZodDto } from '../../../shared/presentation/zod/zod-dto.js';
 import {
   CancelOpdBillCommand,
   CollectCorporateDueCommand,
+  GetDoctorLedgerQuery,
+  PayDoctorCommand,
   CollectOpdDueCommand,
   CreateOpdBillCommand,
   GetOpdBillQuery,
@@ -110,9 +112,41 @@ class CollectCorporateDueDto extends createZodDto(
     reference: z.string().trim().max(100).nullable().default(null),
   }),
 ) {}
+class PayDoctorDto extends createZodDto(
+  z.strictObject({
+    amount: money,
+    method: z.enum(PAYMENT_METHODS).default('cash'),
+    reference: z.string().trim().max(100).nullable().default(null),
+    note: z.string().trim().max(200).nullable().default(null),
+  }),
+) {}
+class DoctorPaidResponseDto extends responseDto({ number: z.string(), balance: z.number() }) {}
+class DoctorLedgerQueryDto extends createZodDto(z.object({ from: day, to: day })) {}
+class DoctorLedgerResponseDto extends responseDto({
+  doctorId: z.uuid(),
+  doctorName: z.string(),
+  from: z.string(),
+  to: z.string(),
+  opening: z.number(),
+  entries: z.array(
+    z.object({
+      entryOn: z.string(),
+      kind: z.enum(['share', 'reversal', 'payment']),
+      documentNumber: z.string(),
+      amount: z.number(),
+      balance: z.number(),
+    }),
+  ),
+  earned: z.number(),
+  reversed: z.number(),
+  paid: z.number(),
+  closing: z.number(),
+}) {}
 class CorporateCollectedResponseDto extends responseDto({
   number: z.string(),
-  settled: z.array(z.object({ billId: z.uuid(), number: z.string(), amount: z.number() })),
+  settled: z.array(
+    z.object({ kind: z.enum(['opd', 'ipd']), billId: z.uuid(), number: z.string(), amount: z.number() }),
+  ),
 }) {}
 class SuggestVisitQueryDto extends createZodDto(z.object({ patientId: z.uuid(), doctorId: z.uuid() })) {}
 
@@ -263,12 +297,30 @@ export class OpdBillsController {
 
   @Post('corporate-clients/:id/collections')
   @RequirePermissions('opd:bill')
-  @ApiOperation({ summary: "A corporate client's payment, settling its bills oldest first on one receipt" })
+  @ApiOperation({
+    summary: "A corporate client's payment, settling its OPD and indoor bills oldest first on one receipt",
+  })
   @ApiCreatedResponse({ type: CorporateCollectedResponseDto })
   collectCorporate(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: CollectCorporateDueDto) {
     return this.commandBus.execute(
       new CollectCorporateDueCommand(actor, params.id, dto.amount, dto.method, dto.reference),
     );
+  }
+
+  @Get('doctors/:id/ledger')
+  @RequirePermissions('opd:read')
+  @ApiOperation({ summary: "A doctor's shares earned, taken back and paid over a period, with what they are owed" })
+  @ApiOkResponse({ type: DoctorLedgerResponseDto })
+  doctorLedger(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Query() query: DoctorLedgerQueryDto) {
+    return this.queryBus.execute(new GetDoctorLedgerQuery(actor, params.id, query.from, query.to));
+  }
+
+  @Post('doctors/:id/payments')
+  @RequirePermissions('doctor:pay')
+  @ApiOperation({ summary: 'Pay a doctor any part of what their ledger says they are owed (posted)' })
+  @ApiCreatedResponse({ type: DoctorPaidResponseDto })
+  payDoctor(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PayDoctorDto) {
+    return this.commandBus.execute(new PayDoctorCommand(actor, params.id, dto));
   }
 
   @Post('opd-bills/:id/cancel')

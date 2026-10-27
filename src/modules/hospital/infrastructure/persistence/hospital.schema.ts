@@ -94,6 +94,8 @@ export const patients = pgTable(
     registeredBy: uuid('registered_by').references(() => users.id, { onDelete: 'set null' }),
     isActive: boolean('is_active').notNull().default(true),
     inactiveReason: text('inactive_reason'),
+    /** The record this duplicate was merged into (its bills, admissions and visits moved there). */
+    mergedIntoId: uuid('merged_into_id').references((): AnyPgColumn => patients.id, { onDelete: 'restrict' }),
     version: integer('version').notNull(),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -428,7 +430,7 @@ export const doctorLedger = pgTable(
       .notNull()
       .references(() => doctors.id, { onDelete: 'restrict' }),
     entryOn: day('entry_on').notNull(),
-    kind: text('kind', { enum: ['share', 'reversal'] }).notNull(),
+    kind: text('kind', { enum: ['share', 'reversal', 'payment'] }).notNull(),
     billId: uuid('bill_id').references(() => opdBills.id, { onDelete: 'restrict' }),
     ipdBillId: uuid('ipd_bill_id').references((): AnyPgColumn => ipdBills.id, { onDelete: 'restrict' }),
     documentNumber: text('document_number').notNull(),
@@ -437,6 +439,32 @@ export const doctorLedger = pgTable(
     createdAt: tz('created_at').notNull().defaultNow(),
   },
   (t) => [index('hospital_doctor_ledger_doctor_idx').on(t.doctorId, t.entryOn)],
+);
+
+// Old Hospital.SaveConsultancyPaymentRecords (InvoiceNo, ConsultantId, PayDate, Amount, DateFrom, DateTo, with a detail
+// row per service paid; no page left in the web app, and never posted): what a doctor is paid of their shares.
+export const doctorPayments = pgTable(
+  'hospital_doctor_payments',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    paidOn: day('paid_on').notNull(),
+    amount: money('amount').notNull(),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    note: text('note'),
+    voucherNumber: text('voucher_number'),
+    paidBy: uuid('paid_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_doctor_payments_number_uq').on(t.number),
+    index('hospital_doctor_payments_doctor_idx').on(t.doctorId, t.paidOn),
+    check('hospital_doctor_payments_amount_ck', sql`${t.amount} > 0`),
+  ],
 );
 
 // Old Admin.UHIDUsesRecords: each time a UHID is used by a service (the visit log behind the UHID dashboard).

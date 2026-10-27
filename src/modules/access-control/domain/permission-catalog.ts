@@ -93,12 +93,14 @@ export const PERMISSION_CATALOG = [
   { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
   { key: 'opd:bill', description: 'Bill consultations, collect their dues and cancel bills on their own day' },
   { key: 'opd:discount', description: "Give a consultation discount above the counter's limit" },
+  { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },
   { key: 'patient:register', description: 'Register patients, give UHIDs and change their details and photos' },
   {
     key: 'patient:manage',
-    description: 'Take patient records out of use (registered twice, made by mistake) and back into use',
+    description:
+      'Take patient records out of use (registered twice, made by mistake) and back into use; merge a duplicate into the record kept',
   },
   { key: 'leave:approve-any', description: 'Approve or reject any pending leave application at its current level' },
 ] as const;

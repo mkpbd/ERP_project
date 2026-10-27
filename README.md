@@ -177,7 +177,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | discount policy and product discounts, loyal members, cancelling sales (sellers: their own the same day) | `pharmacy:manage` |
 | `GET /hospital/patients/*` (search, view, matches, photo) | `patient:read` |
 | registering patients, changing their details and photos | `patient:register` |
-| taking a patient record out of use and back | `patient:manage` |
+| taking a patient record out of use and back; merging a duplicate into the record kept | `patient:manage` |
 | `GET` doctors, specialities, schedules, days off, appointments and the doctor board | `opd:read` |
 | doctors, specialities, chamber schedules and days off | `opd:manage` |
 | booking appointments; arrival, no-show, cancellation, attaching the patient | `opd:book` |
@@ -185,7 +185,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | a consultation discount above the counter's limit | `opd:discount` |
 | the OPD policy (follow-up days, default doctor share, counter discount limit); cancelling a bill later | `opd:manage` |
 | service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
-| a corporate client's payment against its bills | `opd:bill` |
+| a corporate client's payment against its OPD and indoor bills (oldest first) | `opd:bill` |
+| paying a doctor their shares | `doctor:pay` |
+| `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |
 | wards, bed categories and beds; cancelling an admission; taking a bed out of order | `ipd:manage` |
