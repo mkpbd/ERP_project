@@ -26,6 +26,7 @@ const today = new Intl.DateTimeFormat('en-CA', {
   day: '2-digit',
 }).format(new Date());
 const year = Number(today.slice(0, 4));
+const fiscal = Number(today.slice(5, 7)) >= 7 ? year : year - 1;
 
 async function login(identifier: string, password: string): Promise<string> {
   const response = await request(http)
@@ -55,6 +56,33 @@ async function user(name: string, permissions: string[]): Promise<string> {
     .send({ roleId: role })
     .expect(204);
   return login(`${name}@example.com`, PASSWORD);
+}
+
+/** The books the final bill posts to: a company's patient billed the admission fee only. */
+async function books() {
+  await create('accounts/fiscal-years', {
+    label: `${fiscal}-${fiscal + 1}`,
+    startsOn: `${fiscal}-07-01`,
+    endsOn: `${fiscal + 1}-06-30`,
+  });
+  await create('accounts/journal-types', { shortName: 'JV', name: 'Journal' });
+  for (const [nature, normalBalance, code, name, role] of [
+    ['1', 'debit', '1230', 'Corporate receivable', 'corporate_receivable'],
+    ['4', 'credit', '4301', 'Admission fees', 'ipd_admission_income'],
+  ] as const) {
+    const natureId = await create('accounts/natures', {
+      code: nature,
+      name: `Nature ${nature}`,
+      statement: nature === '4' ? 'profit_and_loss' : 'balance_sheet',
+      normalBalance,
+    });
+    const category = await create('accounts/categories', { natureId, code: `${code}C`, name: `${name} group` });
+    const sub = await create('accounts/sub-categories', { categoryId: category, name: 'General' });
+    const head4 = await create('accounts/level4-heads', { subCategoryId: sub, name: 'General' });
+    const head5 = await create('accounts/level5-heads', { level4HeadId: head4, name: 'General' });
+    const glAccountId = await create('accounts/gl-accounts', { level5HeadId: head5, code, name });
+    await create('accounts/gl-roles', { role, glAccountId });
+  }
 }
 
 const api = (method: 'get' | 'post', path: string, token: string, body?: object) => {
@@ -99,6 +127,7 @@ beforeEach(async () => {
   await resetDatabase(t.app);
   await bootstrapAdmin(t.app);
   admin = await login(ADMIN.email, ADMIN.password);
+  await books();
   manager = await user('manager', ['ipd:read', 'ipd:admit', 'ipd:manage', 'opd:read', 'opd:manage']);
   officer = await user('officer', ['ipd:read', 'ipd:admit', 'patient:read', 'patient:register']);
 
@@ -222,6 +251,9 @@ describe('admissions, beds and discharge', () => {
       version: 3,
       doctorIds: [nusrat],
     }).expect(204);
+    const unbilled = await api('post', `admissions/${admitted.body.id}/discharge`, officer, { version: 4 });
+    expect(unbilled.body.code).toBe('bill_needed');
+    await api('post', `admissions/${admitted.body.id}/final-bill`, admin, {}).expect(201);
     const noNote = await api('post', `admissions/${admitted.body.id}/discharge`, officer, { version: 4, type: 'lama' });
     expect(noNote.body.code).toBe('invalid_remarks');
     await api('post', `admissions/${admitted.body.id}/discharge`, officer, {

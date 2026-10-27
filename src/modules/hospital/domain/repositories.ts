@@ -1,7 +1,8 @@
 import type { StoredFile } from '../../../shared/domain/uploads.js';
 import type { Admission } from './admission.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
-import type { OpdBill } from './opd-bill.js';
+import type { IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
+import type { OpdBill, PaymentMethod } from './opd-bill.js';
 import type { IdType, Patient } from './patient.js';
 
 export interface PatientMatch {
@@ -75,6 +76,7 @@ export interface BillableService {
   /** The share of the doctor who gives it; null = none. */
   readonly sharePercent: number | null;
   readonly isOpd: boolean;
+  readonly isIpd: boolean;
   readonly isActive: boolean;
 }
 
@@ -91,7 +93,9 @@ export interface DoctorLedgerEntry {
   readonly doctorId: string;
   readonly entryOn: string;
   readonly kind: 'share' | 'reversal';
-  readonly billId: string;
+  /** The OPD bill, or the final indoor bill. */
+  readonly billId: string | null;
+  readonly ipdBillId?: string | null;
   readonly documentNumber: string;
   readonly amount: number;
 }
@@ -137,6 +141,7 @@ export interface AdmissionBed {
 
 export abstract class AdmissionRepository {
   abstract findForUpdate(id: string): Promise<Admission | null>;
+  abstract findById(id: string): Promise<Admission | null>;
   abstract insert(admission: Admission): Promise<void>;
   /** Saves the header and replaces the bed stays and doctors. */
   abstract update(admission: Admission): Promise<void>;
@@ -145,4 +150,51 @@ export abstract class AdmissionRepository {
   /** The bed, locked for the change. */
   abstract bedForUpdate(id: string): Promise<AdmissionBed | null>;
   abstract setBedStatus(id: string, status: BedStatus): Promise<void>;
+}
+
+export interface IpdPolicy {
+  readonly roundFeePerNight: number;
+  readonly serviceChargePercent: number;
+  readonly counterDiscountPercent: number;
+}
+
+export type IpdPaymentKind = 'advance' | 'refund' | 'payment' | 'collection';
+
+export interface IpdPayment {
+  readonly admissionId: string;
+  readonly billId: string | null;
+  readonly kind: IpdPaymentKind;
+  readonly number: string;
+  readonly method: PaymentMethod;
+  readonly reference: string | null;
+  readonly amount: number;
+  readonly paidOn: string;
+  readonly receivedBy: string;
+  readonly voucherNumber: string | null;
+}
+
+export interface ChargeEntry extends IpdCharge {
+  readonly admissionId: string;
+  readonly note: string | null;
+  readonly chargedBy: string;
+}
+
+export abstract class IpdBillingRepository {
+  abstract policy(): Promise<IpdPolicy>;
+  abstract savePolicy(policy: IpdPolicy, by: string, now: Date): Promise<void>;
+  abstract insertCharge(charge: ChargeEntry): Promise<void>;
+  abstract charge(id: string): Promise<{ admissionId: string; status: 'active' | 'cancelled' } | null>;
+  abstract cancelCharge(id: string, reason: string, by: string, at: Date): Promise<void>;
+  /** The admission's charges not cancelled, in the order given. */
+  abstract activeCharges(admissionId: string): Promise<IpdCharge[]>;
+  /** The admission's bed stays in the organisation's days, with whether each bed is intensive care. */
+  abstract stays(admissionId: string): Promise<StayDays[]>;
+  /** Money put in on the admission (advances, payments, collections) less what was refunded. */
+  abstract received(admissionId: string): Promise<number>;
+  abstract addPayment(payment: IpdPayment): Promise<void>;
+  /** The admission's bill in force, locked. */
+  abstract liveBill(admissionId: string): Promise<IpdBill | null>;
+  abstract billForUpdate(id: string): Promise<IpdBill | null>;
+  abstract insertBill(bill: IpdBill): Promise<void>;
+  abstract updateBill(bill: IpdBill): Promise<void>;
 }

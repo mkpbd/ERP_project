@@ -35,8 +35,17 @@ export class DrizzleAdmissionRepository extends AdmissionRepository {
     super();
   }
 
-  async findForUpdate(id: string): Promise<Admission | null> {
-    const [row] = await this.context.db.select().from(admissions).where(eq(admissions.id, id)).for('update');
+  findForUpdate(id: string): Promise<Admission | null> {
+    return this.load(id, true);
+  }
+
+  findById(id: string): Promise<Admission | null> {
+    return this.load(id, false);
+  }
+
+  private async load(id: string, lock: boolean): Promise<Admission | null> {
+    const query = this.context.db.select().from(admissions).where(eq(admissions.id, id));
+    const [row] = lock ? await query.for('update') : await query;
     if (!row) return null;
     const [stays, doctorRows] = await Promise.all([
       this.context.db

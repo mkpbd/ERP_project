@@ -31,6 +31,7 @@ import {
   SetBedStatusCommand,
 } from '../application/ipd.messages.js';
 import { ADMISSION_KINDS, DISCHARGE_TYPES } from '../domain/admission.js';
+import { PAYMENT_METHODS } from '../domain/opd-bill.js';
 
 const name = (max = 100) => z.string().trim().min(1).max(max);
 const optionalText = (max: number) => z.string().trim().max(max).nullable();
@@ -153,6 +154,15 @@ class AdmitDto extends createZodDto(
     /** Left out: the patient's own corporate client, if any; null: the patient pays. */
     corporateClientId: z.uuid().nullable().optional(),
     staffId: z.uuid().nullable().default(null),
+    /** An advance taken with the admission. */
+    advance: z
+      .strictObject({
+        amount: money,
+        method: z.enum(PAYMENT_METHODS).default('cash'),
+        reference: z.string().trim().max(100).nullable().default(null),
+      })
+      .nullable()
+      .default(null),
   }),
 ) {}
 class TransferDto extends createZodDto(
@@ -198,7 +208,7 @@ const summaryShape = {
   doctorName: z.string().nullable(),
   version: z.int(),
 };
-class AdmittedResponseDto extends responseDto({ id: z.uuid(), number: z.string() }) {}
+class AdmittedResponseDto extends responseDto({ id: z.uuid(), number: z.string(), receipt: z.string().nullable() }) {}
 class AdmissionPageResponseDto extends responseDto({ items: z.array(z.object(summaryShape)), ...pageMetaShape }) {}
 class AdmissionResponseDto extends responseDto({
   ...summaryShape,
@@ -311,7 +321,9 @@ export class AdmissionsController {
 
   @Post('admissions')
   @RequirePermissions('ipd:admit')
-  @ApiOperation({ summary: 'Admit a registered patient with no open admission to a free bed under a consultant' })
+  @ApiOperation({
+    summary: 'Admit a registered patient with no open admission to a free bed under a consultant (with an advance)',
+  })
   @ApiCreatedResponse({ type: AdmittedResponseDto })
   admit(@CurrentUser() actor: Actor, @Body() dto: AdmitDto) {
     return this.commandBus.execute(new AdmitPatientCommand(actor, dto));
@@ -356,7 +368,10 @@ export class AdmissionsController {
   @Post('admissions/:id/discharge')
   @RequirePermissions('ipd:admit')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Discharge (normal, LAMA, referred, absconded, death — a note for all but normal)' })
+  @ApiOperation({
+    summary:
+      'Discharge (normal, LAMA, referred, absconded, death — a note for all but normal) on the day of the final bill',
+  })
   @ApiNoContentResponse()
   async discharge(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: DischargeDto) {
     await this.commandBus.execute(

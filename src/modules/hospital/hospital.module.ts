@@ -9,6 +9,8 @@ import { ReportRegistry } from '../../shared/application/reports.js';
 import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { APPOINTMENT_HANDLERS } from './application/appointment.handlers.js';
+import { IPD_BILLING_HANDLERS, IpdCashier } from './application/ipd-billing.handlers.js';
+import { IpdBillingReadRepository } from './application/ipd-billing.messages.js';
 import { IPD_HANDLERS } from './application/ipd.handlers.js';
 import { AdmissionReadRepository } from './application/ipd.messages.js';
 import { OPD_HANDLERS } from './application/opd.handlers.js';
@@ -19,9 +21,14 @@ import { PatientReadRepository } from './application/patient.messages.js';
 import {
   AdmissionRepository,
   AppointmentRepository,
+  IpdBillingRepository,
   OpdBillRepository,
   PatientRepository,
 } from './domain/repositories.js';
+import {
+  DrizzleIpdBillingReadRepository,
+  DrizzleIpdBillingRepository,
+} from './infrastructure/persistence/drizzle-ipd-billing.repositories.js';
 import {
   DrizzleAdmissionReadRepository,
   DrizzleAdmissionRepository,
@@ -32,7 +39,9 @@ import {
   bedOccupancyReport,
   inpatientCensusReport,
 } from './infrastructure/reports/ipd.reports.js';
+import { IPD_BILLING_CONTROLLERS } from './presentation/ipd-billing.controllers.js';
 import { IPD_CONTROLLERS } from './presentation/ipd.controllers.js';
+import { ipdBillReport, ipdCollectionReport, ipdReceiptReport } from './infrastructure/reports/ipd-billing.reports.js';
 import {
   DrizzleOpdBillReadRepository,
   DrizzleOpdBillRepository,
@@ -63,8 +72,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
  * chamber schedules and appointments (step 9b); OPD consultation billing with the doctor's share (step 9c); OPD and
- * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e). The
- * indoor bill follows in step 9f.
+ * emergency services, corporate clients and staff billing (step 9d); admissions, beds and discharge (step 9e); the
+ * indoor bill: charges, advances, the final bill and its dues (step 9f).
  */
 @Module({
   controllers: [
@@ -73,12 +82,14 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     ...APPOINTMENT_CONTROLLERS,
     ...OPD_CONTROLLERS,
     ...IPD_CONTROLLERS,
+    ...IPD_BILLING_CONTROLLERS,
   ],
   providers: [
     ...PATIENT_HANDLERS,
     ...APPOINTMENT_HANDLERS,
     ...OPD_HANDLERS,
     ...IPD_HANDLERS,
+    ...IPD_BILLING_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
     { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
@@ -87,6 +98,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: OpdBillReadRepository, useClass: DrizzleOpdBillReadRepository },
     { provide: AdmissionRepository, useClass: DrizzleAdmissionRepository },
     { provide: AdmissionReadRepository, useClass: DrizzleAdmissionReadRepository },
+    { provide: IpdBillingRepository, useClass: DrizzleIpdBillingRepository },
+    { provide: IpdBillingReadRepository, useClass: DrizzleIpdBillingReadRepository },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -107,6 +120,8 @@ export class HospitalModule implements OnModuleInit {
     private readonly users: UserDirectory,
     private readonly staff: StaffDirectory,
     private readonly admissions: AdmissionReadRepository,
+    private readonly cashier: IpdCashier,
+    private readonly ipdBills: IpdBillingReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -124,5 +139,8 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(inpatientCensusReport(this.admissions));
     this.reports.register(admissionRegisterReport(this.admissions));
     this.reports.register(bedOccupancyReport(this.context));
+    this.reports.register(ipdBillReport(this.cashier, this.admissions, this.organization, this.staff));
+    this.reports.register(ipdReceiptReport(this.ipdBills, this.organization, this.users));
+    this.reports.register(ipdCollectionReport(this.context, this.users));
   }
 }

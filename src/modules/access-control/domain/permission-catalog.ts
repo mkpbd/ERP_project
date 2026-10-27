@@ -78,7 +78,17 @@ export const PERMISSION_CATALOG = [
     key: 'ipd:admit',
     description: 'Admit patients, move them between beds, change their doctors, discharge them and ready beds',
   },
-  { key: 'ipd:manage', description: 'Keep wards, bed categories and beds; cancel admissions; take beds out of order' },
+  {
+    key: 'ipd:manage',
+    description:
+      'Keep wards, bed categories, beds and the indoor billing policy; cancel admissions; take beds out of order; cancel final bills later and let patients leave with a due',
+  },
+  {
+    key: 'ipd:bill',
+    description:
+      'Charge services to admitted patients, take and refund advances, make final bills and collect their dues',
+  },
+  { key: 'ipd:discount', description: "Give a final bill discount above the counter's limit" },
   { key: 'opd:read', description: 'See doctors, their chamber schedules and the appointment books' },
   { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
   { key: 'opd:bill', description: 'Bill consultations, collect their dues and cancel bills on their own day' },

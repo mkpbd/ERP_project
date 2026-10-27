@@ -187,8 +187,12 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
 | a corporate client's payment against its bills | `opd:bill` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
-| admitting, moving beds, changing doctors, discharging; making a bed ready | `ipd:admit` |
+| admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |
 | wards, bed categories and beds; cancelling an admission; taking a bed out of order | `ipd:manage` |
+| `GET` an admission's account (the bill so far), indoor bills and the indoor policy | `ipd:read` |
+| charging services and consultant visits on the wards, advances and refunds, the final bill, collecting its due, cancelling it on its own day | `ipd:bill` |
+| a final bill discount above the counter's limit | `ipd:discount` |
+| the indoor policy (round fee, service charge, counter discount limit); cancelling a final bill later; discharging a patient who still owes | `ipd:manage` |
 | `POST /scm/purchase-requisitions/:id/decision` | the approval level's role |
 | `POST /scm/comparative-studies/:id/decision` | the approval level's staff member |
 | `GET /scm/{purchase-requisitions,comparative-studies,asset-service-requests,asset-discard-requests,scrap-sales}/inbox` | signed in |

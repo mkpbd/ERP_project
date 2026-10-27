@@ -82,7 +82,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 9c | Hospital: OPD consultation billing with the doctor's share, discount limit, accounts posting, due collection, cancel and refund, `UHIDUsesRecords`, receipt and collection reports | **Done** | [09c-hospital-opd-billing.md](09c-hospital-opd-billing.md) |
 | 9d | Hospital: OPD and emergency services (service master with doctor share), corporate clients (credit limit, discount, collections, statement), staff billing, service income | **Done** | [09d-hospital-services-corporate.md](09d-hospital-services-corporate.md) |
 | 9e | Hospital: wards, bed categories and beds, admissions (one at a time, locked beds), bed transfers through housekeeping, consultant history, discharge types, census, register, occupancy | **Done** | [09e-hospital-admissions.md](09e-hospital-admissions.md) |
-| 9f | Hospital: indoor bill (bed days, services, consultant visits, advances, final bill, discharge clearance), consultant and IPD patient ledgers, due collection, UHID merge | Next | |
+| 9f | Hospital: the indoor bill: services and consultant visits charged on the wards, advances and refunds, the final bill (bed nights, admission and round fees, service charge, discount), discharge clearance, due collection, bill / receipt / collection prints | **Done** | [09f-hospital-indoor-bill.md](09f-hospital-indoor-bill.md) |
+| 9g | Hospital: paying doctors their shares (OPD and indoor), corporate collections and the credit limit across OPD and indoor bills, patient and doctor ledgers, dues and discount statements, income by head, UHID merge | Next | |
 | 10 | Diagnosis, RIS, ReAgentManagement, TransfusionMedicine, lab reports | Planned | |
 | 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |

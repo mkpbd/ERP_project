@@ -1,7 +1,7 @@
 # Step 9e — Hospital: admissions, beds and discharge
 
-Status: **done** (2026-10-27). Previous: [step 9d](09d-hospital-services-corporate.md) · Next: step 9f (the indoor
-bill).
+Status: **done** (2026-10-27). Previous: [step 9d](09d-hospital-services-corporate.md) · Next: [step 9f](09f-hospital-indoor-bill.md)
+(the indoor bill).
 
 This step moves patients only. The indoor bill comes in step 9f: bed days, IPD services, consultant visits, the
 advance taken at admission, the final bill and the discharge payment.

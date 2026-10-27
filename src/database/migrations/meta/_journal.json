@@ -281,6 +281,13 @@
       "when": 1793046722581,
       "tag": "0039_hospital_admissions",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1793067549399,
+      "tag": "0040_hospital_ipd_billing",
+      "breakpoints": true
     }
   ]
 }

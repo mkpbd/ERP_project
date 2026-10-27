@@ -166,6 +166,7 @@ export class DrizzleOpdBillRepository extends OpdBillRepository {
         rate: services.rate,
         sharePercent: services.sharePercent,
         isOpd: services.isOpd,
+        isIpd: services.isIpd,
         isActive: services.isActive,
       })
       .from(services)

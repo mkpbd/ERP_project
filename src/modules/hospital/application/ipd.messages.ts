@@ -3,6 +3,7 @@ import type { Actor } from '../../../shared/application/actor.js';
 import type { Page, PageRequest } from '../../../shared/application/pagination.js';
 import type { AdmissionKind, AdmissionStatus, DischargeType } from '../domain/admission.js';
 import type { BedStatus } from '../domain/repositories.js';
+import type { MoneyInput } from './ipd-billing.messages.js';
 
 /** Seeing admissions, the bed board and the census. */
 export const IPD_READ = 'ipd:read';
@@ -116,9 +117,11 @@ export interface AdmitInput {
   /** Left out (undefined): the patient's own corporate client, if any. */
   readonly corporateClientId?: string | null | undefined;
   readonly staffId: string | null;
+  /** An advance taken with the admission. */
+  readonly advance?: MoneyInput | null | undefined;
 }
 
-export class AdmitPatientCommand extends Command<{ id: string; number: string }> {
+export class AdmitPatientCommand extends Command<{ id: string; number: string; receipt: string | null }> {
   constructor(
     readonly actor: Actor,
     readonly input: AdmitInput,

@@ -418,7 +418,8 @@ export const opdPayments = pgTable(
 );
 
 // Old Account.ConsultantGlobalLedgers for OPD (written against the bill line id instead of the doctor, at a hard-coded
-// 40 %, and never reversed): each doctor's share as it is earned and taken back.
+// 40 %, and never reversed) and the indoor doctor payments worked out in SPGetDoctorPayment: each doctor's share as
+// it is earned and taken back, on an OPD bill or a final indoor bill.
 export const doctorLedger = pgTable(
   'hospital_doctor_ledger',
   {
@@ -429,6 +430,7 @@ export const doctorLedger = pgTable(
     entryOn: day('entry_on').notNull(),
     kind: text('kind', { enum: ['share', 'reversal'] }).notNull(),
     billId: uuid('bill_id').references(() => opdBills.id, { onDelete: 'restrict' }),
+    ipdBillId: uuid('ipd_bill_id').references((): AnyPgColumn => ipdBills.id, { onDelete: 'restrict' }),
     documentNumber: text('document_number').notNull(),
     /** Earned (+) or taken back (−). */
     amount: money('amount').notNull(),
@@ -691,5 +693,181 @@ export const admissionDoctors = pgTable(
       .on(t.admissionId, t.doctorId)
       .where(sql`${t.toAt} is null`),
     index('hospital_admission_doctors_doctor_idx').on(t.doctorId),
+  ],
+);
+
+// Indoor billing rules in one row (the old system had the round fee as 330 in the code and the service charge in the
+// app settings, and no discount limit).
+export const ipdPolicy = pgTable(
+  'hospital_ipd_policy',
+  {
+    id: smallint('id').primaryKey(),
+    /** Old Round Fee (NursingCare head): charged for every bed night. */
+    roundFeePerNight: money('round_fee_per_night').notNull(),
+    /** Old IPDServiceCharge: on the admission fee, bed nights and round fee. */
+    serviceChargePercent: percent('service_charge_percent').notNull(),
+    /** The discount a counter may give on a final bill without ipd:discount, as a share of the bill. */
+    counterDiscountPercent: percent('counter_discount_percent').notNull(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    check('hospital_ipd_policy_single_ck', sql`${t.id} = 1`),
+    check(
+      'hospital_ipd_policy_amounts_ck',
+      sql`${t.roundFeePerNight} >= 0 and ${t.serviceChargePercent} between 0 and 100 and ${t.counterDiscountPercent} between 0 and 100`,
+    ),
+  ],
+);
+
+// Old Hospital.IPDServiceRecords and IPDConsultantServices (a consultant visit was a service head with the doctor
+// picked beside it): what is given to an admitted patient during the stay, at the service's rate of the day.
+export const ipdCharges = pgTable(
+  'hospital_ipd_charges',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    serviceId: uuid('service_id')
+      .notNull()
+      .references(() => services.id, { onDelete: 'restrict' }),
+    /** The doctor who gave it (a consultant's visit, a procedure); needed when it carries a share. */
+    doctorId: uuid('doctor_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    chargedOn: day('charged_on').notNull(),
+    qty: smallint('qty').notNull(),
+    rate: money('rate').notNull(),
+    amount: money('amount').notNull(),
+    sharePercent: percent('share_percent').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ['active', 'cancelled'] }).notNull(),
+    cancelReason: text('cancel_reason'),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    cancelledAt: tz('cancelled_at'),
+    chargedBy: uuid('charged_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('hospital_ipd_charges_admission_idx').on(t.admissionId),
+    index('hospital_ipd_charges_doctor_idx').on(t.doctorId),
+    check(
+      'hospital_ipd_charges_amounts_ck',
+      sql`${t.qty} between 1 and 1000 and ${t.rate} >= 0 and ${t.amount} = round(${t.qty} * ${t.rate}, 2) and ${t.sharePercent} between 0 and 100`,
+    ),
+  ],
+);
+
+// Old Hospital.FinalBills, FinalBillSummarys (one row per head) and FinalBillLedgers: the bill made at discharge,
+// with every line it was made of. One bill in force per admission; a cancelled one stays for the record.
+export const ipdBills = pgTable(
+  'hospital_ipd_bills',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    billedOn: day('billed_on').notNull(),
+    corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
+    nights: smallint('nights').notNull(),
+    gross: money('gross').notNull(),
+    serviceCharge: money('service_charge').notNull(),
+    discount: money('discount').notNull(),
+    discountReason: text('discount_reason'),
+    net: money('net').notNull(),
+    /** The advance held, taken against the bill. */
+    deposit: money('deposit').notNull(),
+    /** Paid when the bill was made. */
+    paid: money('paid').notNull(),
+    /** Collected later against the due. */
+    collected: money('collected').notNull().default(0),
+    status: text('status', { enum: ['billed', 'cancelled'] }).notNull(),
+    cancelReason: text('cancel_reason'),
+    cancelledOn: day('cancelled_on'),
+    cancelledBy: uuid('cancelled_by').references(() => users.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    cancelVoucherNumber: text('cancel_voucher_number'),
+    billedBy: uuid('billed_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_ipd_bills_number_uq').on(t.number),
+    uniqueIndex('hospital_ipd_bills_admission_uq')
+      .on(t.admissionId)
+      .where(sql`${t.status} = 'billed'`),
+    index('hospital_ipd_bills_patient_idx').on(t.patientId),
+    index('hospital_ipd_bills_billed_idx').on(t.billedOn),
+    index('hospital_ipd_bills_corporate_idx').on(t.corporateClientId),
+    check('hospital_ipd_bills_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
+    check(
+      'hospital_ipd_bills_amounts_ck',
+      sql`${t.discount} >= 0 and ${t.discount} <= ${t.gross} + ${t.serviceCharge} and ${t.net} = ${t.gross} + ${t.serviceCharge} - ${t.discount} and ${t.deposit} >= 0 and ${t.paid} >= 0 and ${t.collected} >= 0 and ${t.deposit} + ${t.paid} + ${t.collected} <= ${t.net}`,
+    ),
+  ],
+);
+
+export const ipdBillLines = pgTable(
+  'hospital_ipd_bill_lines',
+  {
+    billId: uuid('bill_id')
+      .notNull()
+      .references(() => ipdBills.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    head: text('head', { enum: ['admission', 'bed', 'round', 'service'] }).notNull(),
+    description: text('description').notNull(),
+    bedId: uuid('bed_id').references(() => beds.id, { onDelete: 'restrict' }),
+    chargeId: uuid('charge_id').references(() => ipdCharges.id, { onDelete: 'restrict' }),
+    serviceId: uuid('service_id').references(() => services.id, { onDelete: 'restrict' }),
+    doctorId: uuid('doctor_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    fromOn: day('from_on'),
+    toOn: day('to_on'),
+    qty: smallint('qty').notNull(),
+    rate: money('rate').notNull(),
+    amount: money('amount').notNull(),
+    serviceCharge: money('service_charge').notNull(),
+    shareAmount: money('share_amount').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.billId, t.position] }),
+    index('hospital_ipd_bill_lines_doctor_idx').on(t.doctorId),
+    check(
+      'hospital_ipd_bill_lines_amounts_ck',
+      sql`${t.qty} >= 0 and ${t.rate} >= 0 and ${t.amount} >= 0 and ${t.serviceCharge} >= 0 and ${t.shareAmount} >= 0 and ${t.shareAmount} <= ${t.amount}`,
+    ),
+  ],
+);
+
+// Old Hospital.AdvancePayments (Payment / Refund rows keyed by GUID, no receipt number) and the FinalBillLedgers
+// payment and due collection rows: money in and out of an admission's account, each with its receipt number.
+export const ipdPayments = pgTable(
+  'hospital_ipd_payments',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    /** The bill a payment or collection was made against. */
+    billId: uuid('bill_id').references(() => ipdBills.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: ['advance', 'refund', 'payment', 'collection'] }).notNull(),
+    number: text('number').notNull(),
+    method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
+    reference: text('reference'),
+    amount: money('amount').notNull(),
+    paidOn: day('paid_on').notNull(),
+    receivedBy: uuid('received_by').references(() => users.id, { onDelete: 'set null' }),
+    voucherNumber: text('voucher_number'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_ipd_payments_number_uq').on(t.number),
+    index('hospital_ipd_payments_admission_idx').on(t.admissionId),
+    index('hospital_ipd_payments_paid_idx').on(t.paidOn),
+    check('hospital_ipd_payments_amount_ck', sql`${t.amount} > 0`),
   ],
 );

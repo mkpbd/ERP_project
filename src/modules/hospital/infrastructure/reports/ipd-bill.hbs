@@ -1,0 +1,85 @@
+<style>
+  .bill-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .bill-head .kind { font-size: 13pt; font-weight: 700; }
+  .bill-head .bars { width: 60mm; height: 10mm; }
+  .bill-head .bars svg { width: 100%; height: 100%; display: block; }
+  table.report.totals { width: 46%; margin-left: auto; margin-top: 8px; }
+  .totals td.strong { font-weight: 700; }
+  .stamp { display: inline-block; font-weight: 800; font-size: 14pt; letter-spacing: 2pt; border: 0.5mm solid #000; padding: 1mm 6mm; }
+</style>
+{{#with data}}
+<div class="bill-head">
+  <div>
+    <div class="kind">{{kind}}{{#if account.bill}} {{account.bill.number}}{{/if}}</div>
+    <div class="muted">{{#if account.bill}}Billed on {{date account.bill.billedOn}}{{else}}To {{date account.asOf}}; not a final bill{{/if}}</div>
+  </div>
+  <div class="bars">{{{barcode}}}</div>
+</div>
+<table class="report" style="margin-bottom: 10px">
+  <tbody>
+    <tr><td style="width: 18%">Admission no</td><td><b>{{admission.number}}</b></td><td style="width: 16%">UHID</td><td><b>{{admission.uhidLabel}}</b></td></tr>
+    <tr><td>Patient</td><td>{{admission.patientName}}</td><td>Age · sex</td><td>{{admission.age}} · {{admission.sex}}</td></tr>
+    <tr><td>Admitted</td><td>{{datetime admission.admittedAt}}</td><td>Discharged</td><td>{{#if admission.dischargedAt}}{{datetime admission.dischargedAt}}{{else}}—{{/if}}</td></tr>
+    <tr><td>Consultant</td><td>{{admission.consultant}}</td><td>Bed</td><td>{{admission.bed}}</td></tr>
+    <tr><td>Bill to</td><td>{{admission.payerName}}</td><td>Nights</td><td>{{account.nights}}</td></tr>
+  </tbody>
+</table>
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 4%">#</th><th>Description</th><th style="width: 20%">Dates</th>
+      <th class="num" style="width: 7%">Qty</th><th class="num" style="width: 12%">Rate</th>
+      <th class="num" style="width: 12%">Service charge</th><th class="num" style="width: 13%">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each groups}}
+    <tr class="group-row"><td colspan="6">{{label}}</td><td class="num">{{money subtotal}}</td></tr>
+    {{#each lines}}
+    <tr>
+      <td>{{inc @index}}</td>
+      <td>{{description}}{{#if doctorName}} <span class="muted">· {{doctorName}}</span>{{/if}}</td>
+      <td>{{#if toOn}}{{date fromOn}} – {{date toOn}}{{else if fromOn}}{{date fromOn}}{{/if}}</td>
+      <td class="num">{{qty}}</td><td class="num">{{money rate}}</td>
+      <td class="num">{{#if serviceCharge}}{{money serviceCharge}}{{/if}}</td><td class="num">{{money amount}}</td>
+    </tr>
+    {{/each}}
+    {{else}}
+    <tr><td colspan="7" class="empty">Nothing charged yet.</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+<table class="report totals">
+  <tbody>
+    <tr><td>Charges</td><td class="num">{{money account.gross}}</td></tr>
+    {{#if account.serviceCharge}}<tr><td>Service charge</td><td class="num">{{money account.serviceCharge}}</td></tr>{{/if}}
+    <tr><td class="strong">Total</td><td class="num strong">{{money account.total}}</td></tr>
+    {{#if account.bill}}
+    {{#if account.bill.discount}}<tr><td>Discount</td><td class="num">−{{money account.bill.discount}}</td></tr>{{/if}}
+    <tr><td class="strong">Payable</td><td class="num strong">{{money account.bill.net}}</td></tr>
+    {{#if account.bill.deposit}}<tr><td>Advance taken</td><td class="num">−{{money account.bill.deposit}}</td></tr>{{/if}}
+    {{#if account.bill.paid}}<tr><td>Paid on the bill</td><td class="num">−{{money account.bill.paid}}</td></tr>{{/if}}
+    {{#if account.bill.collected}}<tr><td>Collected since</td><td class="num">−{{money account.bill.collected}}</td></tr>{{/if}}
+    <tr><td class="strong">Due</td><td class="num strong">{{money account.bill.due}}</td></tr>
+    {{else}}
+    {{#if account.held}}<tr><td>Advance held</td><td class="num">−{{money account.held}}</td></tr>{{/if}}
+    <tr><td class="strong">Balance</td><td class="num strong">{{money account.balance}}</td></tr>
+    {{/if}}
+  </tbody>
+</table>
+{{#if account.bill}}<p>In words: {{amountInWords account.bill.net}}</p>{{/if}}
+{{#if payments.length}}
+<p style="margin: 12px 0 4px"><b>Money received and paid back</b></p>
+<table class="report">
+  <thead><tr><th>Receipt</th><th>Date</th><th>What</th><th>Method</th><th class="num">Amount</th></tr></thead>
+  <tbody>
+    {{#each payments}}
+    <tr><td>{{number}}</td><td>{{date paidOn}}</td><td>{{kindLabel}}</td><td>{{methodLabel}}{{#if reference}} ({{reference}}){{/if}}</td><td class="num">{{money signed}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+<table style="width: 100%; margin-top: 48px; text-align: center">
+  <tr><td><span class="stamp">{{stamp}}</span></td><td>Prepared by {{printedBy}}</td><td>Patient or guardian</td><td>Accounts</td></tr>
+</table>
+{{/with}}

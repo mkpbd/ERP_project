@@ -2,9 +2,12 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
-import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
+import { ConflictError, DomainError, ForbiddenError, NotFoundError } from '../../../shared/domain/errors.js';
 import { Admission } from '../domain/admission.js';
-import { AdmissionRepository, type AdmissionBed } from '../domain/repositories.js';
+import { validMoney } from '../domain/opd-bill.js';
+import { text } from '../domain/patient.js';
+import { AdmissionRepository, IpdBillingRepository, type AdmissionBed } from '../domain/repositories.js';
+import { IPD_ADVANCE_ROLE, type MoneyInput } from './ipd-billing.messages.js';
 import {
   AdmissionReadRepository,
   AdmitPatientCommand,
@@ -17,6 +20,7 @@ import {
   ListAdmissionsQuery,
   SetBedStatusCommand,
 } from './ipd.messages.js';
+import { OPD_RECEIPT_ROLES } from './opd.messages.js';
 import { OpdDesk } from './opd.handlers.js';
 
 @Injectable()
@@ -25,6 +29,7 @@ export class IpdDesk {
     readonly opd: OpdDesk,
     readonly admissions: AdmissionRepository,
     readonly read: AdmissionReadRepository,
+    readonly billing: IpdBillingRepository,
   ) {}
 
   record(action: string, actor: Actor, id: string, metadata: Record<string, string | number | null> = {}) {
@@ -54,6 +59,64 @@ export class IpdDesk {
     await this.admissions.setBedStatus(bedId, 'housekeeping');
   }
 
+  /**
+   * Old AdvancePayments (Payment and Refund rows, no receipt number, posted only for the advance): an advance taken on
+   * the admission, or advance held given back, with its receipt and voucher. Only while no bill is in force.
+   */
+  async moveAdvance(
+    admission: { id: string; number: string },
+    kind: 'advance' | 'refund',
+    money: MoneyInput,
+    actor: Actor,
+  ): Promise<{ number: string; held: number }> {
+    const { opd } = this;
+    validMoney(money.amount, 'amount');
+    if (money.amount === 0) throw new DomainError('invalid_amount', 'More than nothing');
+    const held = await this.billing.received(admission.id);
+    if (kind === 'refund' && money.amount > held) {
+      throw new DomainError('overpayment', `Only ${held.toFixed(2)} is held`);
+    }
+    const today = opd.today();
+    const number = await opd.number(kind === 'advance' ? 'AR' : 'AF', today);
+    const narration = `${kind === 'advance' ? 'Advance on' : 'Advance refunded on'} ${admission.number} (${number})`;
+    const cash = { account: { role: OPD_RECEIPT_ROLES[money.method] }, narration };
+    const advance = { account: { role: IPD_ADVANCE_ROLE }, narration };
+    const voucher = await opd.post(
+      narration,
+      today,
+      admission.id,
+      kind === 'advance'
+        ? [
+            { ...cash, debit: money.amount, credit: 0 },
+            { ...advance, debit: 0, credit: money.amount },
+          ]
+        : [
+            { ...advance, debit: money.amount, credit: 0 },
+            { ...cash, debit: 0, credit: money.amount },
+          ],
+      actor,
+    );
+    await this.billing.addPayment({
+      admissionId: admission.id,
+      billId: null,
+      kind,
+      number,
+      method: money.method,
+      reference: text(money.reference, 100, 'payment reference'),
+      amount: money.amount,
+      paidOn: today,
+      receivedBy: actor.userId,
+      voucherNumber: voucher?.number ?? null,
+    });
+    await this.record(kind === 'advance' ? 'advance_taken' : 'advance_refunded', actor, admission.id, {
+      number,
+      amount: money.amount,
+      method: money.method,
+    });
+    const after = Math.round(held * 100) + (kind === 'advance' ? 1 : -1) * Math.round(money.amount * 100);
+    return { number, held: after / 100 };
+  }
+
   /** Active doctors, by id (any doctor may see an admitted patient; the consultant must see patients here). */
   async doctors(ids: readonly string[]): Promise<void> {
     const found = await this.opd.bills.doctors(ids);
@@ -69,7 +132,7 @@ export class IpdDesk {
  * Old AddEditPatientAdmissionPage OnSubmit (registered the patient before checking the bed, claimed the bed from the
  * page's cached list, never checked for an admission already open): one transaction for a registered patient with no
  * open admission, a free bed taken under a lock, the consultant, the doctors who also see the patient and who pays.
- * The advance taken at admission comes with the indoor bill (step 9f).
+ * An advance may be taken with it.
  */
 @CommandHandler(AdmitPatientCommand)
 export class AdmitPatientHandler implements ICommandHandler<AdmitPatientCommand> {
@@ -124,7 +187,11 @@ export class AdmitPatientHandler implements ICommandHandler<AdmitPatientCommand>
         documentNumber: admission.number,
       });
       await desk.record('admitted', actor, admission.id, { number: admission.number, bed: bed.code });
-      return { id: admission.id, number: admission.number };
+      const advance =
+        input.advance && input.advance.amount > 0
+          ? await desk.moveAdvance(admission, 'advance', input.advance, actor)
+          : null;
+      return { id: admission.id, number: admission.number, receipt: advance?.number ?? null };
     });
   }
 }
@@ -132,6 +199,10 @@ export class AdmitPatientHandler implements ICommandHandler<AdmitPatientCommand>
 /**
  * Old Cabin Transfer, Assigned Doctor Transfer, admission cancel and the discharge (the final bill being saved): each
  * change on the admission's current version. Cancelling needs ipd:manage.
+ *
+ * A discharge needs the final bill, made that day; a patient leaving with something of their own still due needs
+ * ipd:manage (the old page let it go with a remark). An admission with charges, a bill or advance held is not
+ * cancelled (as before: cancel the charges and refund the advance first).
  */
 @CommandHandler(ChangeAdmissionCommand)
 export class ChangeAdmissionHandler implements ICommandHandler<ChangeAdmissionCommand> {
@@ -141,6 +212,8 @@ export class ChangeAdmissionHandler implements ICommandHandler<ChangeAdmissionCo
     const { desk } = this;
     const { opd } = desk;
     await opd.access.authorize(actor.userId, { permissions: [change.kind === 'cancel' ? IPD_MANAGE : IPD_ADMIT] });
+    const mayLeaveDue =
+      change.kind === 'discharge' && (await opd.access.isAllowed(actor.userId, { permissions: [IPD_MANAGE] }));
     await opd.tx.run(async () => {
       const admission = await desk.admissions.findForUpdate(id);
       if (!admission) throw new NotFoundError('admission');
@@ -166,14 +239,33 @@ export class ChangeAdmissionHandler implements ICommandHandler<ChangeAdmissionCo
           admission.setAdditional(change.doctorIds, now);
           metadata = { doctors: change.doctorIds.length };
           break;
-        case 'discharge':
+        case 'discharge': {
+          const bill = await desk.billing.liveBill(id);
+          if (!bill) throw new DomainError('bill_needed', 'Make the final bill first');
+          if (bill.billedOn !== opd.today()) {
+            throw new ConflictError('stale_bill', `The bill was made on ${bill.billedOn}; cancel it and bill again`);
+          }
+          if (bill.due > 0 && bill.payer.kind === 'patient' && !mayLeaveDue) {
+            throw new ForbiddenError(
+              'due_on_discharge',
+              `${bill.due.toFixed(2)} is still due; only a manager lets the patient go with it`,
+            );
+          }
           await desk.leave(admission.discharge({ type: change.type, note: change.note, by: actor.userId, at: now }));
-          metadata = { type: change.type };
+          metadata = { type: change.type, bill: bill.number, due: bill.due };
           break;
-        case 'cancel':
+        }
+        case 'cancel': {
+          if (await desk.billing.liveBill(id)) throw new ConflictError('bill_made', 'Cancel the final bill first');
+          if ((await desk.billing.activeCharges(id)).length > 0) {
+            throw new ConflictError('has_charges', 'Cancel the charges first');
+          }
+          const held = await desk.billing.received(id);
+          if (held > 0) throw new ConflictError('has_advance', `Refund the advance held (${held.toFixed(2)}) first`);
           await desk.leave(admission.cancel(change.reason, actor.userId, now));
           metadata = { reason: change.reason };
           break;
+        }
       }
       await desk.admissions.update(admission);
       await desk.record(change.kind === 'discharge' ? 'discharged' : change.kind, actor, id, metadata);
