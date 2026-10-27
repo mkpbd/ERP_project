@@ -1,7 +1,7 @@
 # Step 10b — Diagnostics: admitted patients' tests and the hospital statements
 
-Status: **done** (2026-10-27). Previous: [step 10a](10a-diagnostic-billing.md) · Next: step 10c (the lab: samples,
-results, verification, reports).
+Status: **done** (2026-10-27). Previous: [step 10a](10a-diagnostic-billing.md) · Next: [step 10c](10c-laboratory.md)
+(the lab: samples, results, verification, reports).
 
 This step:
 

@@ -12,6 +12,7 @@ import { AccountsModule } from './modules/accounts/accounts.module.js';
 import { SupplyChainModule } from './modules/supply-chain/supply-chain.module.js';
 import { PharmacyModule } from './modules/pharmacy/pharmacy.module.js';
 import { HospitalModule } from './modules/hospital/hospital.module.js';
+import { LaboratoryModule } from './modules/laboratory/laboratory.module.js';
 import { AuthorizationGuard } from './modules/access-control/presentation/authorization.guard.js';
 import { AdministrationModule } from './modules/administration/administration.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -97,6 +98,7 @@ export class AppModule {
         SupplyChainModule,
         PharmacyModule,
         HospitalModule,
+        LaboratoryModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

@@ -1,0 +1,61 @@
+<style>
+  .lab { font-size: 9.5pt; }
+  .lab .head { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 2mm; margin-bottom: 3mm; }
+  .lab .head .org { font-size: 15pt; font-weight: 700; }
+  .lab .head .kind { font-size: 11pt; font-weight: 700; margin-top: 1mm; letter-spacing: 1pt; }
+  .lab .who { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .lab .who td { padding: 0.8mm 1.5mm; vertical-align: top; }
+  .lab .bars { width: 55mm; height: 9mm; }
+  .lab .bars svg { width: 100%; height: 100%; display: block; }
+  .lab h3 { font-size: 10.5pt; margin: 4mm 0 1.5mm; border-bottom: 0.2mm solid #888; }
+  .lab table.values { width: 100%; border-collapse: collapse; }
+  .lab table.values th { text-align: left; border-bottom: 0.3mm solid #000; padding: 1mm 1.5mm; font-size: 8.5pt; }
+  .lab table.values td { padding: 1mm 1.5mm; border-bottom: 0.1mm solid #ddd; }
+  .lab .out { font-weight: 700; }
+  .lab .note { font-size: 8.5pt; color: #333; margin-top: 1.5mm; }
+  .lab .sign { margin-top: 18mm; display: flex; justify-content: space-between; }
+  .lab .sign div { text-align: center; min-width: 55mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="lab">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div class="kind">LABORATORY REPORT{{#if sample.departmentName}} · {{sample.departmentName}}{{/if}}</div>
+  </div>
+  <table class="who">
+    <tr>
+      <td style="width: 16%">Patient</td><td><b>{{order.patient.name}}</b></td>
+      <td style="width: 16%">Lab no</td><td><b>{{sample.labNumber}}</b></td>
+      <td rowspan="4" style="width: 30%; text-align: right"><div class="bars">{{{barcode}}}</div></td>
+    </tr>
+    <tr><td>UHID</td><td>{{order.uhidLabel}}</td><td>Bill</td><td>{{order.billNumber}}</td></tr>
+    <tr><td>Age · sex</td><td>{{order.age}} · {{order.patient.sex}}</td><td>Collected</td><td>{{datetime sample.collectedAt}}</td></tr>
+    <tr><td>Referred by</td><td>{{#if order.referredByName}}{{order.referredByName}}{{else}}Self{{/if}}</td><td></td><td></td></tr>
+  </table>
+  {{#each tests}}
+  <h3>{{testName}}</h3>
+  <table class="values">
+    <thead><tr><th style="width: 34%">Test</th><th style="width: 16%">Result</th><th style="width: 6%"></th><th style="width: 14%">Unit</th><th>Normal range</th></tr></thead>
+    <tbody>
+      {{#each values}}
+      <tr>
+        <td>{{name}}{{#if method}} <span class="note">({{method}})</span>{{/if}}</td>
+        <td class="{{#if mark}}out{{/if}}">{{value}}</td>
+        <td class="out">{{mark}}</td>
+        <td>{{unit}}</td>
+        <td>{{range}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{#if comment}}<div class="note"><b>Comment:</b> {{comment}}</div>{{/if}}
+  {{/each}}
+  {{#if pending}}<p class="note">{{pending}} test(s) of this sample will follow in another report.</p>{{/if}}
+  <p class="note">H: above the normal range · L: below it.</p>
+  <div class="sign">
+    <div>Medical technologist</div>
+    <div>{{verifiers}}<br />Verified by</div>
+  </div>
+</div>
+{{/with}}

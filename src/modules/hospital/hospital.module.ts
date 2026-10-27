@@ -1,6 +1,7 @@
 import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
+import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-orders.js';
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
@@ -39,6 +40,7 @@ import {
   referralCommissionReport,
 } from './infrastructure/reports/diagnostic.reports.js';
 import { DIAGNOSTIC_CONTROLLERS } from './presentation/diagnostic.controllers.js';
+import { DrizzleDiagnosticOrders } from './infrastructure/persistence/drizzle-diagnostic-orders.js';
 import { DrizzleInpatientRegister } from './infrastructure/persistence/drizzle-inpatient-register.js';
 import {
   DrizzleIpdBillingReadRepository,
@@ -101,7 +103,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * across OPD and indoor bills, statements and the UHID merge (step 9g); the test catalogue and diagnostic bills with
  * the referring doctors' commission (step 10a); admitted patients' tests on the indoor bill and diagnostic bills in
  * the statements (step 10b). Global: it publishes the admissions other
- * modules charge to (InpatientRegister), for the pharmacy's ward medicine.
+ * modules charge to (InpatientRegister), for the pharmacy's ward medicine, and the diagnostic bills the lab works
+ * from (DiagnosticOrders).
  */
 @Global()
 @Module({
@@ -132,6 +135,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: IpdBillingRepository, useClass: DrizzleIpdBillingRepository },
     { provide: IpdBillingReadRepository, useClass: DrizzleIpdBillingReadRepository },
     { provide: InpatientRegister, useClass: DrizzleInpatientRegister },
+    { provide: DiagnosticOrders, useClass: DrizzleDiagnosticOrders },
     { provide: DiagnosticBillRepository, useClass: DrizzleDiagnosticBillRepository },
     { provide: DiagnosticBillReadRepository, useClass: DrizzleDiagnosticBillReadRepository },
     {
@@ -140,7 +144,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
       useFactory: (config: AppConfig) => ({ timeZone: config.reports.timeZone }),
     },
   ],
-  exports: [InpatientRegister],
+  exports: [InpatientRegister, DiagnosticOrders],
 })
 export class HospitalModule implements OnModuleInit {
   constructor(

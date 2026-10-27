@@ -46,6 +46,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
     truncate table audit_logs,
       pharmacy_ward_return_lines, pharmacy_ward_returns, pharmacy_ward_issue_lines, pharmacy_ward_issues,
       pharmacy_ward_indent_lines, pharmacy_ward_indents,
+      lab_result_values, lab_results, lab_samples, lab_parameter_ranges, lab_parameters, lab_sequences,
       hospital_diagnostic_payments, hospital_diagnostic_bill_lines, hospital_diagnostic_bills,
       hospital_diagnostic_package_tests, hospital_diagnostic_packages, hospital_diagnostic_tests,
       hospital_diagnostic_departments, hospital_diagnostic_policy,
