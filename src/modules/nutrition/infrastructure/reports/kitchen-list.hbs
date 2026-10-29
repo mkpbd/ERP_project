@@ -1,0 +1,29 @@
+{{#with data}}
+<p><b>{{mealType.name}}</b> at {{mealType.servedAt}} · {{date day}}</p>
+{{#if totals.length}}
+<table class="report" style="width: auto; margin-bottom: 4mm">
+  <thead><tr><th>Diet</th><th class="num">Plates</th></tr></thead>
+  <tbody>{{#each totals}}<tr><td>{{planName}}</td><td class="num"><b>{{count}}</b></td></tr>{{/each}}</tbody>
+</table>
+{{/if}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr><th>Ward</th><th>Bed</th><th>Patient</th><th>Diet</th><th>Menu</th><th>Remarks</th><th>State</th></tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{wardName}}</td><td>{{bedCode}}</td><td>{{patientName}}<br /><span class="muted">{{admissionNumber}}</span></td>
+      <td>{{#if planName}}{{planName}}{{else}}—{{/if}}</td>
+      <td style="white-space: pre-wrap">{{menu}}</td>
+      <td>{{remarks}}</td>
+      <td>{{#if (eq state "nil_by_mouth")}}<b>{{stateLabel}}</b>{{else}}{{stateLabel}}{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No admitted patient gets this meal.</p>
+{{/if}}
+{{/with}}

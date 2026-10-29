@@ -142,6 +142,13 @@ export const PERMISSION_CATALOG = [
     key: 'emr:order',
     description: "Order admitted patients' medicines, hold, resume and stop them; write and sign the discharge summary",
   },
+  { key: 'diet:read', description: "See meals, diets, admitted patients' diet orders and the kitchen's lists" },
+  {
+    key: 'diet:manage',
+    description: 'Keep meal types, the meals each bed category gets, diet plans and their menus',
+  },
+  { key: 'diet:order', description: "Order an admitted patient's diet or nothing by mouth, and stop it" },
+  { key: 'diet:serve', description: 'Record meals served to admitted patients, or refused' },
   { key: 'emr:certify', description: 'Record deaths and births of admitted patients, and void one recorded in error' },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },

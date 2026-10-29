@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 52 });
+    expect(applied.rows[0]).toEqual({ n: 53 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -208,6 +208,12 @@ describe('migrations', () => {
       'main_stores',
       'manual_attendances',
       'menus',
+      'nutrition_category_meals',
+      'nutrition_diet_orders',
+      'nutrition_diet_plans',
+      'nutrition_meal_services',
+      'nutrition_meal_types',
+      'nutrition_plan_menus',
       'outbox_messages',
       'password_reset_tokens',
       'payment_channels',

@@ -11,6 +11,14 @@ export interface ChargeableAdmission {
   readonly billed: boolean;
 }
 
+/** An admitted patient where they lie now. */
+export interface WardInpatient extends ChargeableAdmission {
+  readonly bedCode: string;
+  readonly wardName: string;
+  readonly bedCategoryId: string;
+  readonly bedCategoryName: string;
+}
+
 /**
  * The hospital's admissions as other modules charge to them (the pharmacy's ward medicine), so that they never read
  * the hospital tables directly.
@@ -23,4 +31,8 @@ export abstract class InpatientRegister {
   abstract lockForCharge(admissionId: string): Promise<ChargeableAdmission | null>;
   /** The admissions among `ids`, without a lock. */
   abstract find(ids: readonly string[]): Promise<ChargeableAdmission[]>;
+  /** Patients admitted now, with their beds, by ward and bed (the kitchen's list). */
+  abstract inpatients(): Promise<WardInpatient[]>;
+  /** The bed categories (which meals each gets is the kitchen's). */
+  abstract bedCategories(): Promise<{ id: string; name: string }[]>;
 }

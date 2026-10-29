@@ -1,6 +1,6 @@
 # Step 11c — Treatment orders, the medication chart, the discharge summary
 
-Status: **done** (2026-10-30). Previous: [step 11b](11b-emr-notes.md) · Next: step 11d (nutrition).
+Status: **done** (2026-10-30). Previous: [step 11b](11b-emr-notes.md) · Next: [step 11d](11d-nutrition.md).
 
 What this step adds to the `clinical` module, for admitted patients:
 
