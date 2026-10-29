@@ -53,4 +53,9 @@ export abstract class DiagnosticOrders {
   abstract tests(
     testIds: readonly string[],
   ): Promise<Map<string, { id: string; name: string; departmentKind: 'lab' | 'imaging' | 'other' }>>;
+  /** Active tests whose name, short name or code holds the text, for a doctor writing them on a prescription. */
+  abstract searchTests(
+    text: string,
+    limit: number,
+  ): Promise<{ id: string; name: string; departmentKind: 'lab' | 'imaging' | 'other' }[]>;
 }

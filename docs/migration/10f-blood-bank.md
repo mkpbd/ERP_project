@@ -1,7 +1,6 @@
 # Step 10f — Blood bank: donors, donations, units, cross-match and issue
 
-Status: **done** (2026-10-30). Previous: [step 10e](10e-lab-reagents.md) · Next: step 11 (EMR, Rx, nutrition,
-patient portal sign-in).
+Status: **done** (2026-10-30). Previous: [step 10e](10e-lab-reagents.md) · Next: [step 11a](11a-prescriptions.md).
 
 What this step adds, in a new `blood-bank` module:
 

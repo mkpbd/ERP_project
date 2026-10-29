@@ -1,6 +1,8 @@
 import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { InpatientMedicine } from '../../shared/application/contracts/inpatient-medicine.js';
+import { MedicineCatalogue } from '../../shared/application/contracts/medicine-catalogue.js';
+import { DrizzleMedicineCatalogue } from './infrastructure/persistence/drizzle-medicine-catalogue.js';
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
@@ -160,8 +162,9 @@ import {
     { provide: WardRepository, useClass: DrizzleWardRepository },
     { provide: WardReadRepository, useClass: DrizzleWardReadRepository },
     { provide: InpatientMedicine, useClass: DrizzleInpatientMedicine },
+    { provide: MedicineCatalogue, useClass: DrizzleMedicineCatalogue },
   ],
-  exports: [InpatientMedicine],
+  exports: [InpatientMedicine, MedicineCatalogue],
 })
 export class PharmacyModule implements OnModuleInit {
   constructor(

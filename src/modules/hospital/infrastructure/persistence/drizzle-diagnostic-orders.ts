@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { aliasedTable, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
+import { aliasedTable, and, asc, eq, ilike, inArray, or, sql, type SQL } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
+import { escapeLike } from '../../../../shared/infrastructure/persistence/pg-errors.js';
 import { DiagnosticOrders, type DiagnosticOrder } from '../../../../shared/application/contracts/diagnostic-orders.js';
 import {
   diagnosticBillLines,
@@ -124,5 +125,25 @@ export class DrizzleDiagnosticOrders extends DiagnosticOrders {
       .innerJoin(diagnosticDepartments, eq(diagnosticDepartments.id, diagnosticTests.departmentId))
       .where(inArray(diagnosticTests.id, [...new Set(testIds)]));
     return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  searchTests(text: string, limit: number) {
+    const term = escapeLike(text.trim());
+    return this.context.db
+      .select({ id: diagnosticTests.id, name: diagnosticTests.name, departmentKind: diagnosticDepartments.kind })
+      .from(diagnosticTests)
+      .innerJoin(diagnosticDepartments, eq(diagnosticDepartments.id, diagnosticTests.departmentId))
+      .where(
+        and(
+          eq(diagnosticTests.isActive, true),
+          or(
+            ilike(diagnosticTests.name, `%${term}%`),
+            ilike(diagnosticTests.shortName, `%${term}%`),
+            ilike(diagnosticTests.code, `%${term}%`),
+          ),
+        ),
+      )
+      .orderBy(sql`${diagnosticTests.name} not ilike ${`${term}%`}`, asc(diagnosticTests.name))
+      .limit(limit);
   }
 }

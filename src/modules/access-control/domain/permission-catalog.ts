@@ -118,6 +118,16 @@ export const PERMISSION_CATALOG = [
   { key: 'bb:collect', description: 'Register blood donors, take and screen donations and prepare components' },
   { key: 'bb:request', description: 'Ask the blood bank for blood for a patient, and cancel the request' },
   { key: 'bb:issue', description: 'Cross-match blood units and issue them to patients' },
+  { key: 'rx:read', description: 'See prescriptions, the pick lists, and the medicines and tests to prescribe' },
+  {
+    key: 'rx:vitals',
+    description: "Open patients' visits for a doctor, take their vitals and cancel a visit the patient left",
+  },
+  {
+    key: 'rx:write',
+    description: "Write, sign and correct one's own prescriptions as a doctor; keep one's own pick lists and templates",
+  },
+  { key: 'rx:manage', description: 'Keep the pick lists shared by every doctor: complaints, findings, advice, doses' },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },

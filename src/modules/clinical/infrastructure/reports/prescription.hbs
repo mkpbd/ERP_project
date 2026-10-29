@@ -1,0 +1,91 @@
+<style>
+  .rx { font-size: 10pt; font-family: 'Noto Sans', 'Nirmala UI', 'Noto Sans Bengali', 'SolaimanLipi', sans-serif; }
+  .rx .head { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 0.5mm solid #000; padding-bottom: 2mm; }
+  .rx .doctor .name { font-size: 14pt; font-weight: 700; }
+  .rx .org { text-align: right; }
+  .rx .org .name { font-size: 12pt; font-weight: 700; }
+  .rx .who { display: flex; flex-wrap: wrap; gap: 1mm 6mm; padding: 2mm 0; border-bottom: 0.2mm solid #000; }
+  .rx .who b { font-weight: 700; }
+  .rx .bars { width: 45mm; height: 8mm; }
+  .rx .bars svg { width: 100%; height: 100%; display: block; }
+  .rx .body { display: flex; min-height: 200mm; }
+  .rx .left { width: 36%; border-right: 0.2mm solid #000; padding: 3mm 3mm 0 0; }
+  .rx .right { flex: 1; padding: 3mm 0 0 4mm; }
+  .rx h4 { font-size: 9.5pt; margin: 0 0 1mm; text-transform: uppercase; letter-spacing: 0.3pt; }
+  .rx section { margin-bottom: 3.5mm; }
+  .rx .text { white-space: pre-wrap; }
+  .rx ul { margin: 0; padding-left: 4mm; }
+  .rx .symbol { font-size: 20pt; font-weight: 700; font-family: serif; margin-bottom: 2mm; }
+  .rx ol.drugs { margin: 0 0 4mm; padding-left: 5mm; }
+  .rx ol.drugs li { margin-bottom: 2.5mm; }
+  .rx .drug { font-weight: 700; }
+  .rx .dose { padding-left: 2mm; }
+  .rx .sign { margin-top: 18mm; text-align: right; }
+  .rx .sign div { display: inline-block; text-align: center; min-width: 55mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="rx">
+  <div class="head">
+    <div class="doctor">
+      <div class="name">{{rx.doctor.name}}</div>
+      {{#if rx.doctor.degrees}}<div>{{rx.doctor.degrees}}</div>{{/if}}
+      {{#if rx.doctor.specialityName}}<div>{{rx.doctor.specialityName}}</div>{{/if}}
+    </div>
+    <div class="org">
+      <div class="name">{{organization.organizationName}}</div>
+      <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    </div>
+  </div>
+  <div class="who">
+    <span>Name: <b>{{rx.patient.name}}</b></span>
+    <span>Age: <b>{{age}}</b></span>
+    <span>Sex: <b>{{rx.patient.sex}}</b></span>
+    <span>UHID: <b>{{uhidLabel}}</b></span>
+    <span>Date: <b>{{date rx.visitOn}}</b></span>
+    <span>Visit: <b>{{rx.visitNo}}</b></span>
+    <span>Rx: <b>{{rx.number}}</b></span>
+    <span class="bars">{{{barcode}}}</span>
+  </div>
+  <div class="body">
+    <div class="left">
+      {{#if rx.complaints.length}}
+      <section><h4>Chief complaints</h4><ul>{{#each rx.complaints}}<li>{{complaint}}{{#if this.duration}} — {{this.duration}}{{/if}}</li>{{/each}}</ul></section>
+      {{/if}}
+      {{#if rx.history}}<section><h4>History</h4><div class="text">{{rx.history}}</div></section>{{/if}}
+      {{#if rx.pastHistory}}<section><h4>Past history</h4><div class="text">{{rx.pastHistory}}</div></section>{{/if}}
+      {{#if rx.drugHistory}}<section><h4>Drug history</h4><div class="text">{{rx.drugHistory}}</div></section>{{/if}}
+      {{#if vitals.length}}
+      <section><h4>On examination</h4><ul>{{#each vitals}}<li>{{this}}</li>{{/each}}</ul>{{#if rx.examination}}<div class="text">{{rx.examination}}</div>{{/if}}</section>
+      {{else}}
+      {{#if rx.examination}}<section><h4>On examination</h4><div class="text">{{rx.examination}}</div></section>{{/if}}
+      {{/if}}
+      {{#if rx.diagnosis}}<section><h4>Diagnosis</h4><div class="text">{{rx.diagnosis}}</div></section>{{/if}}
+      {{#if rx.tests.length}}
+      <section><h4>Investigations</h4><ul>{{#each rx.tests}}<li>{{name}}{{#if note}} ({{note}}){{/if}}</li>{{/each}}</ul></section>
+      {{/if}}
+      {{#if rx.treatmentPlan}}<section><h4>Treatment plan</h4><div class="text">{{rx.treatmentPlan}}</div></section>{{/if}}
+    </div>
+    <div class="right">
+      <div class="symbol">℞</div>
+      {{#if rx.drugs.length}}
+      <ol class="drugs">
+        {{#each rx.drugs}}
+        <li><div class="drug">{{name}}</div><div class="dose">{{dose}}{{#if this.duration}} — {{this.duration}}{{/if}}{{#if qty}} ({{qty}}){{/if}}</div></li>
+        {{/each}}
+      </ol>
+      {{/if}}
+      {{#if rx.advices.length}}
+      <section><h4>Advice</h4><ul>{{#each rx.advices}}<li>{{this}}</li>{{/each}}</ul></section>
+      {{/if}}
+      {{#if rx.notes}}<section><h4>Notes</h4><div class="text">{{rx.notes}}</div></section>{{/if}}
+      {{#if rx.referral}}<section><h4>Referred to</h4><div class="text">{{rx.referral}}</div></section>{{/if}}
+      {{#if rx.followUpOn}}
+      <section><h4>Follow-up</h4>{{date rx.followUpOn}}{{#if rx.followUpNote}} — {{rx.followUpNote}}{{/if}}</section>
+      {{else}}
+      {{#if rx.followUpNote}}<section><h4>Follow-up</h4>{{rx.followUpNote}}</section>{{/if}}
+      {{/if}}
+      <div class="sign"><div>{{rx.doctor.name}}<br />{{datetime rx.signedAt}}</div></div>
+    </div>
+  </div>
+</div>
+{{/with}}

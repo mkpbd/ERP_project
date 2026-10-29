@@ -90,6 +90,9 @@ Order follows dependencies: later modules reference earlier ones.
 | 10d | Radiology: report templates per imaging test, studies with accession numbers, reports written and signed by the radiologist, reporting fees on the doctor ledger, the imaging report, delivery held while the patient owes | **Done** | [10d-radiology.md](10d-radiology.md) |
 | 10e | Reagents: what each test uses up, used from the lab's store department when reported (shortfalls kept to enter by hand), reagent usage | **Done** | [10e-lab-reagents.md](10e-lab-reagents.md) |
 | 10f | Blood bank: donors, donations screened and split into units, the blood stock, cross-matching, issue to patients (indoor bill or diagnostic bill), expiry | **Done** | [10f-blood-bank.md](10f-blood-bank.md) |
-| 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Next | |
+| 11a | Prescriptions: visits from chamber appointments (or without), vitals by the doctor's assistant, findings, medicines from the pharmacy catalogue, tests, advice, follow-up; signing and same-day correction; the doctor's pick lists, doses and templates; the prescription print | **Done** | [11a-prescriptions.md](11a-prescriptions.md) |
+| 11b | EMR for admitted patients: doctor's notes and rounds, treatment orders and dose times, nurse handover, procedure notes, discharge treatment and diet, death and birth records | Next | |
+| 11c | Nutrition: meal types, food patterns per bed category, meals delivered to wards | Planned | |
+| 11d | Patient portal sign-in (old `AnonymousUser` OTP flow): a patient's own bills, reports and prescriptions | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |
