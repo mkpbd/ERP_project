@@ -1,0 +1,42 @@
+<style>
+  .cert { font-size: 11pt; }
+  .cert .head { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 2mm; margin-bottom: 5mm; }
+  .cert .head .org { font-size: 15pt; font-weight: 700; }
+  .cert .head .kind { font-size: 13pt; font-weight: 700; margin-top: 2mm; letter-spacing: 1.5pt; }
+  .cert table { width: 100%; border-collapse: collapse; margin-bottom: 5mm; }
+  .cert td { padding: 1.5mm 2mm; vertical-align: top; border-bottom: 0.1mm dotted #888; }
+  .cert td.label { width: 32%; color: #333; }
+  .cert h3 { font-size: 11pt; margin: 4mm 0 1mm; }
+  .cert .sign { margin-top: 25mm; display: flex; justify-content: flex-end; }
+  .cert .sign div { text-align: center; min-width: 65mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="cert">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div class="kind">BIRTH CERTIFICATE</div>
+    <div>No. {{record.number}}</div>
+  </div>
+  <h3>The child</h3>
+  <table>
+    <tr><td class="label">Name</td><td><b>{{#if record.childName}}{{record.childName}}{{else}}Not named yet{{/if}}</b></td></tr>
+    <tr><td class="label">Sex</td><td>{{record.childSex}}</td></tr>
+    <tr><td class="label">Date and time of birth</td><td><b>{{datetime record.bornAt}}</b></td></tr>
+    <tr><td class="label">Place of birth</td><td>{{organization.organizationName}}</td></tr>
+    <tr><td class="label">Delivery</td><td>{{record.deliveryLabel}}</td></tr>
+    <tr><td class="label">Birth weight</td><td>{{record.birthWeightKg}} kg</td></tr>
+  </table>
+  <h3>Parents</h3>
+  <table>
+    <tr><td class="label">Mother</td><td><b>{{mother.name}}</b> (UHID {{mother.uhidLabel}}, admission {{admission.number}})</td></tr>
+    {{#if record.fatherName}}<tr><td class="label">Father</td><td><b>{{record.fatherName}}</b></td></tr>{{/if}}
+    {{#if record.grandfatherName}}<tr><td class="label">Grandfather</td><td>{{record.grandfatherName}}</td></tr>{{/if}}
+    {{#if record.religion}}<tr><td class="label">Religion</td><td>{{record.religion}}</td></tr>{{/if}}
+    {{#if record.fatherPresentAddress}}<tr><td class="label">Present address</td><td>{{record.fatherPresentAddress}}</td></tr>{{/if}}
+    {{#if record.fatherPermanentAddress}}<tr><td class="label">Permanent address</td><td>{{record.fatherPermanentAddress}}</td></tr>{{/if}}
+  </table>
+  {{#if record.comments}}<p>{{record.comments}}</p>{{/if}}
+  <div class="sign"><div>{{doctor.name}}{{#if doctor.degrees}}<br />{{doctor.degrees}}{{/if}}<br />Attending doctor</div></div>
+</div>
+{{/with}}

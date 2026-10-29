@@ -127,7 +127,18 @@ export const PERMISSION_CATALOG = [
     key: 'rx:write',
     description: "Write, sign and correct one's own prescriptions as a doctor; keep one's own pick lists and templates",
   },
-  { key: 'rx:manage', description: 'Keep the pick lists shared by every doctor: complaints, findings, advice, doses' },
+  {
+    key: 'rx:manage',
+    description:
+      'Keep the pick lists shared by every doctor (complaints, findings, advice, doses) and the note templates',
+  },
+  { key: 'emr:read', description: "See admitted patients' notes, handovers and death and birth records" },
+  {
+    key: 'emr:write',
+    description:
+      'Write notes on admitted patients (rounds, procedures, transfers, ICU, handovers); take over a handover',
+  },
+  { key: 'emr:certify', description: 'Record deaths and births of admitted patients, and void one recorded in error' },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },

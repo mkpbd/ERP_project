@@ -1,3 +1,4 @@
+import type { BirthDetails, ClinicalNote, DeathDetails } from './emr.js';
 import type { PhraseKind, Prescription, TemplateProps } from './prescription.js';
 
 export interface Phrase {
@@ -30,4 +31,43 @@ export abstract class ClinicalRepository {
   abstract insertTemplate(template: TemplateProps): Promise<void>;
   abstract updateTemplate(template: TemplateProps): Promise<void>;
   abstract deleteTemplate(id: string): Promise<void>;
+}
+
+export interface DeathRecordRow extends DeathDetails {
+  readonly id: string;
+  readonly number: string;
+  readonly admissionId: string;
+  readonly patientId: string;
+  readonly doctorId: string;
+  readonly recordedBy: string;
+  readonly voidedAt: Date | null;
+  readonly voidReason: string | null;
+  readonly version: number;
+  readonly createdAt: Date;
+}
+
+export interface BirthRecordRow extends BirthDetails {
+  readonly id: string;
+  readonly number: string;
+  readonly admissionId: string;
+  readonly motherId: string;
+  readonly doctorId: string;
+  readonly recordedBy: string;
+  readonly voidedAt: Date | null;
+  readonly voidReason: string | null;
+  readonly version: number;
+  readonly createdAt: Date;
+}
+
+export abstract class EmrRepository {
+  abstract insertNote(note: ClinicalNote): Promise<void>;
+  abstract noteForUpdate(id: string): Promise<ClinicalNote | null>;
+  abstract updateNote(note: ClinicalNote): Promise<void>;
+  /** The admission's death record not voided, if any. */
+  abstract liveDeath(admissionId: string): Promise<{ id: string; number: string } | null>;
+  abstract insertDeath(record: DeathRecordRow): Promise<void>;
+  abstract deathForUpdate(id: string): Promise<DeathRecordRow | null>;
+  abstract insertBirth(record: BirthRecordRow): Promise<void>;
+  abstract birthForUpdate(id: string): Promise<BirthRecordRow | null>;
+  abstract voidRecord(kind: 'death' | 'birth', id: string, reason: string, at: Date): Promise<void>;
 }

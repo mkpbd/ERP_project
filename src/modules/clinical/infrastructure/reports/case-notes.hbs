@@ -1,0 +1,23 @@
+{{#with data}}
+<p>
+  <b>{{patient.name}}</b> · UHID {{patient.uhidLabel}} · {{patient.sex}} · Admission <b>{{admission.number}}</b>
+  of {{date admission.admittedOn}} ({{admission.status}})
+</p>
+{{#if notes.length}}
+<table class="report">
+  <thead><tr><th style="width: 16%">When</th><th style="width: 13%">Note</th><th>What was written</th><th style="width: 16%">By</th></tr></thead>
+  <tbody>
+    {{#each notes}}
+    <tr>
+      <td>{{datetime notedAt}}</td>
+      <td>{{kindLabel}}{{#if doctorName}}<br />{{doctorName}}{{/if}}</td>
+      <td style="white-space: pre-wrap">{{note}}{{#if handedToName}}<br /><i>Handed over to {{handedToName}}{{#if acknowledgedAt}}, acknowledged {{datetime acknowledgedAt}}{{else}}, not acknowledged{{/if}}</i>{{/if}}</td>
+      <td>{{writerName}}{{#if (eq version 1)}}{{else}}<br /><span class="muted">corrected</span>{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No note is written for this stay.</p>
+{{/if}}
+{{/with}}

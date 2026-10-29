@@ -206,7 +206,10 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /clinical/*` (prescriptions, pick lists, medicines and tests to prescribe) | `rx:read` |
 | opening a patient's visit for a doctor, taking vitals, cancelling a visit the patient left (the doctor may do these for their own patients with `rx:write`) | `rx:vitals` |
 | writing, signing and correcting one's own prescriptions (the user must be a doctor's); one's own pick lists and templates | `rx:write` |
-| pick lists shared by every doctor (complaints, history, findings, diagnoses, advice, doses) | `rx:manage` |
+| pick lists shared by every doctor (complaints, history, findings, diagnoses, advice, doses) and note templates | `rx:manage` |
+| `GET /clinical/admissions/:id/notes`, `/records`, pending handovers | `emr:read` |
+| writing notes on admitted patients (rounds, consultations, procedures, transfers, ICU course, handovers), correcting one's own within 24 hours, acknowledging a handover to oneself | `emr:write` |
+| recording deaths and births of admitted patients, voiding one recorded in error | `emr:certify` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

@@ -351,6 +351,13 @@
       "when": 1793304180757,
       "tag": "0049_clinical_rx",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1793306744824,
+      "tag": "0050_clinical_emr",
+      "breakpoints": true
     }
   ]
 }

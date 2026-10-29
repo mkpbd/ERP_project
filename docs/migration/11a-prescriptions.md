@@ -1,6 +1,6 @@
 # Step 11a — Prescriptions
 
-Status: **done** (2026-10-30). Previous: [step 10f](10f-blood-bank.md) · Next: step 11b (EMR for admitted patients).
+Status: **done** (2026-10-30). Previous: [step 10f](10f-blood-bank.md) · Next: [step 11b](11b-emr-notes.md).
 
 Step 11 is split:
 

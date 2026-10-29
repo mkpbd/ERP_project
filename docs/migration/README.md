@@ -91,8 +91,9 @@ Order follows dependencies: later modules reference earlier ones.
 | 10e | Reagents: what each test uses up, used from the lab's store department when reported (shortfalls kept to enter by hand), reagent usage | **Done** | [10e-lab-reagents.md](10e-lab-reagents.md) |
 | 10f | Blood bank: donors, donations screened and split into units, the blood stock, cross-matching, issue to patients (indoor bill or diagnostic bill), expiry | **Done** | [10f-blood-bank.md](10f-blood-bank.md) |
 | 11a | Prescriptions: visits from chamber appointments (or without), vitals by the doctor's assistant, findings, medicines from the pharmacy catalogue, tests, advice, follow-up; signing and same-day correction; the doctor's pick lists, doses and templates; the prescription print | **Done** | [11a-prescriptions.md](11a-prescriptions.md) |
-| 11b | EMR for admitted patients: doctor's notes and rounds, treatment orders and dose times, nurse handover, procedure notes, discharge treatment and diet, death and birth records | Next | |
-| 11c | Nutrition: meal types, food patterns per bed category, meals delivered to wards | Planned | |
-| 11d | Patient portal sign-in (old `AnonymousUser` OTP flow): a patient's own bills, reports and prescriptions | Planned | |
+| 11b | EMR for admitted patients: notes (rounds, consultations, procedures, transfers, ICU course), nurse handovers acknowledged by the nurse taking over, note templates, death and birth records with certificates, case notes | **Done** | [11b-emr-notes.md](11b-emr-notes.md) |
+| 11c | Treatment orders for admitted patients: medicines with dose times, given doses charted by the nurses, hold and stop, treatment and diet on discharge, the discharge summary | Next | |
+| 11d | Nutrition: meal types, food patterns per bed category, meals delivered to wards | Planned | |
+| 11e | Patient portal sign-in (old `AnonymousUser` OTP flow): a patient's own bills, reports and prescriptions | Planned | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   index,
@@ -15,6 +16,7 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import {
+  admissions,
   appointments,
   diagnosticTests,
   doctors,
@@ -29,6 +31,9 @@ const decimal = (name: string) => numeric(name, { precision: 5, scale: 1, mode: 
 // The same lists as the domain's (kept literal here so drizzle-kit loads this file on its own).
 const RX_STATUSES = ['draft', 'signed', 'cancelled'] as const;
 const PHRASE_KINDS = ['complaint', 'history', 'examination', 'diagnosis', 'advice', 'dose'] as const;
+const NOTE_KINDS = ['round', 'consult', 'procedure', 'transfer', 'icu', 'handover'] as const;
+const DELIVERY_MODES = ['normal', 'caesarean', 'assisted'] as const;
+const SEXES = ['male', 'female', 'other'] as const;
 const timestamps = {
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -213,4 +218,138 @@ export const rxTemplates = pgTable(
     ...timestamps,
   },
   (t) => [uniqueIndex('clinical_rx_templates_name_uq').on(t.doctorId, sql`lower(${t.name})`)],
+);
+
+// Old EMR ConsultancyVisitNote, DoctorVisitPlan, ProcedureNote, TransferNotesEMR, ICUCourse and
+// NurseToNursePatientHandOverRecord: what the doctors and nurses write about an admitted patient, one kind of note
+// each.
+export const clinicalNotes = pgTable(
+  'clinical_notes',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: NOTE_KINDS }).notNull(),
+    /** The doctor who saw the patient (a round or a consultation; anyone's other notes may name one). */
+    doctorId: uuid('doctor_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    /** When it happened (written then or later). */
+    notedAt: tz('noted_at').notNull(),
+    note: text('note').notNull(),
+    /** A handover: the nurse taking over, and when they acknowledged it. */
+    handedTo: uuid('handed_to').references(() => users.id, { onDelete: 'restrict' }),
+    acknowledgedAt: tz('acknowledged_at'),
+    writtenBy: uuid('written_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('clinical_notes_admission_idx').on(t.admissionId, t.notedAt),
+    index('clinical_notes_handover_idx')
+      .on(t.handedTo)
+      .where(sql`${t.acknowledgedAt} is null`),
+    check('clinical_notes_handover_ck', sql`(${t.kind} = 'handover') = (${t.handedTo} is not null)`),
+  ],
+);
+
+// Old OTTemplate and the special order forms (endoscopy, ERCP, colonoscopy …): a note's starting text.
+export const noteTemplates = pgTable(
+  'clinical_note_templates',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    kind: text('kind', { enum: NOTE_KINDS }).notNull(),
+    body: text('body').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('clinical_note_templates_name_uq').on(sql`lower(${t.name})`)],
+);
+
+// Old EMR DeathRecord (with its detail and common data): an admitted patient's death, certified by a doctor.
+export const deathRecords = pgTable(
+  'clinical_death_records',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    diedAt: tz('died_at').notNull(),
+    /** The immediate cause, what led to it, and other significant conditions. */
+    cause: text('cause').notNull(),
+    antecedentCause: text('antecedent_cause'),
+    otherConditions: text('other_conditions'),
+    deceasedNid: text('deceased_nid'),
+    guardianName: text('guardian_name'),
+    guardianNid: text('guardian_nid'),
+    guardianRelation: text('guardian_relation'),
+    familyContactNo: text('family_contact_no'),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    voidedAt: tz('voided_at'),
+    voidReason: text('void_reason'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('clinical_death_records_number_uq').on(t.number),
+    uniqueIndex('clinical_death_records_admission_uq')
+      .on(t.admissionId)
+      .where(sql`${t.voidedAt} is null`),
+  ],
+);
+
+// Old EMR BirthCertificate: a child born to an admitted mother.
+export const birthRecords = pgTable(
+  'clinical_birth_records',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    /** The mother's admission. */
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    motherId: uuid('mother_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    childName: text('child_name'),
+    childSex: text('child_sex', { enum: SEXES }).notNull(),
+    bornAt: tz('born_at').notNull(),
+    deliveryMode: text('delivery_mode', { enum: DELIVERY_MODES }).notNull(),
+    birthWeightKg: numeric('birth_weight_kg', { precision: 4, scale: 2, mode: 'number' }).notNull(),
+    fatherName: text('father_name'),
+    grandfatherName: text('grandfather_name'),
+    religion: text('religion'),
+    fatherPresentAddress: text('father_present_address'),
+    fatherPermanentAddress: text('father_permanent_address'),
+    comments: text('comments'),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    voidedAt: tz('voided_at'),
+    voidReason: text('void_reason'),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('clinical_birth_records_number_uq').on(t.number),
+    index('clinical_birth_records_admission_idx').on(t.admissionId),
+    check('clinical_birth_records_weight_ck', sql`${t.birthWeightKg} > 0 and ${t.birthWeightKg} < 10`),
+  ],
 );
