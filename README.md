@@ -198,6 +198,11 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | collecting samples | `lab:collect` |
 | taking samples in or rejecting them, entering results, marking imaging studies done and writing their reports, handing reports over | `lab:result` |
 | verifying results (not one's own), signing imaging reports for the radiologist (crediting the reporting fee), taking either back | `lab:verify` |
+| `GET /blood-bank/*` (component types, donors, donations, the blood stock, requests) | `bb:read` |
+| blood component types and their rates; discarding blood units | `bb:manage` |
+| registering blood donors, taking donations, screening them and splitting them into units | `bb:collect` |
+| asking for blood for a patient (for a stay or on a diagnostic bill) and cancelling the request | `bb:request` |
+| cross-matching blood units and issuing them (a stay is charged the component rate) | `bb:issue` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

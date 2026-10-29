@@ -23,6 +23,8 @@ export const IPD_INCOME_ROLES: Record<IpdBillHead | 'serviceCharge', string> = {
   medicine: 'ipd_medicine_unbilled',
   /** Not income here either: the diagnostic bill took it; the bill clears what the stay owed for the tests. */
   investigation: 'ipd_investigation_unbilled',
+  /** Not income here: the blood bank took it when it issued the blood; the bill clears what the stay owed. */
+  blood: 'ipd_blood_unbilled',
   serviceCharge: 'ipd_service_charge_income',
 };
 

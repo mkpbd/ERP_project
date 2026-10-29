@@ -91,7 +91,16 @@ export function chargeOf(params: Omit<IpdCharge, 'amount'>): IpdCharge {
   return { ...params, amount: taka(Math.round(paisa(params.rate) * params.qty)) };
 }
 
-export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service' | 'medicine' | 'investigation';
+export type IpdBillHead = 'admission' | 'bed' | 'round' | 'service' | 'medicine' | 'investigation' | 'blood';
+
+/** A unit of blood issued to the stay by the blood bank. */
+export interface BloodIssue {
+  readonly issueId: string;
+  readonly number: string;
+  readonly issuedOn: string;
+  readonly description: string;
+  readonly amount: number;
+}
 
 /** A diagnostic bill of the stay as it stands on the final bill (tests not cancelled). */
 export interface InvestigationBill {
@@ -171,6 +180,8 @@ export function billLines(params: {
   medicine?: readonly MedicineIssue[];
   /** With the service charge, as the old final bill charged it on pathology and radiology. */
   investigations?: readonly InvestigationBill[];
+  /** Blood issued to the stay (no service charge, as medicine). */
+  blood?: readonly BloodIssue[];
 }): IpdBillLine[] {
   const none = { bedId: null, chargeId: null, serviceId: null, doctorId: null, fromOn: null, toOn: null };
   const charged = (amount: number) => ({ amount, serviceCharge: percentOf(amount, params.serviceChargePercent) });
@@ -237,6 +248,19 @@ export function billLines(params: {
       qty: 1,
       rate: tests.amount,
       ...charged(tests.amount),
+      shareAmount: 0,
+    });
+  }
+  for (const unit of params.blood ?? []) {
+    lines.push({
+      ...none,
+      head: 'blood',
+      description: `${unit.description} (${unit.number})`,
+      fromOn: unit.issuedOn,
+      qty: 1,
+      rate: unit.amount,
+      amount: unit.amount,
+      serviceCharge: 0,
       shareAmount: 0,
     });
   }
@@ -393,6 +417,7 @@ export class IpdBill {
       service: of('service'),
       medicine: of('medicine'),
       investigation: of('investigation'),
+      blood: of('blood'),
       serviceCharge: this.props.serviceCharge,
     };
   }

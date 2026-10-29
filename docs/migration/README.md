@@ -89,7 +89,7 @@ Order follows dependencies: later modules reference earlier ones.
 | 10c | Laboratory: test parameters with normal ranges by sex and age; samples with lab numbers; results entered, flagged and verified by someone else; the lab report; delivery held while the patient owes | **Done** | [10c-laboratory.md](10c-laboratory.md) |
 | 10d | Radiology: report templates per imaging test, studies with accession numbers, reports written and signed by the radiologist, reporting fees on the doctor ledger, the imaging report, delivery held while the patient owes | **Done** | [10d-radiology.md](10d-radiology.md) |
 | 10e | Reagents: what each test uses up, used from the lab's store department when reported (shortfalls kept to enter by hand), reagent usage | **Done** | [10e-lab-reagents.md](10e-lab-reagents.md) |
-| 10f | Transfusion medicine: donors, donations and components, serology screening, cross-matching, issue to patients (indoor bill or diagnostic bill), expiry | Next | |
-| 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Planned | |
+| 10f | Blood bank: donors, donations screened and split into units, the blood stock, cross-matching, issue to patients (indoor bill or diagnostic bill), expiry | **Done** | [10f-blood-bank.md](10f-blood-bank.md) |
+| 11 | EMR, Rx, Nutrition, patient portal sign-in (`AnonymousUser` OTP flow) | Next | |
 | 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

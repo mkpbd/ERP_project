@@ -38,7 +38,7 @@ const day = z.iso.date();
 const money = z.number().min(0).max(10_000_000).multipleOf(0.01);
 const percent = z.number().min(0).max(100).multipleOf(0.01);
 const reason = z.string().trim().min(1).max(300);
-const HEADS = ['admission', 'bed', 'round', 'service', 'medicine', 'investigation'] as const;
+const HEADS = ['admission', 'bed', 'round', 'service', 'medicine', 'investigation', 'blood'] as const;
 const PAYMENT_KINDS = ['advance', 'refund', 'payment', 'collection'] as const;
 
 const moneyShape = {

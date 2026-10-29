@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
+import { InpatientBlood } from '../../../shared/application/contracts/inpatient-blood.js';
 import { InpatientMedicine } from '../../../shared/application/contracts/inpatient-medicine.js';
 import type { LedgerPostingLine } from '../../../shared/application/contracts/ledger-posting.js';
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
@@ -87,6 +88,7 @@ export class IpdCashier {
     readonly read: IpdBillingReadRepository,
     readonly medicine: InpatientMedicine,
     readonly tests: DiagnosticBillRepository,
+    readonly bloodBank: InpatientBlood,
   ) {}
 
   get opd() {
@@ -122,6 +124,7 @@ export class IpdCashier {
     const policy = await this.billing.policy();
     const medicine = await this.medicine.charges(admission.id);
     const investigations = await this.tests.indoorCharges(admission.id);
+    const blood = await this.bloodBank.charges(admission.id);
     const runs = bedNights(stays, on);
     return {
       nights: runs.reduce((total, run) => total + run.nights, 0),
@@ -133,6 +136,7 @@ export class IpdCashier {
         charges,
         medicine,
         investigations,
+        blood,
       }),
     };
   }

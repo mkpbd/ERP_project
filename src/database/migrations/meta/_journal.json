@@ -337,6 +337,13 @@
       "when": 1793128162172,
       "tag": "0047_lab_reagents",
       "breakpoints": true
+    },
+    {
+      "idx": 48,
+      "version": "7",
+      "when": 1793129202546,
+      "tag": "0048_blood_bank",
+      "breakpoints": true
     }
   ]
 }

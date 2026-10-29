@@ -166,6 +166,33 @@ describe('billLines', () => {
     ]);
   });
 
+  it('bills blood issued to the stay at its rate, without the service charge', () => {
+    const lines = billLines({
+      nights: [],
+      admissionFee: 0,
+      roundFeePerNight: 0,
+      serviceChargePercent: 10,
+      charges: [],
+      blood: [
+        {
+          issueId: 'i',
+          number: 'BI-2026-00001',
+          issuedOn: '2026-10-21',
+          description: 'Packed red cells BB-2026-00001/PC',
+          amount: 1500,
+        },
+      ],
+    });
+    expect(lines).toEqual([
+      expect.objectContaining({
+        head: 'blood',
+        description: 'Packed red cells BB-2026-00001/PC (BI-2026-00001)',
+        amount: 1500,
+        serviceCharge: 0,
+      }),
+    ]);
+  });
+
   it('needs the doctor of a charge that carries a share', () => {
     expect(() =>
       chargeOf({
@@ -196,6 +223,7 @@ describe('IpdBill', () => {
       service: 2000,
       medicine: 0,
       investigation: 0,
+      blood: 0,
       serviceCharge: 449,
     });
   });

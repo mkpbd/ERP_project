@@ -1,0 +1,30 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Component</th><th>Group</th><th class="num">Quarantine</th><th class="num">Available</th>
+      <th class="num">Reserved</th><th class="num">Out of date in {{expiringDays}} days</th><th class="num">Out of date</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{componentName}}</td><td>{{bloodGroup}}</td><td class="num">{{quarantine}}</td>
+      <td class="num"><b>{{available}}</b></td><td class="num">{{reserved}}</td>
+      <td class="num">{{#if expiring}}<b>{{expiring}}</b>{{/if}}</td><td class="num">{{#if expired}}<b>{{expired}}</b>{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+  <tfoot>
+    <tr>
+      <th colspan="2">Total</th><th class="num">{{totals.quarantine}}</th><th class="num">{{totals.available}}</th>
+      <th class="num">{{totals.reserved}}</th><th class="num">{{totals.expiring}}</th><th class="num">{{totals.expired}}</th>
+    </tr>
+  </tfoot>
+</table>
+<p class="muted">Quarantine: not screened clear yet. Out of date: still on the shelf, to be discarded.</p>
+{{else}}
+<p>No blood is in stock.</p>
+{{/if}}
+{{/with}}

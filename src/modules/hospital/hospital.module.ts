@@ -3,6 +3,8 @@ import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-orders.js';
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
+import { PatientDirectory } from '../../shared/application/contracts/patient-directory.js';
+import { DrizzlePatientDirectory } from './infrastructure/persistence/drizzle-patient-directory.js';
 import { ReportingFees } from '../../shared/application/contracts/reporting-fees.js';
 import { HospitalReportingFees } from './application/reporting-fees.js';
 import { LocationDirectory } from '../../shared/application/contracts/location-directory.js';
@@ -106,7 +108,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
  * the referring doctors' commission (step 10a); admitted patients' tests on the indoor bill and diagnostic bills in
  * the statements (step 10b). Global: it publishes the admissions other
  * modules charge to (InpatientRegister), for the pharmacy's ward medicine, and the diagnostic bills the lab works
- * from (DiagnosticOrders) and the reporting doctors' fees it credits (ReportingFees).
+ * from (DiagnosticOrders), the reporting doctors' fees it credits (ReportingFees) and the patients (PatientDirectory).
  */
 @Global()
 @Module({
@@ -139,6 +141,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: InpatientRegister, useClass: DrizzleInpatientRegister },
     { provide: DiagnosticOrders, useClass: DrizzleDiagnosticOrders },
     { provide: ReportingFees, useClass: HospitalReportingFees },
+    { provide: PatientDirectory, useClass: DrizzlePatientDirectory },
     { provide: DiagnosticBillRepository, useClass: DrizzleDiagnosticBillRepository },
     { provide: DiagnosticBillReadRepository, useClass: DrizzleDiagnosticBillReadRepository },
     {
@@ -147,7 +150,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
       useFactory: (config: AppConfig) => ({ timeZone: config.reports.timeZone }),
     },
   ],
-  exports: [InpatientRegister, DiagnosticOrders, ReportingFees],
+  exports: [InpatientRegister, DiagnosticOrders, ReportingFees, PatientDirectory],
 })
 export class HospitalModule implements OnModuleInit {
   constructor(

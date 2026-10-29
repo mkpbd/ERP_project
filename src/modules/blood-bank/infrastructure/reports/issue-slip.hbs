@@ -1,0 +1,34 @@
+<style>
+  .slip { font-size: 10pt; }
+  .slip .head { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 2mm; margin-bottom: 3mm; }
+  .slip .head .org { font-size: 15pt; font-weight: 700; }
+  .slip .head .kind { font-size: 11pt; font-weight: 700; margin-top: 1mm; letter-spacing: 1pt; }
+  .slip table { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .slip td { padding: 1mm 1.5mm; vertical-align: top; }
+  .slip .unit td { border: 0.2mm solid #000; }
+  .slip .big { font-size: 13pt; font-weight: 700; }
+  .slip .sign { margin-top: 18mm; display: flex; justify-content: space-between; }
+  .slip .sign div { text-align: center; min-width: 55mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="slip">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div class="kind">BLOOD ISSUE SLIP</div>
+  </div>
+  <table>
+    <tr><td style="width: 18%">Issue</td><td><b>{{issue.number}}</b></td><td style="width: 18%">Issued</td><td>{{datetime issue.issuedAt}}</td></tr>
+    <tr><td>Patient</td><td><b>{{patient.name}}</b></td><td>UHID</td><td>{{patient.uhidLabel}}</td></tr>
+    <tr><td>Patient's group</td><td class="big">{{issue.patientGroup}}</td><td>Request</td><td>{{issue.requestNumber}}</td></tr>
+  </table>
+  <table class="unit">
+    <tr><td style="width: 18%">Unit</td><td><b>{{issue.unitNumber}}</b></td><td style="width: 18%">Bag</td><td>{{issue.bagNumber}}</td></tr>
+    <tr><td>Component</td><td>{{issue.componentName}}</td><td>Unit's group</td><td class="big">{{issue.unitGroup}}</td></tr>
+    <tr><td>Use before</td><td><b>{{date issue.expiresOn}}</b></td><td>Cross-match</td><td>Compatible{{#if issue.crossmatch}} ({{issue.crossmatch}}){{/if}}</td></tr>
+    {{#if issue.amount}}<tr><td>Charge</td><td colspan="3">{{money issue.amount}} to the patient's stay</td></tr>{{/if}}
+  </table>
+  <p>Check the patient's name, the unit number and both groups at the bedside before starting the transfusion.</p>
+  <div class="sign"><div>{{#if issuer}}{{issuer}}{{else}}&nbsp;{{/if}}<br />Issued by</div><div>&nbsp;<br />Received by</div></div>
+</div>
+{{/with}}

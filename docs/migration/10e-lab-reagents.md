@@ -1,6 +1,6 @@
 # Step 10e — Lab reagents: what each test uses up
 
-Status: **done** (2026-10-28). Previous: [step 10d](10d-radiology.md) · Next: step 10f (transfusion medicine).
+Status: **done** (2026-10-28). Previous: [step 10d](10d-radiology.md) · Next: [step 10f](10f-blood-bank.md).
 
 What this step adds:
 
