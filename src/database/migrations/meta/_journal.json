@@ -379,6 +379,13 @@
       "when": 1793313093483,
       "tag": "0053_portal",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1793316089665,
+      "tag": "0054_canteen",
+      "breakpoints": true
     }
   ]
 }

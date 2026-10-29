@@ -1,0 +1,13 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead><tr><th>Member</th><th>Mobile</th><th class="num">Owes</th></tr></thead>
+  <tbody>
+    {{#each rows}}<tr><td>{{name}}</td><td>{{mobileNo}}</td><td class="num">{{money balance}}</td></tr>{{/each}}
+  </tbody>
+  <tfoot><tr><th colspan="2">Total</th><th class="num">{{money total}}</th></tr></tfoot>
+</table>
+{{else}}
+<p>No member owes the canteen.</p>
+{{/if}}
+{{/with}}

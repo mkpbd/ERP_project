@@ -1,0 +1,41 @@
+<style>
+  .rc { font-size: 8.5pt; width: 72mm; margin: 0 auto; }
+  .rc .head { text-align: center; border-bottom: 0.3mm dashed #000; padding-bottom: 1.5mm; margin-bottom: 1.5mm; }
+  .rc .head .org { font-size: 11pt; font-weight: 700; }
+  .rc table { width: 100%; border-collapse: collapse; }
+  .rc td, .rc th { padding: 0.5mm 0; vertical-align: top; }
+  .rc th { text-align: left; border-bottom: 0.2mm solid #000; }
+  .rc .num { text-align: right; }
+  .rc .totals td { padding-top: 0.6mm; }
+  .rc .grand td { font-weight: 700; border-top: 0.2mm solid #000; }
+  .rc .void { text-align: center; font-weight: 700; font-size: 11pt; border: 0.4mm solid #000; margin: 2mm 0; }
+  .rc .foot { text-align: center; margin-top: 2mm; border-top: 0.3mm dashed #000; padding-top: 1.5mm; }
+</style>
+{{#with data}}
+<div class="rc">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>Canteen · {{sale.outletName}}</div>
+    <div>{{sale.number}} · {{datetime sale.soldAt}}</div>
+    <div>{{customerLabel}}{{#if sale.customerName}}: {{sale.customerName}}{{/if}}</div>
+  </div>
+  {{#if (eq sale.status "cancelled")}}<div class="void">CANCELLED</div>{{/if}}
+  <table>
+    <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+    <tbody>
+      {{#each sale.lines}}
+      <tr><td>{{itemName}}</td><td class="num">{{qty}}</td><td class="num">{{money rate}}</td><td class="num">{{money amount}}</td></tr>
+      {{/each}}
+    </tbody>
+  </table>
+  <table class="totals">
+    <tr><td>Total</td><td class="num">{{money sale.gross}}</td></tr>
+    {{#if sale.discount}}<tr><td>Discount</td><td class="num">-{{money sale.discount}}</td></tr>{{/if}}
+    {{#if sale.vat}}<tr><td>VAT</td><td class="num">{{money sale.vat}}</td></tr>{{/if}}
+    <tr class="grand"><td>Net</td><td class="num">{{money sale.net}}</td></tr>
+    <tr><td>Paid</td><td class="num">{{money sale.paid}}</td></tr>
+    {{#if sale.due}}<tr><td>Due</td><td class="num"><b>{{money sale.due}}</b></td></tr>{{/if}}
+  </table>
+  <div class="foot">Thank you</div>
+</div>
+{{/with}}

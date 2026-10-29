@@ -150,6 +150,16 @@ export const PERMISSION_CATALOG = [
   { key: 'diet:order', description: "Order an admitted patient's diet or nothing by mouth, and stop it" },
   { key: 'diet:serve', description: 'Record meals served to admitted patients, or refused' },
   { key: 'emr:certify', description: 'Record deaths and births of admitted patients, and void one recorded in error' },
+  { key: 'canteen:read', description: 'See the canteen menu, outlets, members, sales and dues' },
+  {
+    key: 'canteen:manage',
+    description:
+      'Keep the canteen menu, rates and VAT, outlets and who sells there, members; cancel sales of past days',
+  },
+  {
+    key: 'canteen:sell',
+    description: "Sell at one's canteen outlets, cancel the day's sales and take members' dues",
+  },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },

@@ -1,7 +1,6 @@
 # Step 11e — Patient portal: one-time code sign-in, the patient's own documents
 
-Status: **done** (2026-10-30). Previous: [step 11d](11d-nutrition.md) · Next: step 12 (marketing, canteen, others,
-activity log).
+Status: **done** (2026-10-30). Previous: [step 11d](11d-nutrition.md) · Next: [step 12a](12a-canteen.md).
 
 What this step adds, in a new `portal` module:
 
