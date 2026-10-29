@@ -1,14 +1,16 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Inject, Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
+import { PatientDocumentRegistry } from '../../shared/application/patient-documents.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
+import { clinicalDocuments } from './infrastructure/persistence/clinical.patient-documents.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { EmrDesk, EMR_HANDLERS } from './application/emr.handlers.js';
 import { EmrReadRepository } from './application/emr.messages.js';
 import { ClinicDesk, RX_HANDLERS } from './application/rx.handlers.js';
-import { CLINICAL_SETTINGS, ClinicalReadRepository } from './application/rx.messages.js';
+import { CLINICAL_SETTINGS, ClinicalReadRepository, type ClinicalSettings } from './application/rx.messages.js';
 import { TREATMENT_HANDLERS, TreatmentDesk } from './application/treatment.handlers.js';
 import { TreatmentReadRepository } from './application/treatment.messages.js';
 import { ClinicalRepository, EmrRepository, TreatmentRepository } from './domain/repositories.js';
@@ -74,10 +76,13 @@ export class ClinicalModule implements OnModuleInit {
     private readonly emr: EmrDesk,
     private readonly treatment: TreatmentDesk,
     private readonly organization: OrganizationProfile,
+    private readonly documents: PatientDocumentRegistry,
+    @Inject(CLINICAL_SETTINGS) private readonly settings: ClinicalSettings,
   ) {}
 
   onModuleInit(): void {
     for (const type of clinicalRecordTypes(this.context)) this.records.register(type);
+    this.documents.register(clinicalDocuments(this.context, this.settings.timeZone));
     this.reports.register(prescriptionReport(this.desk, this.organization));
     this.reports.register(caseNotesReport(this.emr, this.organization));
     this.reports.register(deathCertificateReport(this.emr, this.organization));

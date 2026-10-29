@@ -1,4 +1,4 @@
-import { Global, Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Inject, Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-orders.js';
@@ -26,7 +26,9 @@ import { AdmissionReadRepository } from './application/ipd.messages.js';
 import { OPD_HANDLERS } from './application/opd.handlers.js';
 import { OpdBillReadRepository } from './application/opd.messages.js';
 import { AppointmentReadRepository } from './application/appointment.messages.js';
-import { HOSPITAL_SETTINGS, PATIENT_HANDLERS } from './application/patient.handlers.js';
+import { HOSPITAL_SETTINGS, PATIENT_HANDLERS, type HospitalSettings } from './application/patient.handlers.js';
+import { PatientDocumentRegistry } from '../../shared/application/patient-documents.js';
+import { hospitalDocuments } from './infrastructure/persistence/hospital.patient-documents.js';
 import { PatientReadRepository } from './application/patient.messages.js';
 import {
   AdmissionRepository,
@@ -171,10 +173,13 @@ export class HospitalModule implements OnModuleInit {
     private readonly cashier: IpdCashier,
     private readonly ipdBills: IpdBillingReadRepository,
     private readonly diagnostics: DiagnosticBillReadRepository,
+    private readonly documents: PatientDocumentRegistry,
+    @Inject(HOSPITAL_SETTINGS) private readonly settings: HospitalSettings,
   ) {}
 
   onModuleInit(): void {
     for (const type of hospitalRecordTypes(this.context)) this.records.register(type);
+    this.documents.register(hospitalDocuments(this.context, this.settings.timeZone));
     this.reports.register(patientCardReport(this.read, this.organization));
     this.reports.register(patientRegisterReport(this.read, this.locations, this.organization));
     this.reports.register(doctorAppointmentsReport(this.appointments, this.organization));

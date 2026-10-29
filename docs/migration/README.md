@@ -94,6 +94,6 @@ Order follows dependencies: later modules reference earlier ones.
 | 11b | EMR for admitted patients: notes (rounds, consultations, procedures, transfers, ICU course), nurse handovers acknowledged by the nurse taking over, note templates, death and birth records with certificates, case notes | **Done** | [11b-emr-notes.md](11b-emr-notes.md) |
 | 11c | Treatment of admitted patients: medicine orders at set times, every so many hours, once or when needed; hold, resume, stop with their history; doses charted as given or missed; the medication chart; the discharge summary signed by the doctor | **Done** | [11c-treatment-orders.md](11c-treatment-orders.md) |
 | 11d | Nutrition: meal types and the meals each bed category gets, diet plans with a menu per meal, admitted patients' diets (or nothing by mouth), the kitchen list of a meal, meals served or refused | **Done** | [11d-nutrition.md](11d-nutrition.md) |
-| 11e | Patient portal sign-in (old `AnonymousUser` OTP flow): a patient's own bills, reports and prescriptions | Next | |
-| 12 | Marketing, Canteen, Others, ActivityLog | Planned | |
+| 11e | Patient portal (old `AnonymousUser` OTP flow): sign-in with UHID and a one-time code to the patient's mobile or email, a patient token of its own, the patient's own reports, prescriptions, discharge summaries, receipts and bills (lab reports held while owed) | **Done** | [11e-patient-portal.md](11e-patient-portal.md) |
+| 12 | Marketing, Canteen, Others, ActivityLog | Next | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

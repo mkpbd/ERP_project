@@ -215,6 +215,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | meal types, the meals each bed category gets, diet plans and their menus | `diet:manage` |
 | ordering an admitted patient's diet or nothing by mouth, and stopping it | `diet:order` |
 | recording meals served to admitted patients, or refused | `diet:serve` |
+| `/portal/*` (patients: one-time code sign-in, their own documents) | none: the patient's own portal token; staff tokens are refused |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

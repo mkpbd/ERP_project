@@ -6,7 +6,9 @@ import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
+import { PatientDocumentRegistry } from '../../shared/application/patient-documents.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
+import { laboratoryDocuments } from './infrastructure/persistence/laboratory.patient-documents.js';
 import { IMAGING_HANDLERS } from './application/imaging.handlers.js';
 import { ImagingReadRepository } from './application/imaging.messages.js';
 import { LAB_HANDLERS } from './application/lab.handlers.js';
@@ -65,11 +67,13 @@ export class LaboratoryModule implements OnModuleInit {
     private readonly imaging: ImagingReadRepository,
     private readonly context: DbContext,
     private readonly stock: DepartmentStock,
+    private readonly documents: PatientDocumentRegistry,
   ) {}
 
   onModuleInit(): void {
     this.reports.register(labReport(this.read, this.orders, this.organization, this.users));
     this.reports.register(imagingReport(this.imaging, this.orders, this.organization));
     this.reports.register(reagentUsageReport(this.context, this.stock));
+    this.documents.register(laboratoryDocuments(this.context, this.orders));
   }
 }

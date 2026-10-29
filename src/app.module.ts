@@ -16,6 +16,7 @@ import { LaboratoryModule } from './modules/laboratory/laboratory.module.js';
 import { BloodBankModule } from './modules/blood-bank/blood-bank.module.js';
 import { ClinicalModule } from './modules/clinical/clinical.module.js';
 import { NutritionModule } from './modules/nutrition/nutrition.module.js';
+import { PortalModule } from './modules/portal/portal.module.js';
 import { AuthorizationGuard } from './modules/access-control/presentation/authorization.guard.js';
 import { AdministrationModule } from './modules/administration/administration.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
@@ -105,6 +106,7 @@ export class AppModule {
         BloodBankModule,
         ClinicalModule,
         NutritionModule,
+        PortalModule,
         HealthModule,
       ],
       // Order matters: rate limit, then authenticate, then authorize (permissions, then pages).

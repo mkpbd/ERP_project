@@ -1,7 +1,6 @@
 # Step 11d — Nutrition: diets, the kitchen list, meals served
 
-Status: **done** (2026-10-30). Previous: [step 11c](11c-treatment-orders.md) · Next: step 11e (patient portal
-sign-in).
+Status: **done** (2026-10-30). Previous: [step 11c](11c-treatment-orders.md) · Next: [step 11e](11e-patient-portal.md).
 
 What this step adds, in a new `nutrition` module:
 

@@ -94,6 +94,10 @@ export class DrizzleDiagnosticOrders extends DiagnosticOrders {
     return this.load(inArray(diagnosticBills.id, [...new Set(billIds)]));
   }
 
+  ofPatient(patientId: string): Promise<DiagnosticOrder[]> {
+    return this.load(eq(diagnosticBills.patientId, patientId));
+  }
+
   async byNumber(number: string): Promise<DiagnosticOrder | null> {
     const [order] = await this.load(eq(diagnosticBills.number, number.trim().toUpperCase()));
     return order ?? null;

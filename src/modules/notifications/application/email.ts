@@ -37,5 +37,11 @@ export function renderEmail(to: string, content: EmailTemplate): RenderedEmail {
         subject: 'Sign-up attempt for your account',
         text: `Someone tried to register with this email address, which already has an account.\n\nSign in: ${content.loginUrl}\nForgot your password? ${content.resetUrl}\n\nIf this was not you, no action is needed.`,
       };
+    case 'portal-otp':
+      return {
+        to,
+        subject: 'Your sign-in code',
+        text: `Hello ${content.patientName},\n\nYour code to see your reports is ${content.code}. It works once, for ${content.minutes} minutes.\n\nIf you did not ask for it, ignore this message; nobody can sign in without the code.`,
+      };
   }
 }

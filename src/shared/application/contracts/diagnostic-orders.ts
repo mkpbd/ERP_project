@@ -41,6 +41,8 @@ export interface DiagnosticOrder {
  */
 export abstract class DiagnosticOrders {
   abstract find(billIds: readonly string[]): Promise<DiagnosticOrder[]>;
+  /** The patient's bills (the portal's lab reports). */
+  abstract ofPatient(patientId: string): Promise<DiagnosticOrder[]>;
   /** The bill with this number (any case), or null. */
   abstract byNumber(number: string): Promise<DiagnosticOrder | null>;
   /** Diagnostic departments by id. */
