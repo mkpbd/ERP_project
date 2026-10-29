@@ -1,0 +1,44 @@
+<style>
+  .ds { font-size: 10.5pt; }
+  .ds .head { text-align: center; border-bottom: 0.4mm solid #000; padding-bottom: 2mm; margin-bottom: 4mm; }
+  .ds .head .org { font-size: 15pt; font-weight: 700; }
+  .ds .head .kind { font-size: 12pt; font-weight: 700; margin-top: 2mm; letter-spacing: 1pt; }
+  .ds .who { width: 100%; border-collapse: collapse; margin-bottom: 4mm; }
+  .ds .who td { padding: 0.8mm 1.5mm; }
+  .ds h3 { font-size: 10.5pt; margin: 4mm 0 1mm; text-transform: uppercase; letter-spacing: 0.3pt; }
+  .ds .text { white-space: pre-wrap; }
+  .ds table.meds { width: 100%; border-collapse: collapse; }
+  .ds table.meds th, .ds table.meds td { border: 0.2mm solid #000; padding: 1mm 1.5mm; text-align: left; }
+  .ds .sign { margin-top: 20mm; display: flex; justify-content: flex-end; }
+  .ds .sign div { text-align: center; min-width: 65mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
+</style>
+{{#with data}}
+<div class="ds">
+  <div class="head">
+    <div class="org">{{organization.organizationName}}</div>
+    <div>{{organization.address}}{{#if organization.hotline}} · {{organization.hotline}}{{/if}}</div>
+    <div class="kind">DISCHARGE SUMMARY</div>
+  </div>
+  <table class="who">
+    <tr><td style="width: 15%">Patient</td><td><b>{{patient.name}}</b></td><td style="width: 15%">Admission</td><td><b>{{admission.number}}</b></td></tr>
+    <tr><td>UHID</td><td>{{patient.uhidLabel}}</td><td>Admitted</td><td>{{date admission.admittedOn}}</td></tr>
+    <tr><td>Age · sex</td><td>{{patient.age}} · {{patient.sex}}</td><td>Signed</td><td>{{datetime summary.signedAt}}</td></tr>
+  </table>
+  <h3>Diagnosis</h3><div class="text">{{summary.diagnosis}}</div>
+  {{#if summary.course}}<h3>Course in hospital</h3><div class="text">{{summary.course}}</div>{{/if}}
+  {{#if summary.conditionOnDischarge}}<h3>Condition on discharge</h3><div class="text">{{summary.conditionOnDischarge}}</div>{{/if}}
+  {{#if summary.treatment.length}}
+  <h3>Treatment on discharge</h3>
+  <table class="meds">
+    <thead><tr><th style="width: 5%">#</th><th>Medicine</th><th>Dose</th><th style="width: 18%">Duration</th></tr></thead>
+    <tbody>{{#each summary.treatment}}<tr><td>{{inc @index}}</td><td><b>{{name}}</b></td><td>{{dose}}</td><td>{{this.duration}}</td></tr>{{/each}}</tbody>
+  </table>
+  {{/if}}
+  {{#if summary.diet}}<h3>Diet</h3><div class="text">{{summary.diet}}</div>{{/if}}
+  {{#if summary.advice}}<h3>Advice</h3><div class="text">{{summary.advice}}</div>{{/if}}
+  {{#if summary.followUpOn}}
+  <h3>Follow-up</h3><div>{{date summary.followUpOn}}{{#if summary.followUpNote}} — {{summary.followUpNote}}{{/if}}</div>
+  {{else}}{{#if summary.followUpNote}}<h3>Follow-up</h3><div>{{summary.followUpNote}}</div>{{/if}}{{/if}}
+  <div class="sign"><div>{{doctor.name}}{{#if doctor.degrees}}<br />{{doctor.degrees}}{{/if}}</div></div>
+</div>
+{{/with}}

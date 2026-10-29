@@ -1,0 +1,36 @@
+{{#with data}}
+<p>
+  <b>{{patient.name}}</b> · UHID {{patient.uhidLabel}} · Admission <b>{{admission.number}}</b> · Chart of
+  <b>{{date day}}</b>
+</p>
+{{#if orders.length}}
+<table class="report">
+  <thead>
+    <tr><th style="width: 24%">Medicine</th><th style="width: 9%">Route</th><th style="width: 12%">When</th><th style="width: 9%">Status</th><th>Doses</th></tr>
+  </thead>
+  <tbody>
+    {{#each orders}}
+    <tr>
+      <td><b>{{drugName}}</b><br />{{dose}}{{#if note}}<br /><span class="muted">{{note}}</span>{{/if}}</td>
+      <td>{{routeLabel}}</td>
+      <td>{{scheduleText}}</td>
+      <td>{{status}}</td>
+      <td>
+        {{#each slots}}
+        <div>{{time dueAt}} —
+          {{#if (eq state "given")}}<b>given</b> {{time record.givenAt}} by {{by}}{{/if}}
+          {{#if (eq state "missed")}}<b>missed</b>: {{record.reason}} ({{by}}){{/if}}
+          {{#if (eq state "overdue")}}<b>overdue</b>{{/if}}
+          {{#if (eq state "due")}}due{{/if}}
+        </div>
+        {{/each}}
+        {{#each doses}}<div>{{time givenAt}} — <b>given</b> (when needed) by {{by}}</div>{{/each}}
+      </td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No medicine was ordered for this day.</p>
+{{/if}}
+{{/with}}

@@ -1,6 +1,6 @@
 # Step 11b — EMR: notes, handovers, death and birth records
 
-Status: **done** (2026-10-30). Previous: [step 11a](11a-prescriptions.md) · Next: step 11c (treatment orders).
+Status: **done** (2026-10-30). Previous: [step 11a](11a-prescriptions.md) · Next: [step 11c](11c-treatment-orders.md).
 
 What this step adds to the `clinical` module, for admitted patients:
 

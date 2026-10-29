@@ -210,6 +210,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /clinical/admissions/:id/notes`, `/records`, pending handovers | `emr:read` |
 | writing notes on admitted patients (rounds, consultations, procedures, transfers, ICU course, handovers), correcting one's own within 24 hours, acknowledging a handover to oneself | `emr:write` |
 | recording deaths and births of admitted patients, voiding one recorded in error | `emr:certify` |
+| ordering admitted patients' medicines (set times, every so many hours, once, when needed), holding, resuming and stopping them; writing, signing and reopening the discharge summary | `emr:order` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

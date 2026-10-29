@@ -1,5 +1,6 @@
 import type { BirthDetails, ClinicalNote, DeathDetails } from './emr.js';
 import type { PhraseKind, Prescription, TemplateProps } from './prescription.js';
+import type { SummaryContent, TreatmentOrder } from './treatment.js';
 
 export interface Phrase {
   readonly id: string;
@@ -70,4 +71,41 @@ export abstract class EmrRepository {
   abstract insertBirth(record: BirthRecordRow): Promise<void>;
   abstract birthForUpdate(id: string): Promise<BirthRecordRow | null>;
   abstract voidRecord(kind: 'death' | 'birth', id: string, reason: string, at: Date): Promise<void>;
+}
+
+export interface DoseRecordRow {
+  readonly id: string;
+  readonly orderId: string;
+  readonly admissionId: string;
+  readonly dueAt: Date | null;
+  readonly outcome: 'given' | 'missed';
+  readonly givenAt: Date | null;
+  readonly reason: string | null;
+  readonly recordedBy: string;
+  readonly createdAt: Date;
+}
+
+export interface SummaryRow extends SummaryContent {
+  readonly id: string;
+  readonly admissionId: string;
+  readonly patientId: string;
+  readonly doctorId: string;
+  readonly status: 'draft' | 'signed';
+  readonly signedBy: string | null;
+  readonly signedAt: Date | null;
+  readonly writtenBy: string;
+  readonly version: number;
+  readonly createdAt: Date;
+  readonly updatedAt: Date;
+}
+
+export abstract class TreatmentRepository {
+  abstract insertOrder(order: TreatmentOrder): Promise<void>;
+  abstract orderForUpdate(id: string): Promise<TreatmentOrder | null>;
+  /** Saves the order's state and its events. */
+  abstract updateOrder(order: TreatmentOrder): Promise<void>;
+  /** Records a dose; a due time answered already is a conflict. */
+  abstract insertDose(dose: DoseRecordRow): Promise<void>;
+  abstract summaryForUpdate(admissionId: string): Promise<SummaryRow | null>;
+  abstract saveSummary(summary: SummaryRow, isNew: boolean): Promise<void>;
 }

@@ -138,6 +138,10 @@ export const PERMISSION_CATALOG = [
     description:
       'Write notes on admitted patients (rounds, procedures, transfers, ICU, handovers); take over a handover',
   },
+  {
+    key: 'emr:order',
+    description: "Order admitted patients' medicines, hold, resume and stop them; write and sign the discharge summary",
+  },
   { key: 'emr:certify', description: 'Record deaths and births of admitted patients, and void one recorded in error' },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },

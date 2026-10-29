@@ -358,6 +358,13 @@
       "when": 1793306744824,
       "tag": "0050_clinical_emr",
       "breakpoints": true
+    },
+    {
+      "idx": 51,
+      "version": "7",
+      "when": 1793307769661,
+      "tag": "0051_clinical_treatment",
+      "breakpoints": true
     }
   ]
 }

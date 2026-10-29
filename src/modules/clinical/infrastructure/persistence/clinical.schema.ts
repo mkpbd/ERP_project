@@ -34,6 +34,11 @@ const PHRASE_KINDS = ['complaint', 'history', 'examination', 'diagnosis', 'advic
 const NOTE_KINDS = ['round', 'consult', 'procedure', 'transfer', 'icu', 'handover'] as const;
 const DELIVERY_MODES = ['normal', 'caesarean', 'assisted'] as const;
 const SEXES = ['male', 'female', 'other'] as const;
+const ROUTES = ['oral', 'iv', 'im', 'sc', 'topical', 'inhaled', 'rectal', 'other'] as const;
+const SCHEDULES = ['times', 'interval', 'once', 'prn'] as const;
+const ORDER_STATUSES = ['active', 'held', 'stopped'] as const;
+const ORDER_EVENTS = ['start', 'hold', 'resume', 'stop'] as const;
+const DOSE_OUTCOMES = ['given', 'missed'] as const;
 const timestamps = {
   createdAt: tz('created_at').notNull().defaultNow(),
   updatedAt: tz('updated_at').notNull().defaultNow(),
@@ -352,4 +357,133 @@ export const birthRecords = pgTable(
     index('clinical_birth_records_admission_idx').on(t.admissionId),
     check('clinical_birth_records_weight_ck', sql`${t.birthWeightKg} > 0 and ${t.birthWeightKg} < 10`),
   ],
+);
+
+// Old Hospital.RxIpdTreatment with TreatmentDoseTiming / TreatmentDoseTimingDetail: a medicine ordered for an admitted
+// patient, its dose, route and when it is due (set times each day, every so many hours, once, or when needed).
+export const treatmentOrders = pgTable(
+  'clinical_treatment_orders',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }),
+    drugName: text('drug_name').notNull(),
+    dose: text('dose').notNull(),
+    route: text('route', { enum: ROUTES }).notNull(),
+    schedule: text('schedule', { enum: SCHEDULES }).notNull(),
+    /** Set times of day (HH:MM, the organisation's time) for a `times` schedule. */
+    times: text('times').array().notNull(),
+    /** Hours between doses for an `interval` schedule. */
+    intervalHours: smallint('interval_hours'),
+    startAt: tz('start_at').notNull(),
+    note: text('note'),
+    status: text('status', { enum: ORDER_STATUSES }).notNull(),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    orderedBy: uuid('ordered_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index('clinical_treatment_orders_admission_idx').on(t.admissionId, t.status),
+    check(
+      'clinical_treatment_orders_schedule_ck',
+      sql`(${t.schedule} = 'interval') = (${t.intervalHours} is not null) and (${t.schedule} = 'times') = (cardinality(${t.times}) > 0)`,
+    ),
+  ],
+);
+
+// Old RxIpdTreatment's event rows (TreatmentId, EventName, Note): started, held, resumed, stopped.
+export const orderEvents = pgTable(
+  'clinical_order_events',
+  {
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => treatmentOrders.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    event: text('event', { enum: ORDER_EVENTS }).notNull(),
+    at: tz('at').notNull(),
+    note: text('note'),
+    by: uuid('by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+  },
+  (t) => [primaryKey({ columns: [t.orderId, t.position] })],
+);
+
+// Old AppliedMedicationDose: a due dose given (or missed, with why) by the nurse; a when-needed dose when given.
+export const doseRecords = pgTable(
+  'clinical_dose_records',
+  {
+    id: uuid('id').primaryKey(),
+    orderId: uuid('order_id')
+      .notNull()
+      .references(() => treatmentOrders.id, { onDelete: 'restrict' }),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    /** The due time it answers; null for a when-needed dose. */
+    dueAt: tz('due_at'),
+    outcome: text('outcome', { enum: DOSE_OUTCOMES }).notNull(),
+    /** When given (null when missed). */
+    givenAt: tz('given_at'),
+    reason: text('reason'),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('clinical_dose_records_due_uq')
+      .on(t.orderId, t.dueAt)
+      .where(sql`${t.dueAt} is not null`),
+    index('clinical_dose_records_admission_idx').on(t.admissionId, t.createdAt),
+    check('clinical_dose_records_outcome_ck', sql`(${t.outcome} = 'given') = (${t.givenAt} is not null)`),
+  ],
+);
+
+// Old TreatmentOnDischarge, DietOnDischarge and AdvicesOnTreatment, with the discharge certificate: the doctor's summary
+// of the stay and what follows it.
+export const dischargeSummaries = pgTable(
+  'clinical_discharge_summaries',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    diagnosis: text('diagnosis'),
+    /** The course in hospital: findings, procedures, response. */
+    course: text('course'),
+    conditionOnDischarge: text('condition_on_discharge'),
+    treatment: jsonb('treatment')
+      .$type<{ productId: string | null; name: string; dose: string; duration: string | null }[]>()
+      .notNull(),
+    diet: text('diet'),
+    advice: text('advice'),
+    followUpOn: day('follow_up_on'),
+    followUpNote: text('follow_up_note'),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    status: text('status', { enum: ['draft', 'signed'] }).notNull(),
+    signedBy: uuid('signed_by').references(() => users.id, { onDelete: 'set null' }),
+    signedAt: tz('signed_at'),
+    writtenBy: uuid('written_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    version: integer('version').notNull(),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex('clinical_discharge_summaries_admission_uq').on(t.admissionId)],
 );
