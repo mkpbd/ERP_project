@@ -1,7 +1,6 @@
 # Step 13c — Data migration: HR, salaries, leave and PF
 
-Status: **done** (2026-10-30). Previous: [step 13b](13b-accounts-opening-balances.md) · Next: step 13d (catalogues,
-suppliers and opening stock).
+Status: **done** (2026-10-30). Previous: [step 13b](13b-accounts-opening-balances.md) · Next: [step 13d](13d-catalogues-stock.md).
 
 ```
 ETL_SOURCE_URL=… npm run etl -- --cut-over=2027-01-01 [--dry-run] [--only=staff-salaries,pf-openings]

@@ -102,7 +102,7 @@ Order follows dependencies: later modules reference earlier ones.
 | 13a | Data migration framework: the `npm run etl` tool (SQL Server source by environment variable, dry run in a rolled-back transaction, id map for safe re-runs, run log); users and roles (old password hashes accepted, then rehashed), specialities, doctors, patients (UHIDs kept, counters moved on) | **Done** | [13a-data-migration-framework.md](13a-data-migration-framework.md) |
 | 13b | Data migration: chart of accounts (natures to GL accounts), cost centres, banks, sub-ledgers, journals, fiscal years, hard-coded posting roles; opening balances as one posted voucher at the cut-over, checked account by account against the old books | **Done** | [13b-accounts-opening-balances.md](13b-accounts-opening-balances.md) |
 | 13c | Data migration: HR structure, designations, leave types, staff (former staff too, linked to their users), salary policies and salaries, leave policies and entitlements, the cut-over year's approved leave, PF opening balances | **Done** | [13c-hr.md](13c-hr.md) |
-| 13d | Data migration: supply chain and pharmacy catalogues, suppliers, opening stock lots | Next | |
-| 13e | Data migration: open documents and dues (admitted patients, unpaid bills, member and corporate dues) | Planned | |
+| 13d | Data migration: pharmacy and store catalogues, outlets, stores, suppliers (with their 13b sub-ledgers); opening stock per outlet and store from the frozen old stock (the old current-stock procedure for stores), expired lots left out, value compared with the inventory accounts | **Done** | [13d-catalogues-stock.md](13d-catalogues-stock.md) |
+| 13e | Data migration: open documents and dues (admitted patients, unpaid bills, member and corporate dues) | Next | |
 | 13f | Data migration: clinical history (prescriptions, lab results) | Planned | |
 | 13g | Cut-over: rehearsal on a copy, reconciliation reports, go-live runbook, the old system kept read-only | Planned | |

@@ -22,6 +22,13 @@ import {
 } from '../../src/modules/hr/infrastructure/persistence/leave.schema.js';
 import { users } from '../../src/modules/identity/infrastructure/persistence/identity.schema.js';
 import { pfLedgerEntries, staffSalaries } from '../../src/modules/payroll/infrastructure/persistence/payroll.schema.js';
+import { pharmacyMovements, products } from '../../src/modules/pharmacy/infrastructure/persistence/pharmacy.schema.js';
+import {
+  items,
+  stockLots,
+  stockMovements,
+  suppliers,
+} from '../../src/modules/supply-chain/infrastructure/persistence/supply-chain.schema.js';
 import { TransactionManager } from '../../src/shared/application/ports/transaction-manager.js';
 import { aspNetIdentityHash } from '../support/aspnet-hash.js';
 import { ADMIN, bootstrapAdmin, createTestApp, resetDatabase, type TestApp } from '../support/test-app.js';
@@ -152,6 +159,7 @@ const tables = {
 };
 
 const CASH = 'bd52240a-d093-4f02-6ef4-08dc73f57d74';
+const PHARMACY_INVENTORY = 'd2a75694-abab-4d70-288b-08dcbf94ffbd';
 const IPD_RECEIVABLE = '5d525e24-31a9-444d-558d-08dc9d9989d2';
 const natures = [
   [1, 'Assets', 'Balance Sheet'],
@@ -228,6 +236,9 @@ const books = {
     gl('gl-inc', '4001', 4),
     gl('gl-exp', '5001', 5, { IsCostCenter: true }),
     gl('gl-x', null, 5),
+    gl(PHARMACY_INVENTORY, '1003', 1, { Name: 'Medicine inventory' }),
+    gl('gl-consumable', '1004', 1, { Name: 'Consumable stores' }),
+    gl('gl-reusable', '1005', 1, { Name: 'Reusable items' }),
   ],
   subLedgers: [
     {
@@ -254,7 +265,9 @@ const books = {
     balance(CASH, 50_000, 20_000),
     balance(IPD_RECEIVABLE, 12_000, 2_000, 'sl-1'),
     balance('gl-pay', 1_000, 9_000, 'sl-2'),
-    balance('gl-cap', 0, 40_000),
+    balance('gl-cap', 0, 41_500),
+    balance(PHARMACY_INVENTORY, 1_000, 0),
+    balance('gl-consumable', 500, 0),
     balance('gl-inc', 0, 25_000),
     balance('gl-exp', 33_000.01, 0, NIL, 'cc-1'),
     balance('gl-x', 100, 100),
@@ -406,6 +419,144 @@ const hr = {
   salaries: [salary('sal-1', 's-1'), salary('sal-3', 's-3')],
 };
 
+const product = (Id: string, BrandId: string) => ({
+  Id,
+  BarCode: '8941100500019',
+  BrandId,
+  GenericId: 'g-1',
+  FormationId: 'f-1',
+  StrengthId: 'st-1',
+  Unit: 'pcs',
+  PurchasePrice: 1,
+  SalePrice: 1.2,
+  PkgUnit: 'Box',
+  QtyPerBox: 100,
+  IsActive: true,
+  IsDeleted: false,
+});
+const variant = (Id: string, BrandId: string, Name: string, PurchasePrice: number) => ({
+  Id,
+  BrandId,
+  Name,
+  PurchasePrice,
+  SalePrice: 0,
+  ROL: 5,
+  CodeOrPartNo: null,
+  IsExpireDateRequired: false,
+  AlternateName: null,
+  SpecSizeOrColor: null,
+  IsDeleted: false,
+});
+
+/** The old pharmacy and stores: catalogues, a supplier, and the stock when the old system was frozen. */
+const stock = {
+  tables: {
+    'Pharmacy.Groups': [{ Id: 'pg-1', Name: 'Analgesic', Info: null }],
+    'Pharmacy.Generics': [
+      { Id: 'g-1', Name: 'Paracetamol', Parent: 'pg-1', Info: null },
+      { Id: 'g-2', Name: 'Omeprazole', Parent: NIL, Info: null },
+    ],
+    'Pharmacy.Formations': [{ Id: 'f-1', Name: 'Tablet', ShortFormation: 'Tab.' }],
+    'Pharmacy.Strengths': [{ Id: 'st-1', Name: '500 mg' }],
+    'Pharmacy.Manufacturers': [{ Id: 'm-1', Name: 'Beximco' }],
+    'Pharmacy.BrandNames': [
+      { Id: 'b-1', Name: 'Napa', Parent: 'm-1' },
+      { Id: 'b-2', Name: 'Seclo', Parent: 'm-gone' },
+    ],
+    'Pharmacy.MedicineOutlets': [{ Id: 'o-1', Name: 'Outdoor pharmacy', Description: null, CodeNo: 'OP1' }],
+    'Pharmacy.Stocks': [
+      {
+        ProductId: 'p-1',
+        OutletId: 'o-1',
+        LotId: 'pl-1',
+        AvailableStock: 1_000,
+        PurchaseRate: 1,
+        SaleRate: 1.2,
+        BatchNo: 'B1',
+        ExpireDate: new Date('2028-06-30T00:00:00Z'),
+      },
+      {
+        ProductId: 'p-1',
+        OutletId: 'o-1',
+        LotId: 'pl-0',
+        AvailableStock: 400,
+        PurchaseRate: 1,
+        SaleRate: 1.2,
+        BatchNo: 'B0',
+        ExpireDate: new Date('2026-06-30T00:00:00Z'),
+      },
+      {
+        ProductId: 'p-gone',
+        OutletId: 'o-1',
+        LotId: null,
+        AvailableStock: 5,
+        PurchaseRate: 1,
+        SaleRate: 1,
+        BatchNo: null,
+        ExpireDate: new Date('2028-01-31T00:00:00Z'),
+      },
+    ],
+    'SupplyChain.MainStores': [{ Id: 'ms-1', Name: 'Central store', Description: null }],
+    'SupplyChain.Stores': [{ Id: 'ss-1', Name: 'Ward store', Description: null, Parent: 'ms-1' }],
+    'SupplyChain.StoreDepts': [{ Id: 'sd-1', Name: 'Ward 1' }],
+    'SupplyChain.ParentCategories': [{ Id: 'pc-1', Name: 'General' }],
+    'SupplyChain.SubCategories': [{ Id: 'sc-1', Name: 'Stationery', Parent: 'pc-1' }],
+    'SupplyChain.Groups': [{ Id: 'ig-1', Name: 'Office' }],
+    'SupplyChain.SubGroups': [{ Id: 'isg-1', Name: 'Paper and furniture', Parent: 'ig-1' }],
+    'SupplyChain.BrandNames': [
+      {
+        Id: 'i-1',
+        Name: 'A4 paper',
+        SubGroupId: 'isg-1',
+        SubCategoryId: 'sc-1',
+        Unit: 'ream',
+        ItemTypeId: 'gl-consumable',
+        IsDeleted: false,
+      },
+      {
+        Id: 'i-2',
+        Name: 'Wheel chair',
+        SubGroupId: 'isg-1',
+        SubCategoryId: 'sc-1',
+        Unit: null,
+        ItemTypeId: 'gl-reusable',
+        IsDeleted: false,
+      },
+    ],
+    'SupplyChain.SupplierTypes': [{ Id: 'stp-1', Name: 'Local' }],
+    'SupplyChain.Suppliers': [
+      {
+        Id: 'sup-1',
+        TypeId: 'stp-1',
+        Name: 'ACME Pharma',
+        Address: 'Chattogram',
+        ContactNo: '01811000000',
+        IsEnlisted: true,
+        EnlistmentDate: new Date('0001-01-01T00:00:00Z'),
+        ExpireDate: new Date('2027-12-31T00:00:00Z'),
+        VatInPercent: 5,
+        TaxInPercent: 3,
+        IsManufacturer: false,
+        GLId: 'gl-pay',
+        IsDeleted: false,
+      },
+    ],
+    'SupplyChain.LotRecords': [{ Id: 'lot-1', BatchNo: 'L1', ExpireDate: '31/12/2028' }],
+    'SupplyChain.StockReceiveDetails': [{ BrandExtensionId: 'v-1', PurchaseRate: 250 }],
+  } as Record<string, Record<string, unknown>[]>,
+  products: [product('p-1', 'b-1'), product('p-2', 'b-1'), product('p-3', 'b-2')],
+  variants: [variant('v-1', 'i-1', 'Double A 80 gsm', 400), variant('v-2', 'i-2', 'Standard', 9_000)],
+  // The old current-stock procedure per store: lots in, transfers out without their lot.
+  storeStock: {
+    'ms-1': [
+      { Id: 'v-1', LotRecordId: 'lot-1', CurStock: 3, PurchasePrice: 400 },
+      { Id: 'v-1', LotRecordId: NIL, CurStock: -1, PurchasePrice: 400 },
+      { Id: 'v-2', LotRecordId: NIL, CurStock: 2, PurchasePrice: 9_000 },
+    ],
+    'ss-1': [{ Id: 'v-1', LotRecordId: NIL, CurStock: -2, PurchasePrice: 400 }],
+  } as Record<string, Record<string, unknown>[]>,
+};
+
 /** The old database as the loaders query it: tables by name, pages by key. */
 class FakeSource extends LegacySource {
   readonly queries: string[] = [];
@@ -440,7 +591,18 @@ class FakeSource extends LegacySource {
     else if (sql.includes('[Marketing].[Doctors]')) rows = page(tables.doctors, (doctor) => doctor.Id);
     else if (sql.includes('[Hospital].[RegRecords]')) rows = page(tables.patients, (patient) => patient.UHID);
     else if (sql.includes('[Account].[GeneralLedgers]')) rows = page(books.glAccounts, (account) => account.Id);
-    else if (sql.includes('[Account].[SubLedgers]')) rows = page(books.subLedgers, (subLedger) => subLedger.Id);
+    else if (sql.includes('[Account].[SubLedgers]') && sql.includes('[SupplierId] <>')) {
+      rows = [{ Id: 'sl-2', SupplierId: 'sup-1' }];
+    } else if (sql.includes('EXEC [SupplyChain].[SpGetBrandExtensionCurrentStockBySubStore]')) {
+      rows = stock.storeStock[params['store'] as string] ?? [];
+    } else if (sql.includes('[SupplyChain].[BrandExtensions]')) rows = page(stock.variants, (variant) => variant.Id);
+    else if (sql.includes('[Pharmacy].[BrandExtensions]')) rows = page(stock.products, (product) => product.Id);
+    else if (/\[(Pharmacy|SupplyChain)\]\.\[(\w+)\]/.test(sql)) {
+      const [, schema, table] = /\[(Pharmacy|SupplyChain)\]\.\[(\w+)\]/.exec(sql)!;
+      const found = stock.tables[`${schema}.${table}`];
+      if (!found) throw new Error(`Unexpected query: ${sql}`);
+      rows = found;
+    } else if (sql.includes('[Account].[SubLedgers]')) rows = page(books.subLedgers, (subLedger) => subLedger.Id);
     else if (sql.includes('[Account].[VoucherMasterDetails]')) rows = books.balances;
     else {
       const table = /\[Account\]\.\[(\w+)\]/.exec(sql)?.[1];
@@ -564,7 +726,7 @@ describe('data migration', () => {
       'account-level4-heads': [5, 0, 0],
       'account-level5-heads': [5, 0, 0],
       'coa-descriptions': [1, 0, 0],
-      'gl-accounts': [6, 0, 1],
+      'gl-accounts': [9, 0, 1],
       'sub-ledger-types': [2, 0, 0],
       'sub-ledgers': [2, 0, 0],
       'cost-centers': [1, 0, 0],
@@ -580,7 +742,7 @@ describe('data migration', () => {
     const opening = real.reports.find((report) => report.loader === 'opening-balances')!;
     expect(opening.notes).toEqual(
       expect.arrayContaining([
-        'Voucher OB-2026-00001 dated 2026-12-31: 6 lines, 6 accounts, debits = credits = 73000.01',
+        'Voucher OB-2026-00001 dated 2026-12-31: 8 lines, 8 accounts, debits = credits = 74500.01',
         'Old rounding of 0.01 put on the largest line of the short side',
       ]),
     );
@@ -609,9 +771,9 @@ describe('data migration', () => {
     const admin = (await signIn(ADMIN.email, ADMIN.password).expect(200)).body.accessToken as string;
     const get = (path: string) => request(http).get(`/api/v1/accounts/${path}`).set(bearer(admin)).expect(200);
     const tb = await get('statements/trial-balance?from=2027-01-01&to=2027-01-31');
-    expect(tb.body).toMatchObject({ balanced: true, totals: { closingDebit: 73_000.01, closingCredit: 73_000.01 } });
+    expect(tb.body).toMatchObject({ balanced: true, totals: { closingDebit: 74_500.01, closingCredit: 74_500.01 } });
     const bs = await get('statements/balance-sheet?asOf=2026-12-31');
-    expect(bs.body).toMatchObject({ totalDebit: 40_000, totalCredit: 40_000, profitToDate: -8_000.01, balanced: true });
+    expect(bs.body).toMatchObject({ totalDebit: 41_500, totalCredit: 41_500, profitToDate: -8_000.01, balanced: true });
     const [rahima] = await db.select().from(subLedgers).where(eq(subLedgers.name, 'Rahima Begum'));
     expect(rahima!.reference).toBe('501');
     const ledger = await get(`books/ledger?from=2027-01-01&to=2027-01-31&subLedgerId=${rahima!.id}`);
@@ -697,6 +859,72 @@ describe('data migration', () => {
     ]);
 
     const again = await etl(false, people);
+    expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
+  });
+
+  it('brings catalogues and suppliers over, and opens each store with the frozen old stock', async () => {
+    const db = t.app.get(DbContext).db;
+    const stores = {
+      only: ['pharmacy-opening-stock', 'store-opening-stock', 'suppliers', 'store-departments', 'generics'],
+      cutOver: '2027-01-01',
+    };
+    const dry = await etl(true, stores);
+    expect(await db.select().from(products)).toHaveLength(0);
+    const real = await etl(false, stores);
+    expect(counts(real)).toEqual(counts(dry));
+    const report = (loader: string) => real.reports.find((entry) => entry.loader === loader)!;
+    expect(counts(real)).toMatchObject({
+      generics: [2, 0, 0],
+      brands: [1, 0, 1],
+      products: [1, 0, 1],
+      outlets: [1, 0, 0],
+      items: [2, 0, 0],
+      'item-variants': [2, 0, 0],
+      suppliers: [1, 0, 0],
+      'store-departments': [1, 0, 0],
+      'pharmacy-opening-stock': [1, 0, 0],
+      'store-opening-stock': [1, 0, 0],
+    });
+    expect(report('products').notes).toEqual([
+      'p-2: the same brand, formation and strength as another product; merged',
+    ]);
+    expect(report('pharmacy-opening-stock').notes).toEqual([
+      '1 product(s) with stock at outlet o-1 were not brought over',
+      'OP-2026-00001: 1 lines',
+      '1 expired lot(s) worth 400.00 left out',
+      'Stock worth 1000.00 equals account 1003 in the books',
+    ]);
+    expect(report('store-opening-stock').notes).toEqual([
+      'OS-2026-00001: 1 lines',
+      '1 asset item(s) with stock left out: register them as assets',
+      '1 item(s) were below zero in the old stock and hold nothing',
+      'Stock worth 500.00 equals account 1004 in the books',
+    ]);
+
+    const [napa] = await db.select().from(products);
+    expect(napa).toMatchObject({ unitsPerPack: 100, salePrice: 1.2, barcode: '8941100500019' });
+    expect(await db.select().from(pharmacyMovements)).toEqual([
+      expect.objectContaining({ productId: napa!.id, qty: 1_000, unitCost: 1, kind: 'opening', movedOn: '2026-12-31' }),
+    ]);
+    const [movement] = await db.select().from(stockMovements);
+    const [lot] = await db.select().from(stockLots).where(eq(stockLots.id, movement!.lotId));
+    expect(movement).toMatchObject({ qty: 2, unitCost: 250, kind: 'opening', subStoreId: null });
+    expect(lot).toMatchObject({ batchNo: 'L1', expiryDate: '2028-12-31' });
+    const [chair] = await db.select().from(items).where(eq(items.name, 'Wheel chair'));
+    expect(chair).toMatchObject({ isAsset: true, unit: 'pcs' });
+
+    const [acme] = await db.select().from(suppliers);
+    const [ledger] = await db.select().from(subLedgers).where(eq(subLedgers.name, 'ACME Pharma'));
+    const [payable] = await db.select().from(glAccounts).where(eq(glAccounts.code, '2001'));
+    expect(acme).toMatchObject({
+      subLedgerId: ledger!.id,
+      glAccountId: payable!.id,
+      enlistedOn: null,
+      enlistmentExpiresOn: '2027-12-31',
+      vatPercent: 5,
+    });
+
+    const again = await etl(false, stores);
     expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
   });
 
