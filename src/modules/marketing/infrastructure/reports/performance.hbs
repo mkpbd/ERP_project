@@ -1,0 +1,30 @@
+{{#with data}}
+<table class="report" style="width: auto; margin-bottom: 4mm">
+  <tr><th>Referred billing, all doctors</th><td class="num"><b>{{money total}}</b></td></tr>
+  <tr><th>Gross target</th><td class="num">{{#if grossTarget}}{{money grossTarget}}{{else}}—{{/if}}</td></tr>
+  <tr><th>Achieved</th><td class="num">{{#if grossPercent}}{{grossPercent}} %{{else}}—{{/if}}</td></tr>
+  <tr><th>Of doctors no officer looks after</th><td class="num">{{money unassigned}}</td></tr>
+</table>
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th>Officer</th><th>Manager</th><th>Zone</th><th class="num">Doctors</th><th class="num">Consultations</th>
+      <th class="num">Tests</th><th class="num">Indoor</th><th class="num">Achieved</th><th class="num">Target</th><th class="num">%</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{officerName}}</td><td>{{managerName}}</td><td>{{zoneName}}</td><td class="num">{{doctors}}</td>
+      <td class="num">{{money opd}}</td><td class="num">{{money diagnostic}}</td><td class="num">{{money indoor}}</td>
+      <td class="num"><b>{{money achieved}}</b></td><td class="num">{{#if target}}{{money target}}{{else}}—{{/if}}</td>
+      <td class="num">{{#if percent}}{{percent}}{{else}}—{{/if}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No marketing officer is set up.</p>
+{{/if}}
+{{/with}}

@@ -1,6 +1,6 @@
 # Step 12a — Canteen: the menu, sales, members' dues
 
-Status: **done** (2026-10-30). Previous: [step 11e](11e-patient-portal.md) · Next: step 12b (marketing).
+Status: **done** (2026-10-30). Previous: [step 11e](11e-patient-portal.md) · Next: [step 12b](12b-marketing.md).
 
 Step 12 is split:
 

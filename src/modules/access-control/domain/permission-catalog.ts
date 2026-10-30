@@ -160,6 +160,14 @@ export const PERMISSION_CATALOG = [
     key: 'canteen:sell',
     description: "Sell at one's canteen outlets, cancel the day's sales and take members' dues",
   },
+  {
+    key: 'mkt:read',
+    description: 'See the marketing team, zones, the doctors each officer looks after, targets and performance',
+  },
+  {
+    key: 'mkt:manage',
+    description: 'Keep the marketing team, zones and areas, the doctors each officer looks after, and targets',
+  },
   { key: 'doctor:pay', description: 'Pay doctors their shares of OPD and indoor bills' },
   { key: 'opd:book', description: 'Book appointments and mark arrivals, no-shows and cancellations' },
   { key: 'patient:read', description: 'Search and view registered patients, their photos and cards' },

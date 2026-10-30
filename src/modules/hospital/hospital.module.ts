@@ -5,6 +5,8 @@ import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { PatientDirectory } from '../../shared/application/contracts/patient-directory.js';
 import { OutpatientClinic } from '../../shared/application/contracts/outpatient-clinic.js';
+import { ReferredBilling } from '../../shared/application/contracts/referred-billing.js';
+import { DrizzleReferredBilling } from './infrastructure/persistence/drizzle-referred-billing.js';
 import { DrizzleOutpatientClinic } from './infrastructure/persistence/drizzle-outpatient-clinic.js';
 import { DrizzlePatientDirectory } from './infrastructure/persistence/drizzle-patient-directory.js';
 import { ReportingFees } from '../../shared/application/contracts/reporting-fees.js';
@@ -147,6 +149,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: ReportingFees, useClass: HospitalReportingFees },
     { provide: PatientDirectory, useClass: DrizzlePatientDirectory },
     { provide: OutpatientClinic, useClass: DrizzleOutpatientClinic },
+    { provide: ReferredBilling, useClass: DrizzleReferredBilling },
     { provide: DiagnosticBillRepository, useClass: DrizzleDiagnosticBillRepository },
     { provide: DiagnosticBillReadRepository, useClass: DrizzleDiagnosticBillReadRepository },
     {
@@ -155,7 +158,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
       useFactory: (config: AppConfig) => ({ timeZone: config.reports.timeZone }),
     },
   ],
-  exports: [InpatientRegister, DiagnosticOrders, ReportingFees, PatientDirectory, OutpatientClinic],
+  exports: [InpatientRegister, DiagnosticOrders, ReportingFees, PatientDirectory, OutpatientClinic, ReferredBilling],
 })
 export class HospitalModule implements OnModuleInit {
   constructor(

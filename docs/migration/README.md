@@ -96,7 +96,7 @@ Order follows dependencies: later modules reference earlier ones.
 | 11d | Nutrition: meal types and the meals each bed category gets, diet plans with a menu per meal, admitted patients' diets (or nothing by mouth), the kitchen list of a meal, meals served or refused | **Done** | [11d-nutrition.md](11d-nutrition.md) |
 | 11e | Patient portal (old `AnonymousUser` OTP flow): sign-in with UHID and a one-time code to the patient's mobile or email, a patient token of its own, the patient's own reports, prescriptions, discharge summaries, receipts and bills (lab reports held while owed) | **Done** | [11e-patient-portal.md](11e-patient-portal.md) |
 | 12a | Canteen: menu with general and staff rates and VAT, outlets and their sellers, members on credit, cash sales posted to the ledger, packaged goods used up from the store department, dues, receipts, sales by item, member dues | **Done** | [12a-canteen.md](12a-canteen.md) |
-| 12b | Marketing: agents, zones and areas, sales targets and their reports (referral commissions stay with the hospital) | Next | |
-| 12c | Others: health tips, notices and messages to users, live chat | Planned | |
+| 12b | Marketing: zones and areas, the team (managers, officers, agents), the referring doctors each officer looks after, monthly targets per officer and gross, achievement as referred billing (consultations, tests, indoor) | **Done** | [12b-marketing.md](12b-marketing.md) |
+| 12c | Others: health tips, notices and messages to users, live chat | Next | |
 | 12d | Activity log: an audit viewer (by user, action, day) and sign-in history | Planned | |
 | 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |

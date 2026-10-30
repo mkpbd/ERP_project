@@ -219,6 +219,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /canteen/*` (menu, outlets, members, sales, member statements) | `canteen:read` |
 | the canteen menu (groups, items, rates, VAT, store items), outlets and who sells there, members; cancelling sales of past days | `canteen:manage` |
 | selling at one's canteen outlets, cancelling the day's sales, taking members' dues | `canteen:sell` |
+| `GET /marketing/*` (zones, areas, the team, officers' doctors, performance) | `mkt:read` |
+| the marketing team, zones and areas, the doctors each officer looks after, monthly targets | `mkt:manage` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |
