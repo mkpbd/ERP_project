@@ -31,7 +31,8 @@
     "db:migrate:prod": "node dist/cli/migrate.js",
     "db:seed:dev": "nest build && node dist/cli/seed-dev.js",
     "admin:bootstrap": "node dist/cli/bootstrap-admin.js",
-    "audit:deps": "npm audit --omit=dev"
+    "audit:deps": "npm audit --omit=dev",
+    "etl": "tsx src/cli/etl.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",
@@ -47,6 +48,7 @@
     "handlebars": "4.7.10",
     "helmet": "^8.3.0",
     "jose": "^6.2.13",
+    "mssql": "^12.7.13",
     "nestjs-pino": "^5.3.1",
     "nodemailer": "^10.2.1",
     "pdfmake": "0.3.11",
@@ -70,6 +72,7 @@
     "@nestjs/testing": "^12.2.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/express": "^5.0.6",
+    "@types/mssql": "^12.3.0",
     "@types/node": "^24.19.2",
     "@types/nodemailer": "^8.0.2",
     "@types/pdfmake": "0.3.3",

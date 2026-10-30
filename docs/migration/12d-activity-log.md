@@ -1,7 +1,6 @@
 # Step 12d — Activity log: summary, sign-in history, sessions, prints
 
-Status: **done** (2026-10-30). Previous: [step 12c](12c-communication.md) · Next: step 13 (data migration and
-cut-over).
+Status: **done** (2026-10-30). Previous: [step 12c](12c-communication.md) · Next: [step 13a](13a-data-migration-framework.md).
 
 Most of the old activity log was already here: the **audit log** that every module writes, searched with
 `audit:read` (`GET /audit-logs`). The signed-in user's own sessions were here too.
