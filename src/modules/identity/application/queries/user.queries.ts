@@ -32,3 +32,13 @@ export class ListMySessionsQuery extends Query<SessionView[]> {
     super();
   }
 }
+
+/** A user's active sessions, for an administrator (or the user themself). */
+export class ListUserSessionsQuery extends Query<SessionView[]> {
+  constructor(
+    readonly actor: Actor,
+    readonly userId: string,
+  ) {
+    super();
+  }
+}

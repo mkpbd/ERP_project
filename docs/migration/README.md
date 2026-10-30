@@ -98,5 +98,5 @@ Order follows dependencies: later modules reference earlier ones.
 | 12a | Canteen: menu with general and staff rates and VAT, outlets and their sellers, members on credit, cash sales posted to the ledger, packaged goods used up from the store department, dues, receipts, sales by item, member dues | **Done** | [12a-canteen.md](12a-canteen.md) |
 | 12b | Marketing: zones and areas, the team (managers, officers, agents), the referring doctors each officer looks after, monthly targets per officer and gross, achievement as referred billing (consultations, tests, indoor) | **Done** | [12b-marketing.md](12b-marketing.md) |
 | 12c | Communication: health tips published on the patient portal (English and Bangla, pinned, publishing window), notices to users and roles with read marks, live chat between portal patients and staff (take, reply, close, unread counts) | **Done** | [12c-communication.md](12c-communication.md) |
-| 12d | Activity log: an audit viewer (by user, action, day) and sign-in history | Next | |
-| 13 | Data migration (ETL) for all modules, cut-over plan | Later phase | |
+| 12d | Activity log: the activity summary (by day, hour, module, action; failures, denials, active users), sign-in history, a user's sessions for administrators, audit log / activity / sign-in prints | **Done** | [12d-activity-log.md](12d-activity-log.md) |
+| 13 | Data migration (ETL) for all modules, cut-over plan | Next | |

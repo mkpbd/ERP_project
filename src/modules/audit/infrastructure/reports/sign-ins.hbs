@@ -1,0 +1,19 @@
+{{#with data}}
+<p><b>{{user.name}}</b> · {{user.email}} · {{rows.length}} sign-ins, {{failed}} failed</p>
+{{#if rows.length}}
+<table class="report">
+  <thead><tr><th style="width: 18%">When</th><th style="width: 10%">Outcome</th><th style="width: 16%">Reason</th><th style="width: 14%">IP</th><th>Browser</th></tr></thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{datetime occurredAt}}</td>
+      <td>{{#if (eq outcome "success")}}{{outcome}}{{else}}<b>{{outcome}}</b>{{/if}}</td>
+      <td>{{reason}}</td><td>{{ipAddress}}</td><td>{{userAgent}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No sign-in in this period.</p>
+{{/if}}
+{{/with}}

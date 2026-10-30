@@ -3,7 +3,13 @@ import { AccessControl } from '../../../../shared/application/contracts/access-c
 import type { Page } from '../../../../shared/application/pagination.js';
 import { Clock } from '../../../../shared/application/ports/clock.js';
 import { NotFoundError } from '../../../../shared/domain/errors.js';
-import { GetCurrentUserQuery, GetUserByIdQuery, ListMySessionsQuery, ListUsersQuery } from '../queries/user.queries.js';
+import {
+  GetCurrentUserQuery,
+  GetUserByIdQuery,
+  ListMySessionsQuery,
+  ListUserSessionsQuery,
+  ListUsersQuery,
+} from '../queries/user.queries.js';
 import { UserReadRepository, type CurrentUserView, type SessionView, type UserView } from '../read-models.js';
 
 @QueryHandler(GetCurrentUserQuery)
@@ -60,6 +66,22 @@ export class ListMySessionsHandler implements IQueryHandler<ListMySessionsQuery>
 
   async execute({ actor }: ListMySessionsQuery): Promise<SessionView[]> {
     const sessions = await this.read.listActiveSessions(actor.userId, this.clock.now());
+    return sessions.map((session) => ({ ...session, current: session.id === actor.sessionId }));
+  }
+}
+
+@QueryHandler(ListUserSessionsQuery)
+export class ListUserSessionsHandler implements IQueryHandler<ListUserSessionsQuery> {
+  constructor(
+    private readonly read: UserReadRepository,
+    private readonly accessControl: AccessControl,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute({ actor, userId }: ListUserSessionsQuery): Promise<SessionView[]> {
+    await this.accessControl.authorize(actor.userId, { permissions: ['users:read'], ownerId: userId });
+    if (!(await this.read.getView(userId))) throw new NotFoundError('user');
+    const sessions = await this.read.listActiveSessions(userId, this.clock.now());
     return sessions.map((session) => ({ ...session, current: session.id === actor.sessionId }));
   }
 }

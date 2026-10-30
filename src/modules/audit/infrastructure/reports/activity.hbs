@@ -1,0 +1,34 @@
+{{#with data}}
+<table class="report" style="width: auto; margin-bottom: 4mm">
+  <tr><th>Actions</th><td class="num"><b>{{totals.total}}</b></td><th>Failures</th><td class="num">{{totals.failures}}</td><th>Denied</th><td class="num">{{totals.denied}}</td><th>Users</th><td class="num">{{totals.users}}</td></tr>
+</table>
+{{#if byDay.length}}
+<h3>By day</h3>
+<table class="report">
+  <thead><tr><th>Day</th><th class="num">Actions</th><th class="num">Failures</th><th class="num">Denied</th><th class="num">Users</th></tr></thead>
+  <tbody>{{#each byDay}}<tr><td>{{date day}}</td><td class="num">{{total}}</td><td class="num">{{failures}}</td><td class="num">{{denied}}</td><td class="num">{{users}}</td></tr>{{/each}}</tbody>
+</table>
+<h3>By hour of day</h3>
+<table class="report">
+  <thead><tr>{{#each byHour}}<th class="num">{{hour}}</th>{{/each}}</tr></thead>
+  <tbody><tr>{{#each byHour}}<td class="num">{{total}}</td>{{/each}}</tr></tbody>
+</table>
+<h3>By module</h3>
+<table class="report">
+  <thead><tr><th>Module</th><th class="num">Actions</th><th class="num">Failures</th></tr></thead>
+  <tbody>{{#each byModule}}<tr><td>{{module}}</td><td class="num">{{total}}</td><td class="num">{{failures}}</td></tr>{{/each}}</tbody>
+</table>
+<h3>Most frequent actions</h3>
+<table class="report">
+  <thead><tr><th>Action</th><th class="num">Times</th><th class="num">Failures</th></tr></thead>
+  <tbody>{{#each topActions}}<tr><td>{{action}}</td><td class="num">{{total}}</td><td class="num">{{failures}}</td></tr>{{/each}}</tbody>
+</table>
+<h3>Most active users</h3>
+<table class="report">
+  <thead><tr><th>User</th><th class="num">Actions</th></tr></thead>
+  <tbody>{{#each topUsers}}<tr><td>{{name}}</td><td class="num">{{total}}</td></tr>{{/each}}</tbody>
+</table>
+{{else}}
+<p>Nothing was recorded in this period.</p>
+{{/if}}
+{{/with}}

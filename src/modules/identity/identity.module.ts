@@ -32,6 +32,7 @@ import {
   GetCurrentUserHandler,
   GetUserByIdHandler,
   ListMySessionsHandler,
+  ListUserSessionsHandler,
   ListUsersHandler,
 } from './application/handlers/user.query-handlers.js';
 import {
@@ -92,7 +93,13 @@ const commandHandlers = [
   ActivateUserHandler,
   BootstrapAdministratorHandler,
 ];
-const queryHandlers = [GetCurrentUserHandler, GetUserByIdHandler, ListUsersHandler, ListMySessionsHandler];
+const queryHandlers = [
+  GetCurrentUserHandler,
+  GetUserByIdHandler,
+  ListUsersHandler,
+  ListMySessionsHandler,
+  ListUserSessionsHandler,
+];
 const eventHandlers = [SecurityAlertHandler];
 
 /** Accounts, credentials, sessions and tokens. Publishes UserDirectory to other modules. */

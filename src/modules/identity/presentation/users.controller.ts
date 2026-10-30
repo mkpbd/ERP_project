@@ -19,14 +19,20 @@ import {
   RevokeUserSessionsCommand,
   UpdateUserCommand,
 } from '../application/commands/user.commands.js';
-import { GetCurrentUserQuery, GetUserByIdQuery, ListUsersQuery } from '../application/queries/user.queries.js';
-import type { CurrentUserView, UserView } from '../application/read-models.js';
+import {
+  GetCurrentUserQuery,
+  GetUserByIdQuery,
+  ListUserSessionsQuery,
+  ListUsersQuery,
+} from '../application/queries/user.queries.js';
+import type { CurrentUserView, SessionView, UserView } from '../application/read-models.js';
 import {
   CreatedResponseDto,
   CreateUserDto,
   CurrentUserResponseDto,
   ListUsersQueryDto,
   RevokedCountResponseDto,
+  SessionResponseDto,
   UpdateUserDto,
   UserPageResponseDto,
   UserResponseDto,
@@ -105,6 +111,14 @@ export class UsersController {
   @ApiNoContentResponse()
   async activate(@CurrentUser() actor: Actor, @Param() params: IdParamDto): Promise<void> {
     await this.commandBus.execute(new ActivateUserCommand(actor, params.id));
+  }
+
+  @Get(':id/sessions')
+  @RequirePermissions('users:read')
+  @ApiOperation({ summary: "A user's active sessions: when, from where, last used" })
+  @ApiOkResponse({ type: SessionResponseDto, isArray: true })
+  sessions(@CurrentUser() actor: Actor, @Param() params: IdParamDto): Promise<SessionView[]> {
+    return this.queryBus.execute(new ListUserSessionsQuery(actor, params.id));
   }
 
   @Delete(':id/sessions')

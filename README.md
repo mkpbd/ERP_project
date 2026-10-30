@@ -224,6 +224,8 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | health tips (published on the portal's `GET /portal/health-tips` to anyone) | `content:manage` |
 | sending notices to users and roles, seeing what was sent and read (one's own notices need no permission) | `notice:send` |
 | answering patients' portal chats: taking them (over), replying, closing | `chat:answer` |
+| `GET /audit-logs/summary`, `GET /audit-logs/sign-ins` (anyone's; one's own sign-ins need no permission) | `audit:read` |
+| `GET /users/:id/sessions` (a user's active sessions) | `users:read` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

@@ -1,0 +1,18 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead><tr><th style="width: 14%">When</th><th style="width: 16%">User</th><th style="width: 20%">Action</th><th>Resource</th><th style="width: 8%">Outcome</th><th style="width: 11%">IP</th></tr></thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{datetime occurredAt}}</td><td>{{user}}</td><td>{{action}}</td><td>{{resource}}</td>
+      <td>{{#if (eq outcome "success")}}{{outcome}}{{else}}<b>{{outcome}}</b>{{/if}}</td><td>{{ipAddress}}</td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+{{#if cut}}<p class="muted">{{rows.length}} of {{total}} entries printed; narrow the period or the filters to see the rest.</p>{{/if}}
+{{else}}
+<p>Nothing was recorded in this period.</p>
+{{/if}}
+{{/with}}

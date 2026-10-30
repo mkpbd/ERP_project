@@ -1,6 +1,6 @@
 # Step 12c — Communication: health tips, notices, live chat
 
-Status: **done** (2026-10-30). Previous: [step 12b](12b-marketing.md) · Next: step 12d (activity log).
+Status: **done** (2026-10-30). Previous: [step 12b](12b-marketing.md) · Next: [step 12d](12d-activity-log.md).
 
 What this step adds, in a new `communication` module:
 
