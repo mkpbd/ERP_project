@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { eq } from 'drizzle-orm';
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
@@ -12,8 +13,17 @@ import {
   glRoles,
   subLedgers,
 } from '../../src/modules/accounts/infrastructure/persistence/accounts.schema.js';
+import { canteenOutlets, canteenSales } from '../../src/modules/canteen/infrastructure/persistence/canteen.schema.js';
 import { etlRuns } from '../../src/modules/data-migration/infrastructure/persistence/data-migration.schema.js';
-import { doctors, patients } from '../../src/modules/hospital/infrastructure/persistence/hospital.schema.js';
+import {
+  admissions,
+  beds,
+  bedStays,
+  doctorLedger,
+  doctors,
+  ipdPayments,
+  patients,
+} from '../../src/modules/hospital/infrastructure/persistence/hospital.schema.js';
 import { hrSubDepartments, staffRecords } from '../../src/modules/hr/infrastructure/persistence/hr.schema.js';
 import {
   leavePolicyEntitlements,
@@ -21,7 +31,11 @@ import {
   staffLeaveEntitlements,
 } from '../../src/modules/hr/infrastructure/persistence/leave.schema.js';
 import { users } from '../../src/modules/identity/infrastructure/persistence/identity.schema.js';
-import { pfLedgerEntries, staffSalaries } from '../../src/modules/payroll/infrastructure/persistence/payroll.schema.js';
+import {
+  pfLedgerEntries,
+  staffDues,
+  staffSalaries,
+} from '../../src/modules/payroll/infrastructure/persistence/payroll.schema.js';
 import { pharmacyMovements, products } from '../../src/modules/pharmacy/infrastructure/persistence/pharmacy.schema.js';
 import {
   items,
@@ -227,6 +241,12 @@ const books = {
       { Id: 'fy-1', FYear: 2025 },
       { Id: 'fy-2', FYear: 2026 },
     ],
+    ConsultantGlobalLedgers: [{ ConsultantId: DOCTOR, Debit: 1_000, Credit: 6_000 }],
+    LoyalMembers: [
+      { Id: 'lm-1', Name: 'Habib', MobileNo: '01711999999', Address: null, ReferranceName: null, IsDeleted: false },
+      { Id: 'lm-2', Name: 'No Phone', MobileNo: null, Address: null, ReferranceName: null, IsDeleted: false },
+    ],
+    LoyalMemberLedgers: [{ LoyalMemberId: 'lm-1', Debit: 1_500, Credit: 500 }],
   } as Record<string, Record<string, unknown>[]>,
   glAccounts: [
     gl(CASH, '1001', 1, { BankCashOth: 'Cash' }),
@@ -394,6 +414,7 @@ const hr = {
       { StaffRecordId: 's-1', Credit: 54_000, Debit: 4_000 },
       { StaffRecordId: 's-2', Credit: 1_000, Debit: 1_000 },
     ],
+    StaffGlobalLedgers: [{ StaffRecordId: 's-1', Debit: 800, Credit: 300 }],
   } as Record<string, Record<string, unknown>[]>,
   staff: [
     staff('s-1', {
@@ -557,6 +578,85 @@ const stock = {
   } as Record<string, Record<string, unknown>[]>,
 };
 
+const cabin = (Id: string, CabinNo: string, Rent: number, CabinTypeId: string) => ({
+  Id,
+  CabinNo,
+  Rent,
+  CabinTypeId,
+  FloorId: 'fl-3',
+  HDepartmentId: 'hd-1',
+  IsActive: true,
+  IsDeleted: false,
+  DisplayOrder: 1,
+});
+const wall = (value: string) => new Date(`${value}Z`);
+const admittedPatient = (Id: string, UHID: number) => ({
+  Id,
+  UHID,
+  InvoiceNo: 26_001_234,
+  AdmissionDateTime: wall('2026-09-28T10:00:00'),
+  RefdDoctorId: NIL,
+  AssignedDoctorId: DOCTOR,
+  CorporateClientId: 'cc-1',
+  AdmissionFee: 1_000,
+  Remarks: 'Fever',
+});
+
+/** The old wards and the patients still admitted when the old system stopped (old times are Dhaka wall-clock). */
+const open: Record<string, Record<string, unknown>[]> = {
+  'Hospital.CabinTypes': [
+    { Id: 'ct-1', Name: 'Cabin', AdmissionFee: 1_000 },
+    { Id: 'ct-2', Name: 'ICU', AdmissionFee: 2_000 },
+  ],
+  'Hospital.Floors': [{ Id: 'fl-3', Name: '3rd floor' }],
+  'Hospital.HDepartments': [{ Id: 'hd-1', Name: 'Medicine' }],
+  'Hospital.Cabins': [cabin('cb-1', 'c-301', 2_000, 'ct-1'), cabin('icu-1', 'ICU-1', 5_000, 'ct-2')],
+  'Marketing.CorporateClients': [
+    {
+      Id: 'cc-1',
+      Name: 'Grameenphone',
+      Address: null,
+      ContactPerson: null,
+      ContactNumber: null,
+      IsCredit: true,
+      IsDeleted: false,
+    },
+  ],
+  'Hospital.IPDPatientRecords': [
+    admittedPatient('ip-1', 26000010),
+    admittedPatient('ip-2', 26000011),
+    admittedPatient('ip-3', 99999999),
+  ],
+  'Hospital.IPDCabinAllocationRecords': [
+    {
+      PatientId: 'ip-1',
+      CabinId: 'icu-1',
+      AllocationDateTime: wall('2026-09-28T10:00:00'),
+      ReleaseDateTime: wall('2026-09-29T09:00:00'),
+      AllocationOrder: 1,
+    },
+    {
+      PatientId: 'ip-1',
+      CabinId: 'cb-1',
+      AllocationDateTime: wall('2026-09-29T09:00:00'),
+      ReleaseDateTime: null,
+      AllocationOrder: 2,
+    },
+    {
+      PatientId: 'ip-2',
+      CabinId: 'cb-gone',
+      AllocationDateTime: wall('2026-09-28T10:00:00'),
+      ReleaseDateTime: null,
+      AllocationOrder: 1,
+    },
+  ],
+  'Hospital.AdvancePayments': [
+    { PatientId: 'ip-1', PayDate: wall('2026-09-28T00:00:00'), Amount: 10_000, TransactionType: 2 },
+    { PatientId: 'ip-1', PayDate: wall('2026-09-30T00:00:00'), Amount: 2_000, TransactionType: 5 },
+  ],
+  'Hospital.IPDServiceRecords': [{ PatientId: 'ip-1', Services: 3, Amount: 4_500, Charge: 500 }],
+};
+
 /** The old database as the loaders query it: tables by name, pages by key. */
 class FakeSource extends LegacySource {
   readonly queries: string[] = [];
@@ -590,7 +690,12 @@ class FakeSource extends LegacySource {
     else if (sql.includes('[Marketing].[DoctorFieldOfSpecialities]')) rows = tables.specialities;
     else if (sql.includes('[Marketing].[Doctors]')) rows = page(tables.doctors, (doctor) => doctor.Id);
     else if (sql.includes('[Hospital].[RegRecords]')) rows = page(tables.patients, (patient) => patient.UHID);
-    else if (sql.includes('[Account].[GeneralLedgers]')) rows = page(books.glAccounts, (account) => account.Id);
+    else if (/\[(Hospital|Marketing)\]\.\[(\w+)\]/.test(sql)) {
+      const [, schema, table] = /\[(Hospital|Marketing)\]\.\[(\w+)\]/.exec(sql)!;
+      const found = open[`${schema}.${table}`];
+      if (!found) throw new Error(`Unexpected query: ${sql}`);
+      rows = found;
+    } else if (sql.includes('[Account].[GeneralLedgers]')) rows = page(books.glAccounts, (account) => account.Id);
     else if (sql.includes('[Account].[SubLedgers]') && sql.includes('[SupplierId] <>')) {
       rows = [{ Id: 'sl-2', SupplierId: 'sup-1' }];
     } else if (sql.includes('EXEC [SupplyChain].[SpGetBrandExtensionCurrentStockBySubStore]')) {
@@ -925,6 +1030,89 @@ describe('data migration', () => {
     });
 
     const again = await etl(false, stores);
+    expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
+  });
+
+  it('keeps admitted patients in their beds, and opens doctors’, staff and members’ balances', async () => {
+    const db = t.app.get(DbContext).db;
+    await db.insert(canteenOutlets).values({ id: randomUUID(), name: 'Main canteen' });
+    const openings = {
+      only: ['open-admissions', 'doctor-payables', 'staff-dues', 'canteen-dues'],
+      cutOver: '2026-10-01',
+    };
+    const dry = await etl(true, openings);
+    expect(await db.select().from(admissions)).toHaveLength(0);
+    const real = await etl(false, openings);
+    expect(counts(real)).toEqual(counts(dry));
+    expect(counts(real)).toMatchObject({
+      'corporate-clients': [1, 0, 0],
+      'bed-categories': [2, 0, 0],
+      beds: [2, 0, 0],
+      'open-admissions': [1, 0, 2],
+      'doctor-payables': [1, 0, 0],
+      'staff-dues': [1, 0, 0],
+      'canteen-members': [1, 0, 1],
+      'canteen-dues': [1, 0, 0],
+    });
+    const report = (loader: string) => real.reports.find((entry) => entry.loader === loader)!;
+    expect(report('open-admissions').reasons).toEqual({
+      bed_not_brought: { count: 1, examples: ['ip-2'] },
+      patient_not_brought: { count: 1, examples: ['ip-3'] },
+    });
+    expect(report('beds').notes).toEqual(['Ward Medicine (3rd floor)']);
+
+    // The stay, as if it had been here: admitted 10:00 Dhaka time, an ICU night, then a cabin.
+    const [admission] = await db.select().from(admissions);
+    expect(admission).toMatchObject({
+      number: 'IP-2026-00001',
+      admittedAt: new Date('2026-09-28T04:00:00Z'),
+      admissionFee: 1_000,
+      status: 'admitted',
+      reason: 'Old admission 26001234: Fever',
+    });
+    const stays = await db
+      .select({ code: beds.code, toAt: bedStays.toAt, rate: bedStays.dailyRate, status: beds.status })
+      .from(bedStays)
+      .innerJoin(beds, eq(beds.id, bedStays.bedId))
+      .orderBy(bedStays.fromAt);
+    expect(stays).toEqual([
+      { code: 'ICU-1', toAt: new Date('2026-09-29T03:00:00Z'), rate: 5_000, status: 'available' },
+      { code: 'C-301', toAt: null, rate: 2_000, status: 'occupied' },
+    ]);
+    const payments = await db.select().from(ipdPayments).orderBy(ipdPayments.paidOn);
+    expect(payments.map((payment) => [payment.kind, payment.number, payment.amount, payment.voucherNumber])).toEqual([
+      ['advance', 'AR-2026-00001', 10_000, null],
+      ['refund', 'AF-2026-00001', 2_000, null],
+    ]);
+
+    // Billed here at discharge like any stay: the admission fee, the beds, the old services; the advance held.
+    const admin = (await signIn(ADMIN.email, ADMIN.password).expect(200)).body.accessToken as string;
+    const account = await request(http)
+      .get(`/api/v1/hospital/admissions/${admission!.id}/account`)
+      .set(bearer(admin))
+      .expect(200);
+    expect(account.body.held).toBe(8_000);
+    expect(account.body.lines).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ head: 'admission', amount: 1_000 }),
+        expect.objectContaining({ head: 'bed', description: 'Bed ICU-1', qty: 1, rate: 5_000 }),
+        expect.objectContaining({ head: 'bed', description: 'Bed C-301', rate: 2_000 }),
+        expect.objectContaining({ head: 'service', description: 'Charges in the old system', amount: 5_000 }),
+      ]),
+    );
+
+    const [owed] = await db.select().from(doctorLedger);
+    expect(owed).toMatchObject({
+      kind: 'share',
+      amount: 5_000,
+      entryOn: '2026-09-30',
+      documentNumber: 'OPENING-2026-10-01',
+    });
+    expect(await db.select().from(staffDues)).toEqual([expect.objectContaining({ debit: 500, credit: 0 })]);
+    const [due] = await db.select().from(canteenSales);
+    expect(due).toMatchObject({ customerKind: 'member', net: 1_000, due: 1_000, paid: 0, number: 'CS-2026-00001' });
+
+    const again = await etl(false, openings);
     expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
   });
 

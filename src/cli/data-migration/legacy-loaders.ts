@@ -11,6 +11,7 @@ import {
 import { users } from '../../modules/identity/infrastructure/persistence/identity.schema.js';
 import { accountLoaders } from './account-loaders.js';
 import { hrLoaders } from './hr-loaders.js';
+import { openLoaders } from './open-loaders.js';
 import { stockLoaders } from './stock-loaders.js';
 import { noteRejection, type EtlContext, type Loader } from './etl.js';
 import {
@@ -364,5 +365,6 @@ export function legacyLoaders(db: DbContext): Loader[] {
     ...accountLoaders(db),
     ...hrLoaders(db),
     ...stockLoaders(db),
+    ...openLoaders(db),
   ];
 }

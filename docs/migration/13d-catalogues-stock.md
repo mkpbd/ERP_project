@@ -1,6 +1,6 @@
 # Step 13d — Data migration: catalogues, suppliers and opening stock
 
-Status: **done** (2026-10-30). Previous: [step 13c](13c-hr.md) · Next: step 13e (open documents and dues).
+Status: **done** (2026-10-30). Previous: [step 13c](13c-hr.md) · Next: [step 13e](13e-open-documents-dues.md).
 
 ```
 ETL_SOURCE_URL=… npm run etl -- --cut-over=2027-01-01 [--dry-run] [--only=pharmacy-opening-stock,store-opening-stock]

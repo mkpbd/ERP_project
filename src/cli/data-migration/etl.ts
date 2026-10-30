@@ -32,6 +32,8 @@ export interface EtlContext {
   readonly batchSize: number;
   /** The day this system takes over (YYYY-MM-DD): opening balances are the old books' up to the day before. */
   readonly cutOver: string | null;
+  /** The organisation's time zone: the old system kept wall-clock times without one. */
+  readonly timeZone: string;
 }
 
 /** One kind of record brought over: reads the old rows, transforms them, writes what is new. */

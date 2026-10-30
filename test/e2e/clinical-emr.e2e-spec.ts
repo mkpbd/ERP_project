@@ -1,6 +1,7 @@
 import request from 'supertest';
 import type { App } from 'supertest/types.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { dayBounds } from '../../src/shared/domain/zoned-time.js';
 import { ADMIN, bootstrapAdmin, createTestApp, resetDatabase, type TestApp } from '../support/test-app.js';
 
 let t: TestApp;
@@ -18,7 +19,17 @@ let mother: string;
 const PASSWORD = 'quite long passphrase 42';
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 const year = Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka', year: 'numeric' }).format(new Date()));
-const ago = (minutes: number) => new Date(Date.now() - minutes * 60_000).toISOString();
+/**
+ * A time `minutes` before now, on today's date in Dhaka: notes and events may not fall before the admission's day, so
+ * just after midnight the minutes are shortened (keeping their order) rather than reach back into yesterday.
+ */
+const ago = (minutes: number) => {
+  const now = Date.now();
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dhaka' }).format(new Date(now));
+  const sinceMidnight = now - dayBounds(today, 'Asia/Dhaka')[0].getTime();
+  const minute = Math.min(60_000, Math.floor(sinceMidnight / 100));
+  return new Date(now - minutes * minute).toISOString();
+};
 
 async function login(identifier: string, password: string): Promise<string> {
   const response = await request(http)

@@ -65,6 +65,7 @@ export async function runEtl(params: {
   dryRun: boolean;
   batchSize?: number;
   cutOver?: string | null;
+  timeZone?: string;
   now?: Date;
   log?: (report: LoaderReport) => void;
 }): Promise<EtlRun> {
@@ -88,6 +89,7 @@ export async function runEtl(params: {
         now,
         batchSize: params.batchSize ?? 2000,
         cutOver: params.cutOver ?? null,
+        timeZone: params.timeZone ?? 'Asia/Dhaka',
       },
       report,
     );

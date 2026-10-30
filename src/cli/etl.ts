@@ -56,6 +56,7 @@ try {
     dryRun,
     batchSize,
     cutOver,
+    timeZone: config.reports.timeZone,
     log: (report) => {
       console.log(
         `${report.loader.padEnd(14)} read ${report.read}, written ${report.written}, kept ${report.kept}, rejected ${report.rejected}`,
