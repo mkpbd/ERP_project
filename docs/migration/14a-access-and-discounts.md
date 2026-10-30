@@ -1,7 +1,6 @@
 # Step 14a — Data migration gaps: users' outlets and stores, corporate discounts
 
-Status: **done** (2026-10-31). Previous: [step 13g](13g-cut-over-runbook.md) · Next: step 14b (the rest of the
-clinical history).
+Status: **done** (2026-10-31). Previous: [step 13g](13g-cut-over-runbook.md) · Next: [step 14b](14b-clinical-history-rest.md).
 
 Step 13's notes left some setup to do by hand on the cut-over night. This step brings over the parts the old
 system kept, so the morning after the cut-over:

@@ -4,7 +4,7 @@ import { historyRecords, historyValues } from '../../modules/clinical/infrastruc
 import { patients } from '../../modules/hospital/infrastructure/persistence/hospital.schema.js';
 import { text } from './account-records.js';
 import { noteRejection, type EtlContext, type Loader, type LoaderReport } from './etl.js';
-import { plainText, prescriptionText } from './history-records.js';
+import { cultureText, plainText, prescriptionText, sensitivity, sheetText } from './history-records.js';
 import { isNew, NIL, pages } from './loader-kit.js';
 
 type Kind = (typeof historyRecords.$inferInsert)['kind'];
@@ -136,6 +136,63 @@ export function labHistoryLoader(db: DbContext): Loader {
             ORDER BY d.[PathologyReportId], d.[DisplayOrder]`,
           page.map((row) => row.Id),
         );
+        // Culture reports: the organisms grown, the culture's findings, microscopy, and the sensitivity grid.
+        const ids = page.map((row) => row.Id);
+        const cultures = await childrenOf<{
+          ParentId: string;
+          GrowthType: string | null;
+          OrganismA: string | null;
+          OrganismB: string | null;
+          OrganismC: string | null;
+          Message: string | null;
+          ColonyCount: string | null;
+          Incubation: string | null;
+          CultureMediaUsed: string | null;
+        }>(
+          context,
+          `SELECT CAST(c.[PathologyReportId] AS nvarchar(36)) AS [ParentId], g.[Name] AS [GrowthType],
+            a.[Name] AS [OrganismA], b.[Name] AS [OrganismB], o.[Name] AS [OrganismC],
+            COALESCE(NULLIF(c.[CSMessage], ''), m.[Name]) AS [Message], c.[ColonyCount], c.[Incubation],
+            c.[CultureMediaUsed]
+            FROM [Diag].[CSNoGrowthResults] c
+            LEFT JOIN [Diag].[CSGrowthTypes] g ON g.[Id] = c.[GrowthTypeId]
+            LEFT JOIN [Diag].[MicroBioBacterias] a ON a.[Id] = c.[MicroBioBacteriaAId]
+            LEFT JOIN [Diag].[MicroBioBacterias] b ON b.[Id] = c.[MicroBioBacteriaBId]
+            LEFT JOIN [Diag].[MicroBioBacterias] o ON o.[Id] = c.[MicroBioBacteriaCId]
+            LEFT JOIN [Diag].[CSMessases] m ON m.[Id] = c.[CSMessageId]
+            WHERE c.[IsDeleted] = 0 AND c.[PathologyReportId] IN (SELECT [value] FROM OPENJSON(@ids))`,
+          ids,
+        );
+        const microscopy = await childrenOf<{
+          ParentId: string;
+          Analyzer: string | null;
+          PusCellValue: string | null;
+          EpithelialCellValue: string | null;
+          RBCValue: string | null;
+          Note: string | null;
+        }>(
+          context,
+          `SELECT CAST(x.[PathologyReportId] AS nvarchar(36)) AS [ParentId], x.[Analyzer], x.[PusCellValue],
+            x.[EpithelialCellValue], x.[RBCValue], x.[Note] FROM [Diag].[CSOthersValues] x
+            WHERE x.[IsDeleted] = 0 AND x.[PathologyReportId] IN (SELECT [value] FROM OPENJSON(@ids))`,
+          ids,
+        );
+        const grid = await childrenOf<{
+          ParentId: string;
+          Antibiotic: string | null;
+          Diameter: string | null;
+          ValueA: string | null;
+          ValueB: string | null;
+          ValueC: string | null;
+        }>(
+          context,
+          `SELECT CAST(s.[PathologyReportId] AS nvarchar(36)) AS [ParentId], a.[Name] AS [Antibiotic], s.[Diameter],
+            s.[ValueA], s.[ValueB], s.[ValueC] FROM [Diag].[CSGrowths] s
+            LEFT JOIN [Diag].[CSAntibiotics] a ON a.[Id] = s.[CSAntibioticId]
+            WHERE s.[IsDeleted] = 0 AND s.[PathologyReportId] IN (SELECT [value] FROM OPENJSON(@ids))
+            ORDER BY [ParentId], a.[Name]`,
+          ids,
+        );
         await write(
           db,
           context,
@@ -143,10 +200,35 @@ export function labHistoryLoader(db: DbContext): Loader {
           'lab-history',
           uhids,
           page.map((row) => {
-            const lines = details.get(row.Id.toLowerCase()) ?? [];
+            const key = row.Id.toLowerCase();
+            const lines = details.get(key) ?? [];
             const tests = [
               ...new Set(lines.flatMap((line) => (text(line.TestName, 100) ? [text(line.TestName, 100)!] : []))),
             ];
+            const culture = cultures.get(key)?.[0];
+            const seen = microscopy.get(key)?.[0];
+            const organisms = culture ? [culture.OrganismA, culture.OrganismB, culture.OrganismC] : [];
+            const findings = cultureText(
+              culture
+                ? {
+                    growthType: culture.GrowthType,
+                    organisms,
+                    message: culture.Message,
+                    colonyCount: culture.ColonyCount,
+                    incubation: culture.Incubation,
+                    media: culture.CultureMediaUsed,
+                  }
+                : null,
+              seen
+                ? {
+                    analyzer: seen.Analyzer,
+                    pusCells: seen.PusCellValue,
+                    epithelialCells: seen.EpithelialCellValue,
+                    rbc: seen.RBCValue,
+                    note: seen.Note,
+                  }
+                : null,
+            );
             return {
               oldId: row.Id,
               uhid: row.UHID,
@@ -154,14 +236,25 @@ export function labHistoryLoader(db: DbContext): Loader {
               title: tests.length ? `Laboratory report: ${tests.join(', ')}` : 'Laboratory report',
               number: row.LabNo ? `Lab ${row.LabNo}` : null,
               on: row.ReportDate ?? row.PreparedDate ?? row.CreatedOn,
-              body: plainText(row.AnyComments),
+              body: [findings, plainText(row.AnyComments)].filter(Boolean).join('\n\n'),
               shared: Boolean(row.DeliveryOn) || set(row.ReportVerifierId) !== null,
-              values: lines.map((line) => ({
-                test: text(line.TestTitle, 200) ?? '',
-                result: text(line.TestResult, 500) ?? '',
-                unit: text(line.ResultUnit, 50),
-                reference: plainText(line.NormalResult).slice(0, 500) || null,
-              })),
+              values: [
+                ...lines.map((line) => ({
+                  test: text(line.TestTitle, 200) ?? '',
+                  result: text(line.TestResult, 500) ?? '',
+                  unit: text(line.ResultUnit, 50),
+                  reference: plainText(line.NormalResult).slice(0, 500) || null,
+                })),
+                ...(grid.get(key) ?? []).flatMap((entry) => {
+                  const line = sensitivity(
+                    entry.Antibiotic,
+                    entry.Diameter,
+                    [entry.ValueA, entry.ValueB, entry.ValueC],
+                    organisms,
+                  );
+                  return line ? [line] : [];
+                }),
+              ],
             };
           }),
         );
@@ -383,21 +476,78 @@ export function dischargeHistoryLoader(db: DbContext): Loader {
   };
 }
 
-/** Old EMR consultancy visit notes and procedure notes of stays → clinical notes, for staff only. */
+/**
+ * Old EMR notes of stays → clinical notes, for staff only: consultant visits, procedures, ICU course, transfers, nurse
+ * handovers (who handed over to whom, acknowledged or not) and handover sheets (their form written out).
+ */
 export function noteHistoryLoader(db: DbContext): Loader {
   return {
     name: 'note-history',
     dependsOn: ['patients'],
     async run(context, report) {
       const uhids = await patientsByUhid(db);
+      const who = (alias: string) => `COALESCE(NULLIF(${alias}.[FullName], ''), ${alias}.[UserName], 'someone')`;
       for (const spec of [
-        { table: '[EMR].[ConsultancyVisitNotes]', date: 'n.[CreatedOn]', title: 'Consultant visit note' },
-        { table: '[EMR].[ProcedureNotes]', date: 'n.[EntryDate]', title: 'Procedure note' },
-      ]) {
-        const query = `SELECT TOP (@n) CAST(n.[Id] AS nvarchar(36)) AS [Id], n.[Note], ${spec.date} AS [On], p.[UHID],
-          p.[InvoiceNo] FROM ${spec.table} n JOIN [Hospital].[IPDPatientRecords] p ON p.[Id] = n.[IPDPatientId]
+        {
+          table: '[EMR].[ConsultancyVisitNotes]',
+          stay: 'IPDPatientId',
+          date: 'n.[CreatedOn]',
+          label: 'Consultant visit note',
+        },
+        { table: '[EMR].[ProcedureNotes]', stay: 'IPDPatientId', date: 'n.[EntryDate]', label: 'Procedure note' },
+        {
+          table: '[EMR].[ICUCourses]',
+          stay: 'IPDPatientId',
+          note: 'n.[Course]',
+          date: 'n.[EntryDate]',
+          label: 'ICU course',
+        },
+        {
+          table: '[EMR].[TransferNotesEMR]',
+          stay: 'IPDPatientRecordId',
+          date: 'n.[CreatedOn]',
+          label: 'Transfer note',
+          title: `CONCAT('Transfer note', ' (' + NULLIF(n.[DepartmentName], '') + ')')`,
+        },
+        {
+          table: '[EMR].[NurseToNursePatientHandOverRecords]',
+          stay: 'IPDPatientRecordId',
+          date: 'n.[HODate]',
+          label: 'Nurse handover',
+          note: `CONCAT('Handed over by ', ${who('b')}, ' to ', ${who('t')}, ' at ', CONVERT(nvarchar(5), n.[HOTime], 108),
+            CASE WHEN n.[IsReceipantAcknowledged] = 1 THEN ', acknowledged.' ELSE ', not acknowledged.' END)`,
+          joins: `LEFT JOIN [Identity].[Users] b ON b.[Id] = n.[HanOverBy] LEFT JOIN [Identity].[Users] t ON t.[Id] = n.[HandOverTo]`,
+        },
+        {
+          table: '[EMR].[HandOverSheets]',
+          stay: 'PatientId',
+          note: 'n.[Data]',
+          date: 'n.[CreatedOn]',
+          label: 'Handover sheet',
+          form: true,
+        },
+      ] as {
+        table: string;
+        stay: string;
+        date: string;
+        label: string;
+        note?: string;
+        title?: string;
+        joins?: string;
+        form?: boolean;
+      }[]) {
+        const query = `SELECT TOP (@n) CAST(n.[Id] AS nvarchar(36)) AS [Id], ${spec.note ?? 'n.[Note]'} AS [Note],
+          ${spec.title ?? 'NULL'} AS [Title], ${spec.date} AS [On], p.[UHID], p.[InvoiceNo]
+          FROM ${spec.table} n JOIN [Hospital].[IPDPatientRecords] p ON p.[Id] = n.[${spec.stay}] ${spec.joins ?? ''}
           WHERE n.[IsDeleted] = 0 AND n.[Id] > @after ORDER BY n.[Id]`;
-        type Row = { Id: string; Note: string | null; On: Date | null; UHID: number | null; InvoiceNo: number | null };
+        type Row = {
+          Id: string;
+          Note: string | null;
+          Title?: string | null;
+          On: Date | null;
+          UHID: number | null;
+          InvoiceNo: number | null;
+        };
         for await (const page of pages<Row>(context, query, (row) => row.Id)) {
           await write(
             db,
@@ -409,10 +559,10 @@ export function noteHistoryLoader(db: DbContext): Loader {
               oldId: row.Id,
               uhid: row.UHID,
               kind: 'note' as const,
-              title: spec.title,
+              title: text(row.Title, 200) ?? spec.label,
               number: row.InvoiceNo ? `Admission ${row.InvoiceNo}` : null,
               on: row.On,
-              body: plainText(row.Note),
+              body: spec.form ? sheetText(row.Note) : plainText(row.Note),
               shared: false,
             })),
           );

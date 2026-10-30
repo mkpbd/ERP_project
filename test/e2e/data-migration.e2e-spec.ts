@@ -721,6 +721,19 @@ const history = {
         InvoiceNo: 9_003,
       },
       { Id: 'pr-3', LabNo: 503, ReportDate: wall('2025-06-02T00:00:00'), UHID: null, ReportVerifierId: NIL },
+      // A urine culture with its sensitivity grid.
+      {
+        Id: 'pr-4',
+        LabNo: 504,
+        ReportDate: wall('2025-07-01T00:00:00'),
+        PreparedDate: null,
+        CreatedOn: null,
+        AnyComments: null,
+        DeliveryOn: wall('2025-07-02T00:00:00'),
+        ReportVerifierId: NIL,
+        UHID: 26000010,
+        InvoiceNo: 9_004,
+      },
     ],
     'Diag.RadiologyReports': [
       {
@@ -749,6 +762,43 @@ const history = {
       { Id: 'cn-1', Note: 'Seen. Stable.', On: wall('2025-05-02T00:00:00'), UHID: 26000010, InvoiceNo: 25_001 },
     ],
     'EMR.ProcedureNotes': [],
+    'EMR.ICUCourses': [
+      {
+        Id: 'icu-1',
+        Note: 'Day 1: on oxygen, stable',
+        On: wall('2025-05-03T00:00:00'),
+        UHID: 26000010,
+        InvoiceNo: 25_001,
+      },
+    ],
+    'EMR.TransferNotesEMR': [
+      {
+        Id: 'tn-1',
+        Note: 'Shifted from ICU to the ward.',
+        Title: 'Transfer note (Medicine)',
+        On: wall('2025-05-04T00:00:00'),
+        UHID: 26000010,
+        InvoiceNo: 25_001,
+      },
+    ],
+    'EMR.NurseToNursePatientHandOverRecords': [
+      {
+        Id: 'nh-1',
+        Note: 'Handed over by Rina Akter to Mita Das at 08:00, acknowledged.',
+        On: wall('2025-05-04T00:00:00'),
+        UHID: 26000010,
+        InvoiceNo: 25_001,
+      },
+    ],
+    'EMR.HandOverSheets': [
+      {
+        Id: 'hs-1',
+        Note: '{"bloodPressure":"120/80","onOxygen":true,"drains":[],"diet":{"type":"Soft"}}',
+        On: wall('2025-05-04T00:00:00'),
+        UHID: 26000010,
+        InvoiceNo: 25_001,
+      },
+    ],
   } as Record<string, Record<string, unknown>[]>,
   // Child rows read for a page of parents (OPENJSON(@ids)).
   children: {
@@ -785,6 +835,33 @@ const history = {
         ResultUnit: 'g/dL',
         NormalResult: '12 - 16',
       },
+    ],
+    'Diag.CSNoGrowthResults': [
+      {
+        ParentId: 'pr-4',
+        GrowthType: 'Growth',
+        OrganismA: 'E. coli',
+        OrganismB: 'Klebsiella',
+        OrganismC: null,
+        Message: 'Significant bacteriuria',
+        ColonyCount: '10^5 CFU/ml',
+        Incubation: '48 hours',
+        CultureMediaUsed: 'MacConkey',
+      },
+    ],
+    'Diag.CSOthersValues': [
+      {
+        ParentId: 'pr-4',
+        Analyzer: null,
+        PusCellValue: '10-12/HPF',
+        EpithelialCellValue: null,
+        RBCValue: 'Nil',
+        Note: null,
+      },
+    ],
+    'Diag.CSGrowths': [
+      { ParentId: 'pr-4', Antibiotic: 'Ampicillin', Diameter: null, ValueA: 'R', ValueB: 'R', ValueC: null },
+      { ParentId: 'pr-4', Antibiotic: 'Ciprofloxacin', Diameter: '22', ValueA: 'S', ValueB: 'I', ValueC: null },
     ],
     'Rx.PatientChiefComplains': [{ ParentId: 'rx-1', Complain: 'Fever', ComplainManual: null, Duration: '3 days' }],
     'Rx.PatientClinicalimpressions': [{ ParentId: 'rx-1', ImpressionTitle: 'Viral fever', Remarks: null }],
@@ -1306,12 +1383,12 @@ describe('data migration', () => {
     };
     const real = await etl(false, histories);
     expect(counts(real)).toMatchObject({
-      'lab-history': [2, 0, 1],
+      'lab-history': [3, 0, 1],
       'pathology-text-history': [0, 0, 0],
       'imaging-history': [1, 0, 0],
       'prescription-history': [1, 0, 0],
       'discharge-history': [1, 0, 0],
-      'note-history': [1, 0, 0],
+      'note-history': [5, 0, 0],
     });
     expect(real.reports.find((entry) => entry.loader === 'lab-history')!.reasons).toEqual({
       no_patient: { count: 1, examples: ['pr-3'] },
@@ -1327,8 +1404,13 @@ describe('data migration', () => {
       title: string;
     }[];
     expect(list.map((entry) => entry.title)).toEqual([
+      'Laboratory report',
       'Laboratory report: CBC',
       'Discharge certificate',
+      'Handover sheet',
+      'Nurse handover',
+      'Transfer note (Medicine)',
+      'ICU course',
       'Consultant visit note',
       'Imaging report: X-ray chest',
       'Laboratory report: CBC',
@@ -1363,6 +1445,30 @@ describe('data migration', () => {
     });
     expect((await find('discharge-summary')).body).toBe('Diagnosis: Dengue fever\nDischarged in good health.');
 
+    // A culture report: what grew, the culture's findings and microscopy, and the sensitivity grid per organism.
+    const titled = async (title: string) =>
+      (await get(`history/${list.find((entry) => entry.title === title)!.id}`)).body;
+    const culture = await titled('Laboratory report');
+    expect(culture.body).toBe(
+      [
+        'Culture: Growth',
+        'Organisms isolated: E. coli, Klebsiella',
+        'Colony count: 10^5 CFU/ml',
+        'Incubation: 48 hours',
+        'Culture media: MacConkey',
+        'Significant bacteriuria',
+        'Microscopy: Pus cells 10-12/HPF · RBC Nil',
+      ].join('\n'),
+    );
+    expect(culture.values).toEqual([
+      { test: 'Ampicillin', result: 'E. coli: R · Klebsiella: R', unit: null, reference: null },
+      { test: 'Ciprofloxacin', result: 'E. coli: S · Klebsiella: I', unit: null, reference: 'Zone 22' },
+    ]);
+    // The other inpatient notes: ICU course, a transfer, a nurse handover, a handover sheet's form written out.
+    expect((await titled('ICU course')).body).toBe('Day 1: on oxygen, stable');
+    expect((await titled('Nurse handover')).body).toBe('Handed over by Rina Akter to Mita Das at 08:00, acknowledged.');
+    expect((await titled('Handover sheet')).body).toBe('Blood pressure: 120/80\nOn oxygen: yes\nDiet › Type: Soft');
+
     // Results followed over time; values kept as they were (the empty heading row dropped).
     const trend = (await get(`patients/${karim!.id}/history/trend?test=hemoglobin`)).body.items;
     expect(trend.map((point: { recordedOn: string; value: number }) => [point.recordedOn, point.value])).toEqual([
@@ -1382,6 +1488,7 @@ describe('data migration', () => {
     expect(shared.map((doc) => doc.title).sort()).toEqual([
       'Discharge certificate (old system)',
       'Imaging report: X-ray chest (old system)',
+      'Laboratory report (old system)',
       'Laboratory report: CBC (old system)',
       'Prescription (old system)',
     ]);
