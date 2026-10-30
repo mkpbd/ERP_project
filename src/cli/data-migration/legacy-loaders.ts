@@ -10,6 +10,7 @@ import {
 } from '../../modules/hospital/infrastructure/persistence/hospital.schema.js';
 import { users } from '../../modules/identity/infrastructure/persistence/identity.schema.js';
 import { accountLoaders } from './account-loaders.js';
+import { hrLoaders } from './hr-loaders.js';
 import { noteRejection, type EtlContext, type Loader } from './etl.js';
 import {
   doctorRecord,
@@ -360,5 +361,6 @@ export function legacyLoaders(db: DbContext): Loader[] {
     doctorsLoader(db),
     patientsLoader(db),
     ...accountLoaders(db),
+    ...hrLoaders(db),
   ];
 }

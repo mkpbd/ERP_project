@@ -14,7 +14,14 @@ import {
 } from '../../src/modules/accounts/infrastructure/persistence/accounts.schema.js';
 import { etlRuns } from '../../src/modules/data-migration/infrastructure/persistence/data-migration.schema.js';
 import { doctors, patients } from '../../src/modules/hospital/infrastructure/persistence/hospital.schema.js';
+import { hrSubDepartments, staffRecords } from '../../src/modules/hr/infrastructure/persistence/hr.schema.js';
+import {
+  leavePolicyEntitlements,
+  leaveRecords,
+  staffLeaveEntitlements,
+} from '../../src/modules/hr/infrastructure/persistence/leave.schema.js';
 import { users } from '../../src/modules/identity/infrastructure/persistence/identity.schema.js';
+import { pfLedgerEntries, staffSalaries } from '../../src/modules/payroll/infrastructure/persistence/payroll.schema.js';
 import { TransactionManager } from '../../src/shared/application/ports/transaction-manager.js';
 import { aspNetIdentityHash } from '../support/aspnet-hash.js';
 import { ADMIN, bootstrapAdmin, createTestApp, resetDatabase, type TestApp } from '../support/test-app.js';
@@ -44,6 +51,7 @@ const tables = {
       IsDeleted: false,
       CreatedOn: new Date('2024-01-01T00:00:00Z'),
       DoctorId: NIL,
+      StaffRecordId: 's-1',
     },
     {
       Id: 'u-2',
@@ -57,6 +65,7 @@ const tables = {
       IsDeleted: false,
       CreatedOn: null,
       DoctorId: DOCTOR,
+      StaffRecordId: NIL,
     },
     {
       Id: 'u-3',
@@ -70,6 +79,7 @@ const tables = {
       IsDeleted: true,
       CreatedOn: null,
       DoctorId: NIL,
+      StaffRecordId: NIL,
     },
   ],
   userRoles: [
@@ -251,6 +261,151 @@ const books = {
   ],
 };
 
+const staff = (Id: string, extra: Record<string, unknown>) => ({
+  Id,
+  EmployeeNo: null,
+  EmployeeName: null,
+  Sex: 'Male',
+  JoiningDate: new Date('2020-03-01T00:00:00Z'),
+  DivisionId: 1,
+  DeptId: 10,
+  SubDeptId: null,
+  DesignationId: 1,
+  JoiningDesignationId: null,
+  BiometricEnrollmentNo: 0,
+  IsSeparated: false,
+  IsInActive: false,
+  ResignationDate: null,
+  LastModifiedOn: null,
+  IsDeleted: false,
+  ...extra,
+});
+const salary = (Id: string, EmployeeId: string) => ({
+  Id,
+  EmployeeId,
+  BasicAmount: 18_000,
+  HouseRentInPercentOfBasic: 9_000,
+  MedicalAllownceInPercentOfBasic: 1_800,
+  Conveyance: 1_200,
+  OtherAllowance: 0,
+  Others: 0,
+  SpecialAllowance: 500,
+  Pf: 1_800,
+  Cpf: 1_800,
+  TotalSalary: 30_000,
+  OvertimePerHour: 150,
+  FixedAmount: 0,
+  IsPFDeductionOn: true,
+  TaxableAmount: 0,
+  GeneralSalaryPolicyId: 1,
+  SalaryEvaluationDurationId: 1,
+  IncrementType: 'Percentage(%)',
+});
+
+/** The old HR and payroll: structure, four staff records (two left out), a salary, leave and PF. */
+const hr = {
+  tables: {
+    Divisions: [{ Id: 1, Name: 'Medical' }],
+    Departments: [
+      { Id: 10, Name: 'Nursing', Parent: 1 },
+      { Id: 11, Name: 'Accounts', Parent: 1 },
+      { Id: 12, Name: 'Orphan', Parent: 99 },
+    ],
+    SubDepartments: [{ Id: 100, Name: 'Ward nursing', Parent: 10 }],
+    Designations: [
+      { Id: 1, Name: 'Staff Nurse', JoiningSalaray: 20_000, IncrementAfterConfirmation: 1_000 },
+      { Id: 2, Name: 'Accountant', JoiningSalaray: 25_000, IncrementAfterConfirmation: 0 },
+    ],
+    LeaveTypes: [
+      { Id: 1, Name: 'Casual Leave', BanglaName: null },
+      { Id: 2, Name: 'Medical Leave', BanglaName: null },
+      { Id: 3, Name: 'Maternity Leave', BanglaName: null },
+    ],
+    GeneralSalaryPolicies: [
+      {
+        Id: 1,
+        PolicyName: 'General',
+        BasicInPercentOfTotalAmount: 60,
+        HouseRentInPercentOfBasic: 50,
+        MedicalInPercentOfBasic: 10,
+        PfinPercentOfBasic: 10,
+        CpfinPercentOfBasic: 10,
+      },
+    ],
+    SalaryEvaluationDurations: [{ Id: 1, Name: 'Yearly' }],
+    LeavePolicies: [
+      {
+        Id: 1,
+        Year: 2027,
+        Cl: 10,
+        Ml: 112,
+        MedicalLeave: 14,
+        AnnualLeave: 0,
+        FestivalLeave: 11,
+        GovtLeave: 0,
+        AbsentDeduction: true,
+        LateConsiderAfterMins: 15,
+        OnedaySalaryDeductionForLateInDays: 3,
+      },
+    ],
+    IndividualEmployeeLeavePolices: [
+      {
+        Id: 'slp-1',
+        StaffRecordId: 's-1',
+        LeaveYear: 2027,
+        LateConsiderAfterInMins: 30,
+        OneDaySalaryDeductionOnTotalLateCount: 0,
+        AbsentDeduction: false,
+      },
+    ],
+    IndividualEmployeeLeaveEligibles: [{ PolicyId: 'slp-1', LeaveTypeId: 1, LeaveDay: 12 }],
+    LeaveApplications: [
+      {
+        Id: 1,
+        StaffRecordId: 's-1',
+        LeaveTypeIds: 1,
+        StartDate: new Date('2026-12-30T00:00:00Z'),
+        EndDate: new Date('2027-01-02T00:00:00Z'),
+        AppSubject: 'Family wedding',
+      },
+      {
+        Id: 2,
+        StaffRecordId: 's-1',
+        LeaveTypeIds: 1,
+        StartDate: new Date('2025-05-01T00:00:00Z'),
+        EndDate: new Date('2025-05-02T00:00:00Z'),
+        AppSubject: null,
+      },
+    ],
+    PFLedgers: [
+      { StaffRecordId: 's-1', Credit: 54_000, Debit: 4_000 },
+      { StaffRecordId: 's-2', Credit: 1_000, Debit: 1_000 },
+    ],
+  } as Record<string, Record<string, unknown>[]>,
+  staff: [
+    staff('s-1', {
+      EmployeeNo: 'e-001',
+      EmployeeName: 'Nasrin Akter',
+      Sex: 'Female',
+      SubDeptId: 100,
+      BloodGroup: 'A+ve',
+      BiometricEnrollmentNo: 101,
+    }),
+    staff('s-2', {
+      EmployeeNo: 'E-002',
+      EmployeeName: 'Kamal Hossain',
+      DeptId: 11,
+      DesignationId: 2,
+      BiometricEnrollmentNo: 101,
+      IsSeparated: true,
+      LastModifiedOn: new Date('2026-06-30T00:00:00Z'),
+    }),
+    staff('s-3', { EmployeeNo: 'E-003', EmployeeName: 'Removed', IsDeleted: true }),
+    staff('s-4', { EmployeeName: 'No Number' }),
+  ],
+  salaries: [salary('sal-1', 's-1'), salary('sal-3', 's-3')],
+};
+
 /** The old database as the loaders query it: tables by name, pages by key. */
 class FakeSource extends LegacySource {
   readonly queries: string[] = [];
@@ -265,7 +420,18 @@ class FakeSource extends LegacySource {
     let rows: Record<string, unknown>[];
     if (sql.includes('[Identity].[Roles]')) rows = tables.roles;
     else if (sql.includes('[Identity].[UserRoles]')) rows = tables.userRoles;
-    else if (sql.includes('[Identity].[Users]') && sql.includes('[DoctorId] <>')) {
+    else if (sql.includes('[Identity].[Users]') && sql.includes('[StaffRecordId] <>')) {
+      rows = tables.users
+        .filter((user) => user.StaffRecordId !== NIL)
+        .map((user) => ({ Id: user.Id, StaffRecordId: user.StaffRecordId }));
+    } else if (sql.includes('[HR].[StaffRecords]')) rows = page(hr.staff, (staff) => staff.Id);
+    else if (sql.includes('[Payroll].[IndividualSalaries]')) rows = page(hr.salaries, (salary) => salary.Id);
+    else if (/\[(HR|Payroll)\]\./.test(sql)) {
+      const table = /\[(?:HR|Payroll)\]\.\[(\w+)\]/.exec(sql)![1]!;
+      const found = hr.tables[table];
+      if (!found) throw new Error(`Unexpected query: ${sql}`);
+      rows = found;
+    } else if (sql.includes('[Identity].[Users]') && sql.includes('[DoctorId] <>')) {
       rows = tables.users
         .filter((user) => user.DoctorId !== NIL)
         .map((user) => ({ Id: user.Id, DoctorId: user.DoctorId }));
@@ -450,6 +616,88 @@ describe('data migration', () => {
     expect(rahima!.reference).toBe('501');
     const ledger = await get(`books/ledger?from=2027-01-01&to=2027-01-31&subLedgerId=${rahima!.id}`);
     expect(ledger.body).toMatchObject({ opening: 10_000, closing: 10_000 });
+  });
+
+  it('brings staff over with their salaries, this year’s leave and PF balances', async () => {
+    const db = t.app.get(DbContext).db;
+    const people = {
+      only: ['staff-salaries', 'leave-policies', 'staff-leave-policies', 'leave-taken', 'pf-openings'],
+      cutOver: '2027-01-01',
+    };
+    const dry = await etl(true, people);
+    expect(counts(dry)).toEqual({
+      users: [2, 0, 1],
+      'hr-divisions': [1, 0, 0],
+      'hr-departments': [2, 0, 1],
+      'hr-sub-departments': [1, 0, 0],
+      designations: [2, 0, 0],
+      'leave-types': [3, 0, 0],
+      staff: [2, 0, 2],
+      'salary-policies': [1, 0, 0],
+      'salary-review-cycles': [1, 0, 0],
+      'staff-salaries': [1, 0, 1],
+      'leave-policies': [1, 0, 0],
+      'staff-leave-policies': [1, 0, 0],
+      'leave-taken': [1, 0, 1],
+      'pf-openings': [1, 0, 0],
+    });
+    expect(await db.select().from(staffRecords)).toHaveLength(0);
+
+    const real = await etl(false, people);
+    expect(counts(real)).toEqual(counts(dry));
+    const report = (loader: string) => real.reports.find((entry) => entry.loader === loader)!;
+    expect(report('staff').reasons).toEqual({
+      deleted: { count: 1, examples: ['s-3'] },
+      no_employee_no: { count: 1, examples: ['s-4'] },
+    });
+    expect(report('leave-types').notes).toEqual([
+      'Casual Leave: code CL',
+      'Medical Leave: code ML',
+      'Maternity Leave: code ML2',
+    ]);
+    expect(report('leave-policies').notes).toEqual([
+      '2027: 11 days of festival leave left out (no single leave type named so)',
+    ]);
+
+    const [rana] = await db.select().from(users).where(eq(users.username, 'rana'));
+    const [nasrin] = await db.select().from(staffRecords).where(eq(staffRecords.employeeNo, 'E-001'));
+    const [ward] = await db.select().from(hrSubDepartments).where(eq(hrSubDepartments.name, 'Ward nursing'));
+    expect(nasrin).toMatchObject({
+      fullName: 'Nasrin Akter',
+      sex: 'female',
+      bloodGroup: 'A+',
+      biometricEnrollmentNo: 101,
+      subDepartmentId: ward!.id,
+      userId: rana!.id,
+      status: 'active',
+      serviceNature: 'Permanent',
+    });
+    const [kamal] = await db.select().from(staffRecords).where(eq(staffRecords.employeeNo, 'E-002'));
+    const [general] = await db.select().from(hrSubDepartments).where(eq(hrSubDepartments.id, kamal!.subDepartmentId));
+    expect(kamal).toMatchObject({ status: 'separated', separationDate: '2026-06-30', biometricEnrollmentNo: null });
+    expect(general!.name).toBe('General');
+
+    const [pay] = await db.select().from(staffSalaries).where(eq(staffSalaries.staffId, nasrin!.id));
+    expect(pay).toMatchObject({
+      gross: 30_000,
+      basic: 18_000,
+      houseRent: 9_000,
+      pf: 1_800,
+      incrementMethod: 'percentage',
+    });
+    expect(await db.select().from(leavePolicyEntitlements)).toHaveLength(3);
+    expect(await db.select().from(staffLeaveEntitlements)).toEqual([
+      expect.objectContaining({ staffId: nasrin!.id, year: 2027, days: 12 }),
+    ]);
+    expect(await db.select().from(leaveRecords)).toEqual([
+      expect.objectContaining({ staffId: nasrin!.id, startDate: '2027-01-01', endDate: '2027-01-02', days: 2 }),
+    ]);
+    expect(await db.select().from(pfLedgerEntries)).toEqual([
+      expect.objectContaining({ staffId: nasrin!.id, entryDate: '2026-12-31', type: 'opening', credit: 50_000 }),
+    ]);
+
+    const again = await etl(false, people);
+    expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
   });
 
   it('leaves the opening balances out without a cut-over day', async () => {

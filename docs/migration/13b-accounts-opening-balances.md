@@ -1,6 +1,6 @@
 # Step 13b — Data migration: the chart of accounts and opening balances
 
-Status: **done** (2026-10-30). Previous: [step 13a](13a-data-migration-framework.md) · Next: step 13c (HR).
+Status: **done** (2026-10-30). Previous: [step 13a](13a-data-migration-framework.md) · Next: [step 13c](13c-hr.md).
 
 The old books are brought over as a chart of accounts and **one posted opening voucher**. Old vouchers stay in the
 old database, which is kept read-only.
