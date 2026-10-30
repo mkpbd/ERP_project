@@ -3,6 +3,7 @@
  *
  *   ETL_SOURCE_URL="Server=…;Database=…;User Id=<read-only>;Password=…;Encrypt=true" npm run etl -- [--dry-run]
  *     [--only=users,patients] [--batch=2000] [--cut-over=2027-01-01]
+ *   ETL_SOURCE_URL=… npm run etl -- --reconcile --cut-over=2027-01-01   (old and new side by side, logged to sign)
  *
  * Loaders run with what they depend on, in order. Records already brought over (etl_id_map) are kept, so a run may be
  * repeated. --dry-run does everything in one transaction and rolls it back, printing what would have happened.
@@ -14,6 +15,7 @@ import { AppModule } from '../app.module.js';
 import { loadConfig } from '../config/configuration.js';
 import { DbContext } from '../database/drizzle-transaction-manager.js';
 import { legacyLoaders } from './data-migration/legacy-loaders.js';
+import { runReconciliation } from './data-migration/reconcile.js';
 import { runEtl } from './data-migration/runner.js';
 import { MssqlSource } from './data-migration/mssql-source.js';
 import { TransactionManager } from '../shared/application/ports/transaction-manager.js';
@@ -23,6 +25,7 @@ loadLocalEnv();
 const args = process.argv.slice(2);
 const flag = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?.split('=')[1];
 const dryRun = args.includes('--dry-run');
+const reconciling = args.includes('--reconcile');
 const only = flag('only')?.split(',').filter(Boolean) ?? null;
 const batchSize = Number(flag('batch') ?? 2000);
 const cutOver = flag('cut-over') ?? null;
@@ -33,6 +36,10 @@ if (!sourceUrl) {
 }
 if (cutOver !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(cutOver) || Number.isNaN(Date.parse(cutOver)))) {
   console.error('--cut-over is a day, YYYY-MM-DD (the first day this system keeps the books)');
+  process.exit(1);
+}
+if (reconciling && cutOver === null) {
+  console.error('--reconcile needs the --cut-over day it checks');
   process.exit(1);
 }
 if (!Number.isInteger(batchSize) || batchSize < 100 || batchSize > 50_000) {
@@ -47,28 +54,43 @@ let failed = false;
 try {
   await app.init();
   const db = app.get(DbContext);
-  const run = await runEtl({
-    db,
-    tx: app.get(TransactionManager),
-    source,
-    loaders: legacyLoaders(db),
-    only,
-    dryRun,
-    batchSize,
-    cutOver,
-    timeZone: config.reports.timeZone,
-    log: (report) => {
+  if (reconciling) {
+    const { runId, result } = await runReconciliation({ db, source, cutOver: cutOver! });
+    for (const check of result.checks) {
+      const side = (value: number | null) => (value === null ? '—' : value.toLocaleString('en-US')).padStart(16);
       console.log(
-        `${report.loader.padEnd(14)} read ${report.read}, written ${report.written}, kept ${report.kept}, rejected ${report.rejected}`,
+        `${check.status.toUpperCase().padEnd(6)} ${`${check.area}: ${check.item}`.padEnd(56)} old ${side(check.old)} new ${side(check.new)}`,
       );
-      for (const [reason, entry] of Object.entries(report.reasons)) {
-        console.log(`  rejected ${reason}: ${entry.count} (e.g. ${entry.examples.join(', ')})`);
-      }
-      for (const note of report.notes.slice(0, 20)) console.log(`  ${note}`);
-      if (report.notes.length > 20) console.log(`  … ${report.notes.length - 20} more notes in etl_runs`);
-    },
-  });
-  console.log(`${dryRun ? 'Dry run' : 'Run'} ${run.runId} done${dryRun ? '; nothing was kept' : ''}`);
+      if (check.note) console.log(`       ${check.note}`);
+    }
+    console.log(
+      `Reconciliation ${runId}: ${result.verdict}. Print it from the app (data-migration.reconciliation) to sign.`,
+    );
+    failed = result.verdict === 'no-go';
+  } else {
+    const run = await runEtl({
+      db,
+      tx: app.get(TransactionManager),
+      source,
+      loaders: legacyLoaders(db),
+      only,
+      dryRun,
+      batchSize,
+      cutOver,
+      timeZone: config.reports.timeZone,
+      log: (report) => {
+        console.log(
+          `${report.loader.padEnd(14)} read ${report.read}, written ${report.written}, kept ${report.kept}, rejected ${report.rejected}`,
+        );
+        for (const [reason, entry] of Object.entries(report.reasons)) {
+          console.log(`  rejected ${reason}: ${entry.count} (e.g. ${entry.examples.join(', ')})`);
+        }
+        for (const note of report.notes.slice(0, 20)) console.log(`  ${note}`);
+        if (report.notes.length > 20) console.log(`  … ${report.notes.length - 20} more notes in etl_runs`);
+      },
+    });
+    console.log(`${dryRun ? 'Dry run' : 'Run'} ${run.runId} done${dryRun ? '; nothing was kept' : ''}`);
+  }
 } catch (error) {
   failed = true;
   console.error('The data migration failed:', error instanceof Error ? error.message : error);

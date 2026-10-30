@@ -1,6 +1,6 @@
 # Step 13f — Data migration: clinical history
 
-Status: **done** (2026-10-31). Previous: [step 13e](13e-open-documents-dues.md) · Next: step 13g (cut-over runbook).
+Status: **done** (2026-10-31). Previous: [step 13e](13e-open-documents-dues.md) · Next: [step 13g](13g-cut-over-runbook.md).
 
 ```
 ETL_SOURCE_URL=… npm run etl -- [--dry-run] [--only=lab-history,prescription-history]

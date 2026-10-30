@@ -23,6 +23,7 @@ import { CommunicationModule } from './modules/communication/communication.modul
 import { AuthorizationGuard } from './modules/access-control/presentation/authorization.guard.js';
 import { AdministrationModule } from './modules/administration/administration.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
+import { DataMigrationModule } from './modules/data-migration/data-migration.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { IdentityModule } from './modules/identity/identity.module.js';
 import { HrModule } from './modules/hr/hr.module.js';
@@ -93,6 +94,7 @@ export class AppModule {
         DatabaseModule,
         NotificationsModule,
         AuditModule,
+        DataMigrationModule,
         AccessControlModule,
         IdentityModule,
         NavigationModule,

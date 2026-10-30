@@ -5,6 +5,7 @@ import type { App } from 'supertest/types.js';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { LegacySource } from '../../src/cli/data-migration/etl.js';
 import { legacyLoaders } from '../../src/cli/data-migration/legacy-loaders.js';
+import { runReconciliation } from '../../src/cli/data-migration/reconcile.js';
 import { runEtl } from '../../src/cli/data-migration/runner.js';
 import { DbContext } from '../../src/database/drizzle-transaction-manager.js';
 import {
@@ -769,6 +770,25 @@ const history = {
   } as Record<string, Record<string, unknown>[]>,
 };
 
+/** What the old system's own totals say at the cut-over (the reconciliation's queries; the books are summed above). */
+const oldFigures: Record<string, number> = {
+  'count:user': 3,
+  'count:doctor': 2,
+  'count:patient': 4,
+  'count:staff': 3,
+  'count:gl-account': 10,
+  'count:supplier': 1,
+  'count:product': 3,
+  'count:item-variant': 2,
+  'pharmacy-units': 1_000,
+  admitted: 3,
+  advances: 8_000,
+  'doctor-payables': 5_000,
+  'staff-dues': 500,
+  'canteen-dues': 1_000,
+  pf: 50_000,
+};
+
 /** The old database as the loaders query it: tables by name, pages by key. */
 class FakeSource extends LegacySource {
   readonly queries: string[] = [];
@@ -782,7 +802,10 @@ class FakeSource extends LegacySource {
         .slice(0, params['n'] as number);
     let rows: Record<string, unknown>[];
     const clinical = /\[(Diag|Rx|EMR)\]\.\[(\w+)\]/.exec(sql);
-    if (clinical && sql.includes('OPENJSON(@ids)')) {
+    const reconciling = /\/\* reconcile:([\w:-]+) \*\//.exec(sql)?.[1];
+    if (reconciling === 'books') rows = books.balances;
+    else if (reconciling) rows = [{ n: oldFigures[reconciling] ?? 0 }];
+    else if (clinical && sql.includes('OPENJSON(@ids)')) {
       const ids = (JSON.parse(params['ids'] as string) as string[]).map((id) => id.toLowerCase());
       rows = (history.children[`${clinical[1]}.${clinical[2]}`] ?? []).filter((row) =>
         ids.includes(String(row['ParentId']).toLowerCase()),
@@ -1338,6 +1361,76 @@ describe('data migration', () => {
 
     const again = await etl(false, histories);
     expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
+  });
+
+  it('reconciles the cut-over side by side and prints it to sign', async () => {
+    const db = t.app.get(DbContext).db;
+    await db.insert(canteenOutlets).values({ id: randomUUID(), name: 'Main canteen' });
+    const cutOver = '2026-10-01';
+    await etl(false, {
+      only: [
+        'opening-balances',
+        'pharmacy-opening-stock',
+        'store-opening-stock',
+        'open-admissions',
+        'doctor-payables',
+        'staff-dues',
+        'canteen-dues',
+        'pf-openings',
+        'suppliers',
+      ],
+      cutOver,
+    });
+    const { runId, result } = await runReconciliation({ db: t.app.get(DbContext), source: new FakeSource(), cutOver });
+    const status = Object.fromEntries(result.checks.map((check) => [`${check.area}: ${check.item}`, check.status]));
+    expect(status).toEqual({
+      // Left out by the loaders (each reported there): explained, not failed.
+      'Records: Users': 'check',
+      'Records: Doctors': 'check',
+      'Records: Patients': 'check',
+      'Records: Staff': 'check',
+      'Records: GL accounts': 'check',
+      'Records: Suppliers': 'ok',
+      'Records: Pharmacy products': 'check',
+      'Records: Store items': 'ok',
+      'Records: Lab reports': 'ok',
+      'Records: Prescriptions': 'ok',
+      // The old books' 0.01 float rounding, taken up on the opening.
+      'Books: Trial balance, debit side': 'check',
+      'Stock: Pharmacy units in date': 'ok',
+      'Stock: Pharmacy stock value against its account': 'ok',
+      'Stock: Store stock value against account 1004': 'ok',
+      'Admitted patients: Patients in their beds': 'check',
+      'Admitted patients: Advances held': 'ok',
+      'Dues: Owed to doctors': 'ok',
+      'Dues: Owed by staff': 'ok',
+      'Dues: Owed by canteen members': 'ok',
+      'Dues: PF held for staff': 'ok',
+    });
+    expect(result.verdict).toBe('go-with-notes');
+    expect(result.checks.find((check) => check.item === 'Trial balance, debit side')).toMatchObject({
+      old: 74_500.01,
+      new: 74_500.01,
+      note: '1 account(s) differ by 0.01 in all: 3001 (old float rounding, taken up on the opening)',
+    });
+
+    const admin = (await signIn(ADMIN.email, ADMIN.password).expect(200)).body.accessToken as string;
+    const runs = await request(http).get('/api/v1/data-migration/runs').set(bearer(admin)).expect(200);
+    expect(runs.body.items[0]).toMatchObject({ id: runId, loaders: ['reconcile'], status: 'done', rejected: 0 });
+    const run = await request(http).get(`/api/v1/data-migration/runs/${runId}`).set(bearer(admin)).expect(200);
+    expect(run.body.report).toMatchObject({ kind: 'reconciliation', cutOver, verdict: 'go-with-notes' });
+    await request(http)
+      .post('/api/v1/reports/data-migration.reconciliation/render')
+      .set(bearer(admin))
+      .send({ format: 'pdf', params: { runId } })
+      .expect(200);
+    // A loader run is not a reconciliation to print.
+    const loaderRun = runs.body.items.find((item: { loaders: string[] }) => !item.loaders.includes('reconcile'));
+    const refused = await request(http)
+      .post('/api/v1/reports/data-migration.reconciliation/render')
+      .set(bearer(admin))
+      .send({ format: 'pdf', params: { runId: loaderRun.id } });
+    expect(refused.body.code).toBe('not_a_reconciliation');
   });
 
   it('leaves the opening balances out without a cut-over day', async () => {

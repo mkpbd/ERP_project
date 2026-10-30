@@ -1,0 +1,34 @@
+{{#with data}}
+<p>
+  Cut-over on <b>{{date cutOver}}</b> · checked {{datetime run.startedAt}} · <b>{{verdictLabel}}</b>
+</p>
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 15%">Area</th>
+      <th>What</th>
+      <th class="num" style="width: 14%">Old system</th>
+      <th class="num" style="width: 14%">Here</th>
+      <th style="width: 9%">Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each checks}}
+    <tr>
+      <td>{{area}}</td>
+      <td>{{item}}{{#if note}}<br /><span class="muted">{{note}}</span>{{/if}}</td>
+      <td class="num">{{oldText}}</td>
+      <td class="num">{{newText}}</td>
+      <td><b>{{statusLabel}}</b></td>
+    </tr>
+    {{/each}}
+  </tbody>
+</table>
+<table style="width: 100%; margin-top: 48px">
+  <tr>
+    <td style="width: 33%; text-align: center">______________________<br />Accounts</td>
+    <td style="width: 33%; text-align: center">______________________<br />IT</td>
+    <td style="width: 33%; text-align: center">______________________<br />Management</td>
+  </tr>
+</table>
+{{/with}}

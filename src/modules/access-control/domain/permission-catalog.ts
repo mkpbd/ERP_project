@@ -15,6 +15,10 @@ export const PERMISSION_CATALOG = [
   { key: 'permissions:read', description: 'View permissions and user assignments' },
   { key: 'permissions:assign', description: 'Assign roles to users and permissions to roles' },
   { key: 'audit:read', description: 'Read the audit log' },
+  {
+    key: 'migration:read',
+    description: 'See the data migration runs from the old system and print their reconciliation for sign-off',
+  },
   { key: 'menus:read', description: 'View the menu tree and which menus each role holds' },
   { key: 'menus:manage', description: 'Create, edit, activate and delete menus' },
   { key: 'menus:assign', description: 'Grant menus to roles (only menus you can use yourself)' },
