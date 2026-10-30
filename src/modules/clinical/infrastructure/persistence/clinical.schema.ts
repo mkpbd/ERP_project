@@ -487,3 +487,57 @@ export const dischargeSummaries = pgTable(
   },
   (t) => [uniqueIndex('clinical_discharge_summaries_admission_uq').on(t.admissionId)],
 );
+
+export const HISTORY_KINDS = ['prescription', 'lab-report', 'imaging-report', 'discharge-summary', 'note'] as const;
+
+// The old system's clinical records, brought over at the cut-over (step 13f): read-only, as they were written there.
+// Lab reports keep their results as values (below), so a patient's results can be followed over time.
+export const historyRecords = pgTable(
+  'clinical_history_records',
+  {
+    id: uuid('id').primaryKey(),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    kind: text('kind', { enum: HISTORY_KINDS }).notNull(),
+    title: text('title').notNull(),
+    number: text('number'),
+    recordedOn: day('recorded_on').notNull(),
+    author: text('author'),
+    body: text('body').notNull(),
+    /** Shown to the patient (reports finalised in the old system, prescriptions, discharge certificates). */
+    shared: boolean('shared').notNull(),
+    /** The old table and row it came from. */
+    source: text('source').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('clinical_history_records_source_uq').on(t.source),
+    index('clinical_history_records_patient_idx').on(t.patientId, t.recordedOn),
+    check(
+      'clinical_history_records_kind_ck',
+      sql`${t.kind} in ('prescription', 'lab-report', 'imaging-report', 'discharge-summary', 'note')`,
+    ),
+    check('clinical_history_records_title_ck', sql`char_length(${t.title}) between 1 and 200`),
+    check('clinical_history_records_body_ck', sql`char_length(${t.body}) <= 200000`),
+  ],
+);
+
+export const historyValues = pgTable(
+  'clinical_history_values',
+  {
+    recordId: uuid('record_id')
+      .notNull()
+      .references(() => historyRecords.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    test: text('test').notNull(),
+    result: text('result').notNull(),
+    unit: text('unit'),
+    reference: text('reference'),
+  },
+  (t) => [
+    primaryKey({ columns: [t.recordId, t.position] }),
+    index('clinical_history_values_test_idx').on(sql`lower(${t.test})`),
+    check('clinical_history_values_test_ck', sql`char_length(${t.test}) between 1 and 200`),
+  ],
+);

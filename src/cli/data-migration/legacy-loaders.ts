@@ -10,6 +10,7 @@ import {
 } from '../../modules/hospital/infrastructure/persistence/hospital.schema.js';
 import { users } from '../../modules/identity/infrastructure/persistence/identity.schema.js';
 import { accountLoaders } from './account-loaders.js';
+import { historyLoaders } from './history-loaders.js';
 import { hrLoaders } from './hr-loaders.js';
 import { openLoaders } from './open-loaders.js';
 import { stockLoaders } from './stock-loaders.js';
@@ -366,5 +367,6 @@ export function legacyLoaders(db: DbContext): Loader[] {
     ...hrLoaders(db),
     ...stockLoaders(db),
     ...openLoaders(db),
+    ...historyLoaders(db),
   ];
 }

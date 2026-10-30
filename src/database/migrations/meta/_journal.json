@@ -407,6 +407,13 @@
       "when": 1793368837928,
       "tag": "0057_data_migration",
       "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1793384875198,
+      "tag": "0058_clinical_history",
+      "breakpoints": true
     }
   ]
 }

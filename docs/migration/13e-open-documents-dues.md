@@ -1,6 +1,6 @@
 # Step 13e — Data migration: admitted patients and dues
 
-Status: **done** (2026-10-30). Previous: [step 13d](13d-catalogues-stock.md) · Next: step 13f (clinical history).
+Status: **done** (2026-10-30). Previous: [step 13d](13d-catalogues-stock.md) · Next: [step 13f](13f-clinical-history.md).
 
 ```
 ETL_SOURCE_URL=… npm run etl -- --cut-over=2027-01-01 [--dry-run] [--only=open-admissions,doctor-payables]

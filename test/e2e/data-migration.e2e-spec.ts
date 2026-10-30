@@ -43,6 +43,7 @@ import {
   stockMovements,
   suppliers,
 } from '../../src/modules/supply-chain/infrastructure/persistence/supply-chain.schema.js';
+import { PatientDocumentRegistry } from '../../src/shared/application/patient-documents.js';
 import { TransactionManager } from '../../src/shared/application/ports/transaction-manager.js';
 import { aspNetIdentityHash } from '../support/aspnet-hash.js';
 import { ADMIN, bootstrapAdmin, createTestApp, resetDatabase, type TestApp } from '../support/test-app.js';
@@ -655,6 +656,117 @@ const open: Record<string, Record<string, unknown>[]> = {
     { PatientId: 'ip-1', PayDate: wall('2026-09-30T00:00:00'), Amount: 2_000, TransactionType: 5 },
   ],
   'Hospital.IPDServiceRecords': [{ PatientId: 'ip-1', Services: 3, Amount: 4_500, Charge: 500 }],
+  'Hospital.DischargeCertificate': [
+    {
+      Id: 'dc-1',
+      EditorText: '<p><b>Diagnosis:</b> Dengue fever</p><p>Discharged in good health.</p>',
+      DischargeCertificateDate: wall('2025-05-05T00:00:00'),
+      UHID: 26000010,
+      InvoiceNo: 25_001,
+    },
+  ],
+};
+
+/** The old clinical records of one patient: two lab reports (one not delivered), an X-ray, an Rx visit, a note. */
+const history = {
+  tables: {
+    'Diag.PathologyReports': [
+      {
+        Id: 'pr-1',
+        LabNo: 501,
+        ReportDate: wall('2025-03-01T00:00:00'),
+        PreparedDate: null,
+        CreatedOn: null,
+        AnyComments: null,
+        DeliveryOn: wall('2025-03-02T00:00:00'),
+        ReportVerifierId: NIL,
+        UHID: 26000010,
+        InvoiceNo: 9_001,
+      },
+      {
+        Id: 'pr-2',
+        LabNo: 502,
+        ReportDate: wall('2025-06-01T00:00:00'),
+        PreparedDate: null,
+        CreatedOn: null,
+        AnyComments: 'Repeat after a month',
+        DeliveryOn: null,
+        ReportVerifierId: NIL,
+        UHID: 26000010,
+        InvoiceNo: 9_003,
+      },
+      { Id: 'pr-3', LabNo: 503, ReportDate: wall('2025-06-02T00:00:00'), UHID: null, ReportVerifierId: NIL },
+    ],
+    'Diag.RadiologyReports': [
+      {
+        Id: 'rr-1',
+        InvoiceNo: 9_002,
+        ReportDateTime: wall('2025-04-01T10:00:00'),
+        CreatedOn: null,
+        ReportContent: '<p>Chest X-ray&nbsp;PA view</p><p>No active lesion &amp; no effusion.</p>',
+        FinalizedByDoctorId: '6f1d2c3b-0000-4000-8000-0000000000dd',
+        TestName: 'X-ray chest',
+        UHID: 26000010,
+      },
+    ],
+    'Diag.PathologyDescriptiveReports': [],
+    'Rx.VisitHistories': [
+      {
+        Id: 'rx-1',
+        RxNo: 7_001,
+        VisitDate: wall('2025-02-10T00:00:00'),
+        FollowUpDate: wall('2025-02-24T00:00:00'),
+        Notes: null,
+        UHID: 26000010,
+      },
+    ],
+    'EMR.ConsultancyVisitNotes': [
+      { Id: 'cn-1', Note: 'Seen. Stable.', On: wall('2025-05-02T00:00:00'), UHID: 26000010, InvoiceNo: 25_001 },
+    ],
+    'EMR.ProcedureNotes': [],
+  } as Record<string, Record<string, unknown>[]>,
+  // Child rows read for a page of parents (OPENJSON(@ids)).
+  children: {
+    'Diag.PathologyReportDetails': [
+      {
+        ParentId: 'pr-1',
+        TestName: 'CBC',
+        TestTitle: 'Hemoglobin',
+        TestResult: '11.2',
+        ResultUnit: 'g/dL',
+        NormalResult: '12 - 16',
+      },
+      {
+        ParentId: 'pr-1',
+        TestName: 'CBC',
+        TestTitle: 'WBC',
+        TestResult: 'Normal',
+        ResultUnit: null,
+        NormalResult: null,
+      },
+      {
+        ParentId: 'pr-1',
+        TestName: 'CBC',
+        TestTitle: 'Differential',
+        TestResult: '',
+        ResultUnit: null,
+        NormalResult: null,
+      },
+      {
+        ParentId: 'pr-2',
+        TestName: 'CBC',
+        TestTitle: 'Hemoglobin',
+        TestResult: '12.8',
+        ResultUnit: 'g/dL',
+        NormalResult: '12 - 16',
+      },
+    ],
+    'Rx.PatientChiefComplains': [{ ParentId: 'rx-1', Complain: 'Fever', ComplainManual: null, Duration: '3 days' }],
+    'Rx.PatientClinicalimpressions': [{ ParentId: 'rx-1', ImpressionTitle: 'Viral fever', Remarks: null }],
+    'Rx.Drugs': [{ ParentId: 'rx-1', Name: 'Napa', Dosage: '1+1+1', Duration: '5 days' }],
+    'Rx.Investigations': [{ ParentId: 'rx-1', Name: 'CBC' }],
+    'Rx.AdviceToPatients': [{ ParentId: 'rx-1', Advice: 'Plenty of fluids' }],
+  } as Record<string, Record<string, unknown>[]>,
 };
 
 /** The old database as the loaders query it: tables by name, pages by key. */
@@ -669,7 +781,17 @@ class FakeSource extends LegacySource {
         .sort((a, b) => (key(a) < key(b) ? -1 : 1))
         .slice(0, params['n'] as number);
     let rows: Record<string, unknown>[];
-    if (sql.includes('[Identity].[Roles]')) rows = tables.roles;
+    const clinical = /\[(Diag|Rx|EMR)\]\.\[(\w+)\]/.exec(sql);
+    if (clinical && sql.includes('OPENJSON(@ids)')) {
+      const ids = (JSON.parse(params['ids'] as string) as string[]).map((id) => id.toLowerCase());
+      rows = (history.children[`${clinical[1]}.${clinical[2]}`] ?? []).filter((row) =>
+        ids.includes(String(row['ParentId']).toLowerCase()),
+      );
+    } else if (clinical) {
+      const found = history.tables[`${clinical[1]}.${clinical[2]}`];
+      if (!found) throw new Error(`Unexpected query: ${sql}`);
+      rows = page(found, (row) => String(row['Id']));
+    } else if (sql.includes('[Identity].[Roles]')) rows = tables.roles;
     else if (sql.includes('[Identity].[UserRoles]')) rows = tables.userRoles;
     else if (sql.includes('[Identity].[Users]') && sql.includes('[StaffRecordId] <>')) {
       rows = tables.users
@@ -1113,6 +1235,108 @@ describe('data migration', () => {
     expect(due).toMatchObject({ customerKind: 'member', net: 1_000, due: 1_000, paid: 0, number: 'CS-2026-00001' });
 
     const again = await etl(false, openings);
+    expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
+  });
+
+  it('brings the clinical history over to read, follow and show the patient', async () => {
+    const histories = {
+      only: [
+        'lab-history',
+        'pathology-text-history',
+        'imaging-history',
+        'prescription-history',
+        'discharge-history',
+        'note-history',
+      ],
+    };
+    const real = await etl(false, histories);
+    expect(counts(real)).toMatchObject({
+      'lab-history': [2, 0, 1],
+      'pathology-text-history': [0, 0, 0],
+      'imaging-history': [1, 0, 0],
+      'prescription-history': [1, 0, 0],
+      'discharge-history': [1, 0, 0],
+      'note-history': [1, 0, 0],
+    });
+    expect(real.reports.find((entry) => entry.loader === 'lab-history')!.reasons).toEqual({
+      no_patient: { count: 1, examples: ['pr-3'] },
+    });
+
+    const db = t.app.get(DbContext).db;
+    const [karim] = await db.select().from(patients).where(eq(patients.uhid, 26000010));
+    const admin = (await signIn(ADMIN.email, ADMIN.password).expect(200)).body.accessToken as string;
+    const get = (path: string) => request(http).get(`/api/v1/clinical/${path}`).set(bearer(admin)).expect(200);
+    const list = (await get(`patients/${karim!.id}/history`)).body.items as {
+      id: string;
+      kind: string;
+      title: string;
+    }[];
+    expect(list.map((entry) => entry.title)).toEqual([
+      'Laboratory report: CBC',
+      'Discharge certificate',
+      'Consultant visit note',
+      'Imaging report: X-ray chest',
+      'Laboratory report: CBC',
+      'Prescription',
+    ]);
+    const find = async (kind: string) => (await get(`history/${list.find((entry) => entry.kind === kind)!.id}`)).body;
+    expect((await find('prescription')).body).toBe(
+      [
+        'Complaints:',
+        '  Fever — 3 days',
+        '',
+        'Clinical impression:',
+        '  Viral fever',
+        '',
+        'Rx:',
+        '  1. Napa — 1+1+1 — 5 days',
+        '',
+        'Investigations:',
+        '  CBC',
+        '',
+        'Advice:',
+        '  Plenty of fluids',
+        '',
+        'Follow up on 2025-02-24',
+      ].join('\n'),
+    );
+    expect(await find('imaging-report')).toMatchObject({
+      number: 'Invoice 9002',
+      recordedOn: '2025-04-01',
+      body: 'Chest X-ray PA view\nNo active lesion & no effusion.',
+      shared: true,
+    });
+    expect((await find('discharge-summary')).body).toBe('Diagnosis: Dengue fever\nDischarged in good health.');
+
+    // Results followed over time; values kept as they were (the empty heading row dropped).
+    const trend = (await get(`patients/${karim!.id}/history/trend?test=hemoglobin`)).body.items;
+    expect(trend.map((point: { recordedOn: string; value: number }) => [point.recordedOn, point.value])).toEqual([
+      ['2025-03-01', 11.2],
+      ['2025-06-01', 12.8],
+    ]);
+    const first = (await get(`history/${trend[0].recordId}`)).body;
+    expect(first.values).toEqual([
+      { test: 'Hemoglobin', result: '11.2', unit: 'g/dL', reference: '12 - 16' },
+      { test: 'WBC', result: 'Normal', unit: null, reference: null },
+    ]);
+
+    // The patient sees what was finalised there (not the undelivered report, not the note); it prints.
+    const shared = (await t.app.get(PatientDocumentRegistry).list(karim!.id)).filter((doc) =>
+      doc.ref.startsWith('history:'),
+    );
+    expect(shared.map((doc) => doc.title).sort()).toEqual([
+      'Discharge certificate (old system)',
+      'Imaging report: X-ray chest (old system)',
+      'Laboratory report: CBC (old system)',
+      'Prescription (old system)',
+    ]);
+    await request(http)
+      .post('/api/v1/reports/clinical.history-record/render')
+      .set(bearer(admin))
+      .send({ format: 'pdf', params: shared[0]!.params })
+      .expect(200);
+
+    const again = await etl(false, histories);
     expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
   });
 

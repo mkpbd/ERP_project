@@ -1,0 +1,22 @@
+{{#with data}}
+<p>
+  <b>{{patient.name}}</b> · UHID {{patient.uhidLabel}} · {{patient.sex}}
+</p>
+<p>
+  <b>{{record.kindLabel}}</b>{{#if record.number}} · {{record.number}}{{/if}} · {{date record.recordedOn}}{{#if record.author}} · {{record.author}}{{/if}}
+  <br /><span class="muted">{{record.title}} — brought over from the old system as it was written there</span>
+</p>
+{{#if record.values.length}}
+<table class="report">
+  <thead><tr><th>Test</th><th style="width: 18%">Result</th><th style="width: 14%">Unit</th><th style="width: 26%">Reference</th></tr></thead>
+  <tbody>
+    {{#each record.values}}
+    <tr><td>{{test}}</td><td><b>{{result}}</b></td><td>{{unit}}</td><td style="white-space: pre-wrap">{{reference}}</td></tr>
+    {{/each}}
+  </tbody>
+</table>
+{{/if}}
+{{#if record.body}}
+<div style="white-space: pre-wrap; margin-top: 8px">{{record.body}}</div>
+{{/if}}
+{{/with}}

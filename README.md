@@ -47,7 +47,7 @@ Starts PostgreSQL (host port 55432) with separate owner/app roles, Mailpit (UI o
 | `npm run db:migrate:prod` | Same, from the compiled build (`dist/cli/migrate.js`). |
 | `npm run db:seed:dev` | Builds, then seeds development users/roles. Refuses to run in production. |
 | `npm run admin:bootstrap` | Idempotently creates the first super-admin from `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` (run `npm run build` first). |
-| `ETL_SOURCE_URL=… npm run etl -- [--dry-run] [--only=users,patients] [--batch=2000] [--cut-over=YYYY-MM-DD]` | Brings data over from the old system's SQL Server database (read-only login). Safe to re-run; `--dry-run` rolls everything back and prints what would happen; `--cut-over` (the first day this system keeps the books) brings the opening balances. See [docs/migration/13a-data-migration-framework.md](docs/migration/13a-data-migration-framework.md), [13b](docs/migration/13b-accounts-opening-balances.md), [13c](docs/migration/13c-hr.md), [13d](docs/migration/13d-catalogues-stock.md) and [13e](docs/migration/13e-open-documents-dues.md). |
+| `ETL_SOURCE_URL=… npm run etl -- [--dry-run] [--only=users,patients] [--batch=2000] [--cut-over=YYYY-MM-DD]` | Brings data over from the old system's SQL Server database (read-only login). Safe to re-run; `--dry-run` rolls everything back and prints what would happen; `--cut-over` (the first day this system keeps the books) brings the opening balances. See [docs/migration/13a-data-migration-framework.md](docs/migration/13a-data-migration-framework.md), [13b](docs/migration/13b-accounts-opening-balances.md), [13c](docs/migration/13c-hr.md), [13d](docs/migration/13d-catalogues-stock.md), [13e](docs/migration/13e-open-documents-dues.md) and [13f](docs/migration/13f-clinical-history.md). |
 
 Migrations never run automatically on startup. Destructive changes need a reviewed, explicit migration.
 
@@ -209,6 +209,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | writing, signing and correcting one's own prescriptions (the user must be a doctor's); one's own pick lists and templates | `rx:write` |
 | pick lists shared by every doctor (complaints, history, findings, diagnoses, advice, doses) and note templates | `rx:manage` |
 | `GET /clinical/admissions/:id/notes`, `/records`, pending handovers | `emr:read` |
+| `GET /clinical/patients/:id/history` (and `/trend?test=`), `GET /clinical/history/:id`: the old system's prescriptions, reports, discharge certificates and notes, brought over read-only | `emr:read` |
 | writing notes on admitted patients (rounds, consultations, procedures, transfers, ICU course, handovers), correcting one's own within 24 hours, acknowledging a handover to oneself | `emr:write` |
 | recording deaths and births of admitted patients, voiding one recorded in error | `emr:certify` |
 | ordering admitted patients' medicines (set times, every so many hours, once, when needed), holding, resuming and stopping them; writing, signing and reopening the discharge summary | `emr:order` |
