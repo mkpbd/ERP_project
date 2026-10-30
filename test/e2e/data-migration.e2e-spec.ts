@@ -20,6 +20,7 @@ import {
   admissions,
   beds,
   bedStays,
+  corporateClients,
   doctorLedger,
   doctors,
   ipdPayments,
@@ -37,8 +38,15 @@ import {
   staffDues,
   staffSalaries,
 } from '../../src/modules/payroll/infrastructure/persistence/payroll.schema.js';
-import { pharmacyMovements, products } from '../../src/modules/pharmacy/infrastructure/persistence/pharmacy.schema.js';
 import {
+  outletUsers,
+  pharmacyMovements,
+  products,
+} from '../../src/modules/pharmacy/infrastructure/persistence/pharmacy.schema.js';
+import {
+  departmentStoreAccess,
+  departmentUsers,
+  issueStoreUsers,
   items,
   stockLots,
   stockMovements,
@@ -566,6 +574,13 @@ const stock = {
     ],
     'SupplyChain.LotRecords': [{ Id: 'lot-1', BatchNo: 'L1', ExpireDate: '31/12/2028' }],
     'SupplyChain.StockReceiveDetails': [{ BrandExtensionId: 'v-1', PurchaseRate: 250 }],
+    'Pharmacy.PharmacistDutyOutlets': [
+      { Id: 'pdo-1', UserId: 'u-1', OutletId: 'o-1' },
+      { Id: 'pdo-2', UserId: 'u-3', OutletId: 'o-1' },
+    ],
+    'SupplyChain.StoreDeptUserAccesses': [{ Id: 'sdu-1', UserId: 'u-2', StoreDeptIds: 'sd-1, sd-gone' }],
+    'SupplyChain.DeptStoreAcesses': [{ Id: 'dsa-1', DeptId: 'sd-1', UserId: 'u-2', StoreId: 'ss-1' }],
+    'SupplyChain.IssueStoreAcesses': [{ Id: 'isa-1', UserId: 'u-1', StoreId: 'ss-1' }],
   } as Record<string, Record<string, unknown>[]>,
   products: [product('p-1', 'b-1'), product('p-2', 'b-1'), product('p-3', 'b-2')],
   variants: [variant('v-1', 'i-1', 'Double A 80 gsm', 400), variant('v-2', 'i-2', 'Standard', 9_000)],
@@ -621,6 +636,15 @@ const open: Record<string, Record<string, unknown>[]> = {
       ContactPerson: null,
       ContactNumber: null,
       IsCredit: true,
+      IsDeleted: false,
+    },
+    {
+      Id: 'cc-2',
+      Name: 'Robi',
+      Address: null,
+      ContactPerson: null,
+      ContactNumber: null,
+      IsCredit: false,
       IsDeleted: false,
     },
   ],
@@ -804,7 +828,15 @@ class FakeSource extends LegacySource {
     const clinical = /\[(Diag|Rx|EMR)\]\.\[(\w+)\]/.exec(sql);
     const reconciling = /\/\* reconcile:([\w:-]+) \*\//.exec(sql)?.[1];
     if (reconciling === 'books') rows = books.balances;
-    else if (reconciling) rows = [{ n: oldFigures[reconciling] ?? 0 }];
+    else if (sql.includes('[Diag].[DiscountGroupDetails]')) {
+      // Each client's discount group, test by test: one percent for Grameenphone, two for Robi.
+      rows = [
+        { ClientId: 'cc-1', Name: 'Grameenphone', Percent: 10, Gross: 0 },
+        { ClientId: 'cc-1', Name: 'Grameenphone', Percent: 10, Gross: 0 },
+        { ClientId: 'cc-2', Name: 'Robi', Percent: 10, Gross: 0 },
+        { ClientId: 'cc-2', Name: 'Robi', Percent: 15, Gross: 0 },
+      ];
+    } else if (reconciling) rows = [{ n: oldFigures[reconciling] ?? 0 }];
     else if (clinical && sql.includes('OPENJSON(@ids)')) {
       const ids = (JSON.parse(params['ids'] as string) as string[]).map((id) => id.toLowerCase());
       rows = (history.children[`${clinical[1]}.${clinical[2]}`] ?? []).filter((row) =>
@@ -1190,7 +1222,7 @@ describe('data migration', () => {
     const real = await etl(false, openings);
     expect(counts(real)).toEqual(counts(dry));
     expect(counts(real)).toMatchObject({
-      'corporate-clients': [1, 0, 0],
+      'corporate-clients': [2, 0, 0],
       'bed-categories': [2, 0, 0],
       beds: [2, 0, 0],
       'open-admissions': [1, 0, 2],
@@ -1431,6 +1463,56 @@ describe('data migration', () => {
       .set(bearer(admin))
       .send({ format: 'pdf', params: { runId: loaderRun.id } });
     expect(refused.body.code).toBe('not_a_reconciliation');
+  });
+
+  it('gives users their outlets and stores again, and corporate clients their discount', async () => {
+    const access = {
+      only: [
+        'pharmacist-outlets',
+        'store-department-users',
+        'department-store-access',
+        'issue-store-users',
+        'corporate-discounts',
+      ],
+    };
+    const real = await etl(false, access);
+    expect(counts(real)).toMatchObject({
+      'pharmacist-outlets': [1, 0, 1],
+      'store-department-users': [1, 0, 1],
+      'department-store-access': [1, 0, 0],
+      'issue-store-users': [1, 0, 0],
+      'corporate-discounts': [1, 0, 0],
+    });
+    const report = (loader: string) => real.reports.find((entry) => entry.loader === loader)!;
+    expect(report('pharmacist-outlets').reasons).toEqual({ user_not_brought: { count: 1, examples: ['pdo-2'] } });
+    expect(report('store-department-users').reasons).toEqual({
+      store_department_not_brought: { count: 1, examples: ['sdu-1/sd-gone'] },
+    });
+    expect(report('corporate-discounts').notes).toEqual([
+      "Grameenphone: 10% on its people's bills",
+      'Robi: 2 different percents (10, 15) per test in the old system; set its discount by hand',
+    ]);
+
+    const db = t.app.get(DbContext).db;
+    const [rana] = await db.select().from(users).where(eq(users.username, 'rana'));
+    const [nusrat] = await db.select().from(users).where(eq(users.username, 'nusrat'));
+    expect(await db.select({ userId: outletUsers.userId }).from(outletUsers)).toEqual([{ userId: rana!.id }]);
+    expect(await db.select({ userId: departmentUsers.userId }).from(departmentUsers)).toEqual([{ userId: nusrat!.id }]);
+    expect(await db.select({ userId: departmentStoreAccess.userId }).from(departmentStoreAccess)).toEqual([
+      { userId: nusrat!.id },
+    ]);
+    expect(await db.select({ userId: issueStoreUsers.userId }).from(issueStoreUsers)).toEqual([{ userId: rana!.id }]);
+    const clients = await db
+      .select({ name: corporateClients.name, discount: corporateClients.discountPercent })
+      .from(corporateClients)
+      .orderBy(corporateClients.name);
+    expect(clients).toEqual([
+      { name: 'Grameenphone', discount: 10 },
+      { name: 'Robi', discount: 0 },
+    ]);
+
+    const again = await etl(false, access);
+    expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
   });
 
   it('leaves the opening balances out without a cut-over day', async () => {

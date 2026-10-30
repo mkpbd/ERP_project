@@ -1,6 +1,7 @@
 # Step 13g — Cut-over: rehearsals, reconciliation and the go-live runbook
 
-Status: **done** (2026-10-31). Previous: [step 13f](13f-clinical-history.md). This closes step 13 and the port.
+Status: **done** (2026-10-31). Previous: [step 13f](13f-clinical-history.md) · Next: [step 14a](14a-access-and-discounts.md).
+This closes step 13 and the port as planned; step 14 fills gaps step 13 left to set by hand.
 
 This is the plan for the night the hospital moves from the old system to this one. It has three parts:
 
