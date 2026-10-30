@@ -64,6 +64,7 @@ export async function runEtl(params: {
   only: readonly string[] | null;
   dryRun: boolean;
   batchSize?: number;
+  cutOver?: string | null;
   now?: Date;
   log?: (report: LoaderReport) => void;
 }): Promise<EtlRun> {
@@ -80,7 +81,16 @@ export async function runEtl(params: {
   const reports: LoaderReport[] = [];
   const runLoader = async (loader: Loader, ids: IdMap) => {
     const report = newReport(loader.name);
-    await loader.run({ source: params.source, ids, now, batchSize: params.batchSize ?? 2000 }, report);
+    await loader.run(
+      {
+        source: params.source,
+        ids,
+        now,
+        batchSize: params.batchSize ?? 2000,
+        cutOver: params.cutOver ?? null,
+      },
+      report,
+    );
     reports.push(report);
     params.log?.(report);
   };

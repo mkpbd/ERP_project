@@ -100,8 +100,8 @@ Order follows dependencies: later modules reference earlier ones.
 | 12c | Communication: health tips published on the patient portal (English and Bangla, pinned, publishing window), notices to users and roles with read marks, live chat between portal patients and staff (take, reply, close, unread counts) | **Done** | [12c-communication.md](12c-communication.md) |
 | 12d | Activity log: the activity summary (by day, hour, module, action; failures, denials, active users), sign-in history, a user's sessions for administrators, audit log / activity / sign-in prints | **Done** | [12d-activity-log.md](12d-activity-log.md) |
 | 13a | Data migration framework: the `npm run etl` tool (SQL Server source by environment variable, dry run in a rolled-back transaction, id map for safe re-runs, run log); users and roles (old password hashes accepted, then rehashed), specialities, doctors, patients (UHIDs kept, counters moved on) | **Done** | [13a-data-migration-framework.md](13a-data-migration-framework.md) |
-| 13b | Data migration: chart of accounts, cost centres, opening ledger balances at the cut-over date | Next | |
-| 13c | Data migration: HR staff, departments, designations, leave balances | Planned | |
+| 13b | Data migration: chart of accounts (natures to GL accounts), cost centres, banks, sub-ledgers, journals, fiscal years, hard-coded posting roles; opening balances as one posted voucher at the cut-over, checked account by account against the old books | **Done** | [13b-accounts-opening-balances.md](13b-accounts-opening-balances.md) |
+| 13c | Data migration: HR staff, departments, designations, leave balances | Next | |
 | 13d | Data migration: supply chain and pharmacy catalogues, suppliers, opening stock lots | Planned | |
 | 13e | Data migration: open documents and dues (admitted patients, unpaid bills, member and corporate dues) | Planned | |
 | 13f | Data migration: clinical history (prescriptions, lab results) | Planned | |

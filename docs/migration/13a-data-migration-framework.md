@@ -1,7 +1,6 @@
 # Step 13a — Data migration: the framework, users, doctors, patients
 
-Status: **done** (2026-10-30). Previous: [step 12d](12d-activity-log.md) · Next: step 13b (accounts and opening
-balances).
+Status: **done** (2026-10-30). Previous: [step 12d](12d-activity-log.md) · Next: [step 13b](13b-accounts-opening-balances.md).
 
 Step 13 moves the old system's data into this one. It is split:
 

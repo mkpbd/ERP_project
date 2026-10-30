@@ -2,7 +2,7 @@
  * The data migration from the old system (SQL Server) into this one.
  *
  *   ETL_SOURCE_URL="Server=…;Database=…;User Id=<read-only>;Password=…;Encrypt=true" npm run etl -- [--dry-run]
- *     [--only=users,patients] [--batch=2000]
+ *     [--only=users,patients] [--batch=2000] [--cut-over=2027-01-01]
  *
  * Loaders run with what they depend on, in order. Records already brought over (etl_id_map) are kept, so a run may be
  * repeated. --dry-run does everything in one transaction and rolls it back, printing what would have happened.
@@ -25,9 +25,14 @@ const flag = (name: string) => args.find((arg) => arg.startsWith(`--${name}=`))?
 const dryRun = args.includes('--dry-run');
 const only = flag('only')?.split(',').filter(Boolean) ?? null;
 const batchSize = Number(flag('batch') ?? 2000);
+const cutOver = flag('cut-over') ?? null;
 const sourceUrl = process.env['ETL_SOURCE_URL'];
 if (!sourceUrl) {
   console.error('Set ETL_SOURCE_URL to the old SQL Server database (a read-only login)');
+  process.exit(1);
+}
+if (cutOver !== null && (!/^\d{4}-\d{2}-\d{2}$/.test(cutOver) || Number.isNaN(Date.parse(cutOver)))) {
+  console.error('--cut-over is a day, YYYY-MM-DD (the first day this system keeps the books)');
   process.exit(1);
 }
 if (!Number.isInteger(batchSize) || batchSize < 100 || batchSize > 50_000) {
@@ -50,6 +55,7 @@ try {
     only,
     dryRun,
     batchSize,
+    cutOver,
     log: (report) => {
       console.log(
         `${report.loader.padEnd(14)} read ${report.read}, written ${report.written}, kept ${report.kept}, rejected ${report.rejected}`,

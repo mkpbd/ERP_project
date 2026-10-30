@@ -47,7 +47,7 @@ Starts PostgreSQL (host port 55432) with separate owner/app roles, Mailpit (UI o
 | `npm run db:migrate:prod` | Same, from the compiled build (`dist/cli/migrate.js`). |
 | `npm run db:seed:dev` | Builds, then seeds development users/roles. Refuses to run in production. |
 | `npm run admin:bootstrap` | Idempotently creates the first super-admin from `BOOTSTRAP_ADMIN_EMAIL` / `BOOTSTRAP_ADMIN_PASSWORD` (run `npm run build` first). |
-| `ETL_SOURCE_URL=… npm run etl -- [--dry-run] [--only=users,patients] [--batch=2000]` | Brings data over from the old system's SQL Server database (read-only login). Safe to re-run; `--dry-run` rolls everything back and prints what would happen. See [docs/migration/13a-data-migration-framework.md](docs/migration/13a-data-migration-framework.md). |
+| `ETL_SOURCE_URL=… npm run etl -- [--dry-run] [--only=users,patients] [--batch=2000] [--cut-over=YYYY-MM-DD]` | Brings data over from the old system's SQL Server database (read-only login). Safe to re-run; `--dry-run` rolls everything back and prints what would happen; `--cut-over` (the first day this system keeps the books) brings the opening balances. See [docs/migration/13a-data-migration-framework.md](docs/migration/13a-data-migration-framework.md) and [13b](docs/migration/13b-accounts-opening-balances.md). |
 
 Migrations never run automatically on startup. Destructive changes need a reviewed, explicit migration.
 

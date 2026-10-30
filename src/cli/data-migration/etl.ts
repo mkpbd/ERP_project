@@ -30,6 +30,8 @@ export interface EtlContext {
   readonly now: Date;
   /** Rows read at a time. */
   readonly batchSize: number;
+  /** The day this system takes over (YYYY-MM-DD): opening balances are the old books' up to the day before. */
+  readonly cutOver: string | null;
 }
 
 /** One kind of record brought over: reads the old rows, transforms them, writes what is new. */
