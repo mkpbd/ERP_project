@@ -1,11 +1,13 @@
 import { Module } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
+import { PORTAL_ENGAGEMENT_HANDLERS } from './application/portal-engagement.handlers.js';
 import { PORTAL_HANDLERS } from './application/portal.handlers.js';
 import { OtpHasher, PortalRepository, PortalTokens, SmsSender } from './application/portal.ports.js';
 import { DrizzlePortalRepository } from './infrastructure/persistence/drizzle-portal.repository.js';
 import { HmacOtpHasher, JwtPortalTokens, LogSmsSender } from './infrastructure/security/portal-security.js';
 import { PortalController } from './presentation/portal.controllers.js';
+import { PortalEngagementController } from './presentation/portal-engagement.controller.js';
 import { PortalGuard } from './presentation/portal.guard.js';
 
 /**
@@ -14,9 +16,10 @@ import { PortalGuard } from './presentation/portal.guard.js';
  * modules that own them (PatientDocumentRegistry) and printed through the DocumentPrinter.
  */
 @Module({
-  controllers: [PortalController],
+  controllers: [PortalController, PortalEngagementController],
   providers: [
     ...PORTAL_HANDLERS,
+    ...PORTAL_ENGAGEMENT_HANDLERS,
     PortalGuard,
     { provide: PortalRepository, useClass: DrizzlePortalRepository },
     { provide: PortalTokens, useClass: JwtPortalTokens },

@@ -235,6 +235,9 @@ export class StubAccessControl extends AccessControl {
   roleExists(): Promise<boolean> {
     return Promise.resolve(true);
   }
+  usersWithRoles(): Promise<string[]> {
+    return Promise.resolve([]);
+  }
   invalidateUser(userId: string): void {
     this.invalidated.push(userId);
   }

@@ -1,7 +1,6 @@
 # Step 12b — Marketing: the team, doctors looked after, targets and achievement
 
-Status: **done** (2026-10-30). Previous: [step 12a](12a-canteen.md) · Next: step 12c (others: health tips,
-notices, chat).
+Status: **done** (2026-10-30). Previous: [step 12a](12a-canteen.md) · Next: [step 12c](12c-communication.md).
 
 What this step adds, in a new `marketing` module:
 

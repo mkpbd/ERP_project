@@ -91,6 +91,10 @@ export class AccessControlService extends AccessControl {
     return (await this.roles.findById(roleId)) !== null;
   }
 
+  usersWithRoles(roleIds: readonly string[]): Promise<string[]> {
+    return roleIds.length === 0 ? Promise.resolve([]) : this.userRoles.userIdsWithRoleIds(roleIds);
+  }
+
   invalidateUser(userId: string): void {
     this.cache.delete(userId);
   }

@@ -43,5 +43,8 @@ export abstract class AccessControl {
 
   abstract roleExists(roleId: string): Promise<boolean>;
 
+  /** Users holding any of the roles (by id), each once. */
+  abstract usersWithRoles(roleIds: readonly string[]): Promise<string[]>;
+
   abstract invalidateUser(userId: string): void;
 }

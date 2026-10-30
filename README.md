@@ -221,6 +221,9 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | selling at one's canteen outlets, cancelling the day's sales, taking members' dues | `canteen:sell` |
 | `GET /marketing/*` (zones, areas, the team, officers' doctors, performance) | `mkt:read` |
 | the marketing team, zones and areas, the doctors each officer looks after, monthly targets | `mkt:manage` |
+| health tips (published on the portal's `GET /portal/health-tips` to anyone) | `content:manage` |
+| sending notices to users and roles, seeing what was sent and read (one's own notices need no permission) | `notice:send` |
+| answering patients' portal chats: taking them (over), replying, closing | `chat:answer` |
 | `GET` a doctor's ledger (shares earned, taken back, paid) | `opd:read` |
 | `GET` admissions, the bed board, wards, bed categories and beds | `ipd:read` |
 | admitting (with an advance), moving beds, changing doctors, discharging on the day of the final bill; making a bed ready | `ipd:admit` |

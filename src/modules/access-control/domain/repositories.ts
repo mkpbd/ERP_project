@@ -19,6 +19,7 @@ export abstract class UserRoleRepository {
   /** Returns false when there was no such assignment. */
   abstract unassign(userId: string, roleId: string): Promise<boolean>;
   abstract userIdsWithRole(roleName: string): Promise<string[]>;
+  abstract userIdsWithRoleIds(roleIds: readonly string[]): Promise<string[]>;
 }
 
 export abstract class PermissionRepository {

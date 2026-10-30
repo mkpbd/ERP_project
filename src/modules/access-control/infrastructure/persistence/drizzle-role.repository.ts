@@ -148,6 +148,14 @@ export class DrizzleUserRoleRepository extends UserRoleRepository {
       .where(eq(roles.name, roleName));
     return rows.map((row) => row.userId);
   }
+
+  async userIdsWithRoleIds(roleIds: readonly string[]): Promise<string[]> {
+    const rows = await this.context.db
+      .selectDistinct({ userId: userRoles.userId })
+      .from(userRoles)
+      .where(inArray(userRoles.roleId, [...roleIds]));
+    return rows.map((row) => row.userId);
+  }
 }
 
 @Injectable()

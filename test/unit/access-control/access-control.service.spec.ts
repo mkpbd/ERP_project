@@ -68,6 +68,12 @@ class FakeUserRoles extends UserRoleRepository {
     const role = await this.roles.findByName(roleName);
     return [...this.assignments].filter((key) => key.endsWith(`:${role?.id}`)).map((key) => key.split(':')[0]!);
   };
+  userIdsWithRoleIds = (roleIds: readonly string[]) =>
+    Promise.resolve([
+      ...new Set(
+        [...this.assignments].filter((key) => roleIds.includes(key.split(':')[1]!)).map((key) => key.split(':')[0]!),
+      ),
+    ]);
 }
 
 class FakeDirectory extends UserDirectory {
