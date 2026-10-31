@@ -13,6 +13,8 @@ export const IPD_ADMIT = 'ipd:admit';
 export const IPD_MANAGE = 'ipd:manage';
 
 export interface AdmissionFilter extends PageRequest {
+  /** The patient's name, UHID or the admission number. */
+  readonly q?: string | undefined;
   readonly status?: AdmissionStatus | undefined;
   readonly patientId?: string | undefined;
   readonly doctorId?: string | undefined;

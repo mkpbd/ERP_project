@@ -1,6 +1,6 @@
 # Step 15a — Operation theatre
 
-Status: **done** (2026-10-31). Previous: [step 14c](14c-rehearsal-1.md).
+Status: **done** (2026-10-31). Previous: [step 14c](14c-rehearsal-1.md) · Screens: [step 16a](16a-ot-screens.md).
 
 The first gap the page-by-page check of the old UI found (14c): the old system's operation theatre had no API here.
 
@@ -145,7 +145,7 @@ Charges for an operation need `ipd:bill`, as any charge does.
 * **OT note templates.** The old `OTTemplates` had copy-in text. The surgery procedures library takes their place;
   bringing old templates over is a data migration step.
 * **The old OT records.** Bringing old operations and notes into the history is a data migration step.
-* **Screens.** The Angular screens for the OT come with the OT's turn in the UI steps.
+* **Screens.** Done in [step 16a](16a-ot-screens.md).
 
 ## Verification
 

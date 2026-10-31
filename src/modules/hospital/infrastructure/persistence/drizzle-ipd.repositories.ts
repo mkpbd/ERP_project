@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { Inject, Injectable } from '@nestjs/common';
-import { aliasedTable, and, asc, count, desc, eq, inArray, isNull, sql } from 'drizzle-orm';
+import { aliasedTable, and, asc, count, desc, eq, ilike, inArray, isNull, or, sql } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { offsetOf, toPage, type Page } from '../../../../shared/application/pagination.js';
+import { escapeLike } from '../../../../shared/infrastructure/persistence/pg-errors.js';
 import {
   AdmissionReadRepository,
   type AdmissionFilter,
@@ -176,7 +177,15 @@ export class DrizzleAdmissionReadRepository extends AdmissionReadRepository {
   }
 
   async list(filter: AdmissionFilter): Promise<Page<AdmissionSummary>> {
+    const q = filter.q?.trim();
     const where = and(
+      q
+        ? or(
+            /^d{1,15}$/.test(q) ? eq(patients.uhid, Number(q)) : undefined,
+            ilike(admissions.number, `%${escapeLike(q)}%`),
+            ilike(patients.fullName, `%${escapeLike(q)}%`),
+          )
+        : undefined,
       filter.status ? eq(admissions.status, filter.status) : undefined,
       filter.patientId ? eq(admissions.patientId, filter.patientId) : undefined,
       filter.doctorId
@@ -197,7 +206,12 @@ export class DrizzleAdmissionReadRepository extends AdmissionReadRepository {
         .orderBy(desc(admissions.admittedAt))
         .limit(filter.pageSize)
         .offset(offsetOf(filter)),
-      this.context.db.select({ n: count() }).from(admissions).leftJoin(beds, eq(beds.id, lastStay)).where(where),
+      this.context.db
+        .select({ n: count() })
+        .from(admissions)
+        .innerJoin(patients, eq(patients.id, admissions.patientId))
+        .leftJoin(beds, eq(beds.id, lastStay))
+        .where(where),
     ]);
     return toPage(rows, total?.n ?? 0, filter);
   }

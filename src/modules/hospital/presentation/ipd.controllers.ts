@@ -182,6 +182,7 @@ class BedStatusDto extends createZodDto(z.strictObject({ status: z.enum(['availa
 class AdmissionListQueryDto extends createZodDto(
   z.object({
     ...paginationShape,
+    q: z.string().trim().min(1).max(150).optional(),
     status: z.enum(['admitted', 'discharged', 'cancelled']).optional(),
     patientId: z.uuid().optional(),
     doctorId: z.uuid().optional(),

@@ -295,6 +295,12 @@ describe('admissions, beds and discharge', () => {
     // Discharged and cancelled, Karim can be admitted again.
     await api('post', 'admissions', officer, { patientId: karim, bedId: bed['W-1'], doctorId: nusrat }).expect(201);
     expect((await api('get', 'admissions?status=admitted', officer).expect(200)).body.total).toBe(1);
+    // Found by the patient's name or the admission number.
+    const found = await api('get', 'admissions?q=karim&status=admitted', officer).expect(200);
+    expect(found.body.items.map((row: { patientName: string }) => row.patientName)).toEqual(['Abdul Karim']);
+    const byNumber = await api('get', `admissions?q=${found.body.items[0].number}`, officer).expect(200);
+    expect(byNumber.body.total).toBe(1);
+    expect((await api('get', 'admissions?q=nobody', officer).expect(200)).body.total).toBe(0);
 
     await request(http)
       .post('/api/v1/reports/hospital.admission-form/render')
