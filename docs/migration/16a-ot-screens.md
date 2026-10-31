@@ -1,6 +1,7 @@
 # Step 16a — Operation theatre screens (Angular)
 
-Status: **done** (2026-10-31). Previous: [step 15a](15a-operation-theatre.md) (its API).
+Status: **done** (2026-10-31). Previous: [step 15a](15a-operation-theatre.md) (its API) · Next:
+[step 16b](16b-lab-screens.md).
 
 The first screens of the HealthCare modules in the Angular frontend (`D:\Pratices\ERP_Frontend`,
 `mkpbd/ERP_frontend`, commit `82610c7`). As agreed, each module's screens come with (or right after) its API:
