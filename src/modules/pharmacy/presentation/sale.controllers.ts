@@ -6,9 +6,13 @@ import { CurrentUser, RequirePermissions } from '../../../shared/presentation/au
 import { IdParamDto } from '../../../shared/presentation/zod/common.schemas.js';
 import {
   CancelSaleCommand,
+  CollectCorporateDueCommand,
   CollectDueCommand,
+  CollectStaffDueCommand,
+  GetCorporateDuesQuery,
   GetDiscountPolicyQuery,
   GetMemberDuesQuery,
+  GetStaffDuesQuery,
   GetSaleQuery,
   ListSalesQuery,
   MakeSaleCommand,
@@ -19,6 +23,7 @@ import {
   PharmacyCancelSaleDto,
   PharmacyCollectDto,
   PharmacyCollectedResponseDto,
+  PharmacyCorporateDuesResponseDto,
   PharmacyDiscountPolicyDto,
   PharmacyDiscountPolicyResponseDto,
   PharmacyMemberDuesResponseDto,
@@ -29,6 +34,7 @@ import {
   PharmacySalePageResponseDto,
   PharmacySaleResponseDto,
   PharmacySoldResponseDto,
+  PharmacyStaffDuesResponseDto,
 } from './dto/sale.dto.js';
 
 @ApiTags('pharmacy')
@@ -91,6 +97,8 @@ export class PharmacySalesController {
         dto.customerName,
         dto.mobileNo,
         dto.loyalMemberId,
+        dto.corporateClientId,
+        dto.staffId,
         dto.lines,
         dto.method,
         dto.reference,
@@ -122,6 +130,42 @@ export class PharmacySalesController {
   collect(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PharmacyCollectDto) {
     return this.commandBus.execute(
       new CollectDueCommand(actor, params.id, dto.collectedOn, dto.amount, dto.method, dto.reference),
+    );
+  }
+
+  @Get('corporate-clients/:id/dues')
+  @RequirePermissions('pharmacy:read')
+  @ApiOperation({ summary: "A company's pharmacy credit sales still owing, and all it owes against its limit" })
+  @ApiOkResponse({ type: PharmacyCorporateDuesResponseDto })
+  corporateDues(@CurrentUser() actor: Actor, @Param() params: IdParamDto) {
+    return this.queryBus.execute(new GetCorporateDuesQuery(actor, params.id));
+  }
+
+  @Post('corporate-clients/:id/collections')
+  @RequirePermissions('pharmacy:sell')
+  @ApiOperation({ summary: "Collect a company's payment against its pharmacy credit sales, oldest first" })
+  @ApiCreatedResponse({ type: PharmacyCollectedResponseDto })
+  collectCorporate(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PharmacyCollectDto) {
+    return this.commandBus.execute(
+      new CollectCorporateDueCommand(actor, params.id, dto.collectedOn, dto.amount, dto.method, dto.reference),
+    );
+  }
+
+  @Get('staff/:id/dues')
+  @RequirePermissions('pharmacy:read')
+  @ApiOperation({ summary: "A staff member's staff ledger balance and latest pharmacy credit sales" })
+  @ApiOkResponse({ type: PharmacyStaffDuesResponseDto })
+  staffDues(@CurrentUser() actor: Actor, @Param() params: IdParamDto) {
+    return this.queryBus.execute(new GetStaffDuesQuery(actor, params.id));
+  }
+
+  @Post('staff/:id/collections')
+  @RequirePermissions('pharmacy:sell')
+  @ApiOperation({ summary: 'Collect what a staff member pays against their staff ledger' })
+  @ApiCreatedResponse({ type: PharmacyCollectedResponseDto })
+  collectStaff(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: PharmacyCollectDto) {
+    return this.commandBus.execute(
+      new CollectStaffDueCommand(actor, params.id, dto.collectedOn, dto.amount, dto.method, dto.reference),
     );
   }
 }

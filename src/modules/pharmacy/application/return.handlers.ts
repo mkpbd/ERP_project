@@ -22,7 +22,7 @@ import {
 import {
   PHARMACY_COGS_ROLE,
   PHARMACY_DISCOUNT_ROLE,
-  PHARMACY_RECEIVABLE_ROLE,
+  receivableRole,
   PHARMACY_SALES_ROLE,
   RECEIPT_ROLES,
   SaleDesk,
@@ -102,7 +102,7 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
           ? [{ account: { role: RECEIPT_ROLES[sale.method] }, debit: 0, credit: given.paidBack, narration }]
           : []),
         ...(given.dueReduced > 0
-          ? [{ account: { role: PHARMACY_RECEIVABLE_ROLE }, debit: 0, credit: given.dueReduced, narration }]
+          ? [{ account: { role: receivableRole(sale.debtor) }, debit: 0, credit: given.dueReduced, narration }]
           : []),
         ...(given.cost - given.damagedCost > 0
           ? [
@@ -135,6 +135,7 @@ export class ReturnSaleHandler implements ICommandHandler<ReturnSaleCommand> {
         await keeper.putIn(sale.outletId, restocked, { id, number, on: returnedOn }, 'sale_return');
       }
       await this.sales.sales.update(sale);
+      await this.sales.staffEntry(sale, returnedOn, narration, given.dueReduced, false);
       await this.returns.insert({
         id,
         number,

@@ -30,6 +30,10 @@ export class PharmacySaleDto extends createZodDto(
     customerName: optionalText(150).default(null),
     mobileNo: optionalText(20).default(null),
     loyalMemberId: ref.nullable().default(null),
+    /** The company the due is left with (on credit, within its limit). */
+    corporateClientId: ref.nullable().default(null),
+    /** The staff member whose ledger the due goes to. */
+    staffId: ref.nullable().default(null),
     lines: saleLines,
     method: method.default('cash'),
     reference: optionalText(100).default(null),
@@ -52,6 +56,8 @@ export class PharmacySaleListQueryDto extends createZodDto(
     ...paginationShape,
     outletId: ref.optional(),
     loyalMemberId: ref.optional(),
+    corporateClientId: ref.optional(),
+    staffId: ref.optional(),
     status: z.string().trim().max(30).optional(),
     from: day.optional(),
     to: day.optional(),
@@ -106,6 +112,10 @@ const saleShape = {
   mobileNo: z.string().nullable(),
   loyalMemberId: z.uuid().nullable(),
   loyalMemberName: z.string().nullable(),
+  corporateClientId: z.uuid().nullable(),
+  corporateClientName: z.string().nullable(),
+  staffId: z.uuid().nullable(),
+  staffName: z.string().nullable(),
   total: z.number(),
   paid: z.number(),
   due: z.number(),
@@ -132,19 +142,36 @@ export class PharmacySaleResponseDto extends responseDto({
   soldBy: z.uuid().nullable(),
   lines: z.array(z.object({ ...lineShape, returnedQty: z.int() })),
 }) {}
+const dueSales = z.array(
+  z.object({
+    saleId: z.uuid(),
+    number: z.string(),
+    soldOn: z.string(),
+    total: z.number(),
+    due: z.number(),
+    collected: z.number(),
+  }),
+);
 export class PharmacyMemberDuesResponseDto extends responseDto({
   loyalMemberId: z.uuid(),
   name: z.string(),
   contactNo: z.string(),
   due: z.number(),
-  sales: z.array(
-    z.object({
-      saleId: z.uuid(),
-      number: z.string(),
-      soldOn: z.string(),
-      total: z.number(),
-      due: z.number(),
-      collected: z.number(),
-    }),
-  ),
+  sales: dueSales,
+}) {}
+export class PharmacyCorporateDuesResponseDto extends responseDto({
+  corporateClientId: z.uuid(),
+  name: z.string(),
+  payment: z.enum(['cash', 'credit']),
+  creditLimit: z.number().nullable(),
+  owed: z.number(),
+  due: z.number(),
+  sales: dueSales,
+}) {}
+export class PharmacyStaffDuesResponseDto extends responseDto({
+  staffId: z.uuid(),
+  employeeNo: z.string(),
+  fullName: z.string(),
+  balance: z.number(),
+  sales: dueSales,
 }) {}

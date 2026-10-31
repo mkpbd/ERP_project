@@ -174,13 +174,17 @@ export abstract class DiscountRules {
 export interface CollectionRecord {
   readonly id: string;
   readonly number: string;
-  readonly loyalMemberId: string;
+  /** Who paid: exactly one of them. */
+  readonly loyalMemberId: string | null;
+  readonly corporateClientId: string | null;
+  readonly staffId: string | null;
   readonly collectedOn: string;
   readonly method: 'cash' | 'card' | 'mobile';
   readonly reference: string | null;
   readonly amount: number;
   readonly voucherNumber: string | null;
   readonly createdBy: string;
+  /** The sales it settles; none for a staff member (their staff ledger takes it). */
   readonly lines: readonly { saleId: string; amount: number }[];
 }
 
@@ -192,6 +196,8 @@ export abstract class SaleRepository {
   abstract memberIsActive(loyalMemberId: string): Promise<boolean | null>;
   /** The member's completed sales with a due, locked. */
   abstract memberDues(loyalMemberId: string): Promise<SaleDue[]>;
+  /** The company's completed credit sales with a due, locked. */
+  abstract corporateDues(corporateClientId: string): Promise<SaleDue[]>;
   abstract insertCollection(collection: CollectionRecord): Promise<void>;
 }
 

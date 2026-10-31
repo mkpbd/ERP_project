@@ -2,7 +2,9 @@ import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { InpatientMedicine } from '../../shared/application/contracts/inpatient-medicine.js';
 import { MedicineCatalogue } from '../../shared/application/contracts/medicine-catalogue.js';
+import { PharmacyCredit } from '../../shared/application/contracts/pharmacy-credit.js';
 import { DrizzleMedicineCatalogue } from './infrastructure/persistence/drizzle-medicine-catalogue.js';
+import { DrizzlePharmacyCredit } from './infrastructure/persistence/drizzle-pharmacy-credit.js';
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { SupplierDirectory } from '../../shared/application/contracts/supplier-directory.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
@@ -17,7 +19,7 @@ import { COUNT_HANDLERS } from './application/count.handlers.js';
 import { CountReadRepository } from './application/count.messages.js';
 import { RETURN_HANDLERS } from './application/return.handlers.js';
 import { ReturnReadRepository } from './application/return.messages.js';
-import { SALE_HANDLERS } from './application/sale.handlers.js';
+import { SALE_HANDLERS, SaleDesk } from './application/sale.handlers.js';
 import { SaleReadRepository } from './application/sale.messages.js';
 import { TRANSFER_HANDLERS } from './application/transfer.handlers.js';
 import { WARD_HANDLERS } from './application/ward.handlers.js';
@@ -88,7 +90,7 @@ import { PURCHASE_CONTROLLERS } from './presentation/purchase.controllers.js';
 import { SUPPLIER_CONTROLLERS } from './presentation/supplier.controllers.js';
 import { transferReport } from './infrastructure/reports/transfer.reports.js';
 import { TRANSFER_CONTROLLERS } from './presentation/transfer.controllers.js';
-import { memberDuesReport, saleReceiptReport } from './infrastructure/reports/sale.reports.js';
+import { dueReceiptReport, memberDuesReport, saleReceiptReport } from './infrastructure/reports/sale.reports.js';
 import { SALE_CONTROLLERS } from './presentation/sale.controllers.js';
 import { returnReceiptReport } from './infrastructure/reports/return.reports.js';
 import { RETURN_CONTROLLERS } from './presentation/return.controllers.js';
@@ -113,8 +115,10 @@ import {
  * supplier payments over receives and supplier returns settled by replacements (step 8c); outlet indents and
  * transfers between outlets (step 8d); counter sales with discount rules, loyal members and their dues (step 8e);
  * returns from customers within the return period (step 8f); stock counts applied lot by lot (step 8g); stock, trade and cash counter reports (step 8h);
- * ward indents, medicine sent to and back from the wards for admitted patients, charged to their indoor bills (step 8i).
- * Global: it publishes the medicine charged to admissions (InpatientMedicine) for the hospital's indoor bill.
+ * ward indents, medicine sent to and back from the wards for admitted patients, charged to their indoor bills (step 8i);
+ * credit sales to corporate clients and staff, and their collection (step 15d).
+ * Global: it publishes the medicine charged to admissions (InpatientMedicine) for the hospital's indoor bill, and
+ * what companies owe it (PharmacyCredit) for their credit limit.
  */
 @Global()
 @Module({
@@ -163,8 +167,9 @@ import {
     { provide: WardReadRepository, useClass: DrizzleWardReadRepository },
     { provide: InpatientMedicine, useClass: DrizzleInpatientMedicine },
     { provide: MedicineCatalogue, useClass: DrizzleMedicineCatalogue },
+    { provide: PharmacyCredit, useClass: DrizzlePharmacyCredit },
   ],
-  exports: [InpatientMedicine, MedicineCatalogue],
+  exports: [InpatientMedicine, MedicineCatalogue, PharmacyCredit],
 })
 export class PharmacyModule implements OnModuleInit {
   constructor(
@@ -182,6 +187,7 @@ export class PharmacyModule implements OnModuleInit {
     private readonly users: UserDirectory,
     private readonly wards: WardReadRepository,
     private readonly inpatients: InpatientRegister,
+    private readonly saleDesk: SaleDesk,
   ) {}
 
   onModuleInit(): void {
@@ -193,7 +199,9 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(supplierPaymentReport(this.suppliers));
     this.reports.register(supplierReturnReport(this.suppliers));
     this.reports.register(transferReport(this.transfers));
-    this.reports.register(saleReceiptReport(this.sales));
+    const named = this.saleDesk.named.bind(this.saleDesk);
+    this.reports.register(saleReceiptReport(this.sales, named));
+    this.reports.register(dueReceiptReport(this.sales, named));
     this.reports.register(memberDuesReport(this.sales));
     this.reports.register(returnReceiptReport(this.returns));
     this.reports.register(countSheetReport(this.counts));

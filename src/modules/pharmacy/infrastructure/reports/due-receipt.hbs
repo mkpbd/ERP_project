@@ -1,0 +1,44 @@
+<style>
+  /* An 80 mm roll: 70 mm of print inside the 5 mm margins. */
+  .receipt { width: 70mm; font-size: 8pt; line-height: 1.3; }
+  .receipt .head { text-align: center; margin-bottom: 2mm; }
+  .receipt .head .org { font-weight: 700; font-size: 10pt; }
+  .receipt .rule { border-top: 0.2mm dashed #000; margin: 1.5mm 0; }
+  .receipt table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+  .receipt td { padding: 0.4mm 0; vertical-align: top; }
+  .receipt .num { text-align: right; white-space: nowrap; }
+  .receipt .small { font-size: 6.5pt; color: #333; }
+  .receipt .total td { font-weight: 700; }
+</style>
+{{#with data}}
+<div class="receipt">
+  <div class="head">
+    <div class="org">{{organization}}</div>
+    <div>Due collection {{collection.number}} · {{date collection.collectedOn}}</div>
+    {{#if collection.loyalMemberName}}<div>Member: {{collection.loyalMemberName}}</div>{{/if}}
+    {{#if collection.corporateClientName}}<div>Company: {{collection.corporateClientName}}</div>{{/if}}
+    {{#if collection.staffName}}<div>Staff: {{collection.staffName}}</div>{{/if}}
+  </div>
+  <div class="rule"></div>
+  {{#if collection.lines.length}}
+  <table>
+    {{#each collection.lines}}
+    <tr>
+      <td>Sale {{number}}<br /><span class="small">{{date soldOn}}</span></td>
+      <td class="num">{{money amount}}</td>
+    </tr>
+    {{/each}}
+  </table>
+  {{else}}
+  <div class="small">Against the staff ledger.</div>
+  {{/if}}
+  <div class="rule"></div>
+  <table>
+    <tr class="total"><td>Received ({{collection.method}})</td><td class="num">{{money collection.amount}}</td></tr>
+    {{#if collection.reference}}<tr><td>Reference</td><td class="num">{{collection.reference}}</td></tr>{{/if}}
+  </table>
+  <div class="rule"></div>
+  <div class="small">In words: {{amountInWords collection.amount}}</div>
+  <div class="small">Received by {{printedBy}}{{#if collection.voucherNumber}} · voucher {{collection.voucherNumber}}{{/if}}.</div>
+</div>
+{{/with}}

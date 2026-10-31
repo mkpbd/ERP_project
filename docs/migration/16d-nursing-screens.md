@@ -1,6 +1,6 @@
 # Step 16d — Nursing screens (Angular)
 
-Status: **done** (2026-10-31). Previous: [step 16c](16c-ipd-screens.md) · Next: step 15d (pharmacy credit) · API:
+Status: **done** (2026-10-31). Previous: [step 16c](16c-ipd-screens.md) · Next: [step 15d](15d-pharmacy-credit.md) (pharmacy credit) · API:
 [step 11c](11c-treatment-orders.md) (treatment orders and the medication chart) and [15c](15c-inpatient-care.md) (observations, rounds, care
 orders).
 

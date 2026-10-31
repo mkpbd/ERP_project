@@ -19,6 +19,8 @@
     <div>Sale {{sale.number}} · {{date sale.soldOn}}</div>
     {{#if sale.customerName}}<div>{{sale.customerName}}{{#if sale.mobileNo}} · {{sale.mobileNo}}{{/if}}</div>{{/if}}
     {{#if sale.loyalMemberName}}<div>Member: {{sale.loyalMemberName}}</div>{{/if}}
+    {{#if sale.corporateClientName}}<div>On credit to {{sale.corporateClientName}}</div>{{/if}}
+    {{#if sale.staffName}}<div>Staff: {{sale.staffName}}</div>{{/if}}
   </div>
   {{#if (eq sale.status "cancelled")}}<div class="void">CANCELLED</div>{{/if}}
   <div class="rule"></div>

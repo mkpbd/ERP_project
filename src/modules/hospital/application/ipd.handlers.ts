@@ -170,7 +170,7 @@ export class AdmitPatientHandler implements ICommandHandler<AdmitPatientCommand>
       // A credit client at or over its limit takes no more admissions (the final bill is never refused, so a
       // discharge is never held up by it).
       if (payer.kind === 'corporate' && payer.client.payment === 'credit' && payer.client.creditLimit !== null) {
-        const owed = await opd.bills.corporateDue(payer.client.id);
+        const owed = await opd.corporate.owed(payer.client.id);
         if (owed >= payer.client.creditLimit) {
           throw new DomainError(
             'credit_limit',
@@ -315,7 +315,7 @@ export class CorrectAdmissionHandler implements ICommandHandler<CorrectAdmission
         if (await desk.billing.liveBill(id)) throw new ConflictError('bill_made', 'Cancel the final bill first');
         const payer = await opd.payer(correction.corporateClientId, correction.staffId);
         if (payer.kind === 'corporate' && payer.client.payment === 'credit' && payer.client.creditLimit !== null) {
-          const owed = await opd.bills.corporateDue(payer.client.id);
+          const owed = await opd.corporate.owed(payer.client.id);
           if (owed >= payer.client.creditLimit) {
             throw new DomainError(
               'credit_limit',

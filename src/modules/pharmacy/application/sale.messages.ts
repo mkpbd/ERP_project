@@ -15,6 +15,8 @@ export interface SaleLineInput {
 export interface SaleFilter extends PageRequest {
   readonly outletId?: string | undefined;
   readonly loyalMemberId?: string | undefined;
+  readonly corporateClientId?: string | undefined;
+  readonly staffId?: string | undefined;
   readonly status?: string | undefined;
   readonly from?: string | undefined;
   readonly to?: string | undefined;
@@ -32,6 +34,10 @@ export interface SaleSummary {
   readonly mobileNo: string | null;
   readonly loyalMemberId: string | null;
   readonly loyalMemberName: string | null;
+  readonly corporateClientId: string | null;
+  readonly corporateClientName: string | null;
+  readonly staffId: string | null;
+  readonly staffName: string | null;
   readonly total: number;
   readonly paid: number;
   readonly due: number;
@@ -87,18 +93,76 @@ export interface SaleQuote {
   readonly total: number;
 }
 
+export interface DueSale {
+  readonly saleId: string;
+  readonly number: string;
+  readonly soldOn: string;
+  readonly total: number;
+  readonly due: number;
+  /** Collected, and taken down by returns. */
+  readonly collected: number;
+}
+
 export interface MemberDues {
   readonly loyalMemberId: string;
   readonly name: string;
   readonly contactNo: string;
   readonly due: number;
-  readonly sales: { saleId: string; number: string; soldOn: string; total: number; due: number; collected: number }[];
+  readonly sales: DueSale[];
+}
+
+/** A company's credit at the pharmacy, against its limit across the hospital and the pharmacy. */
+export interface CorporateDues {
+  readonly corporateClientId: string;
+  readonly name: string;
+  readonly payment: 'cash' | 'credit';
+  readonly creditLimit: number | null;
+  /** All it owes: hospital bills and pharmacy sales. */
+  readonly owed: number;
+  /** What it owes the pharmacy: the sales below. */
+  readonly due: number;
+  readonly sales: DueSale[];
+}
+
+/** What a staff member owes on their staff ledger, and what they bought on credit at the pharmacy. */
+export interface StaffDues {
+  readonly staffId: string;
+  readonly employeeNo: string;
+  readonly fullName: string;
+  /** The staff ledger: every unit's credit and old dues, less what was paid or recovered. */
+  readonly balance: number;
+  /** The latest pharmacy credit sales, newest first. */
+  readonly sales: DueSale[];
+}
+
+/** A payment against dues, as its receipt shows it. */
+export interface CollectionView {
+  readonly id: string;
+  readonly number: string;
+  readonly collectedOn: string;
+  readonly method: PaymentMethod;
+  readonly reference: string | null;
+  readonly amount: number;
+  readonly voucherNumber: string | null;
+  readonly loyalMemberId: string | null;
+  readonly loyalMemberName: string | null;
+  readonly corporateClientId: string | null;
+  readonly corporateClientName: string | null;
+  readonly staffId: string | null;
+  readonly staffName: string | null;
+  /** The sales it settled; none for a staff member's payment. */
+  readonly lines: { saleId: string; number: string; soldOn: string; amount: number }[];
 }
 
 export abstract class SaleReadRepository {
   abstract listSales(filter: SaleFilter): Promise<Page<SaleSummary>>;
   abstract getSale(id: string): Promise<SaleView | null>;
   abstract memberDues(loyalMemberId: string): Promise<MemberDues | null>;
+  /** A company's completed sales still owing, oldest first. */
+  abstract corporateSales(corporateClientId: string): Promise<DueSale[]>;
+  /** A staff member's latest completed credit sales, newest first. */
+  abstract staffSales(staffId: string, limit: number): Promise<DueSale[]>;
+  abstract collection(id: string): Promise<CollectionView | null>;
   abstract lotLabels(lotIds: readonly string[]): Promise<Map<string, { batchNo: string | null; expiryDate: string }>>;
   abstract productRefs(productIds: readonly string[]): Promise<Map<string, ProductRef>>;
 }
@@ -144,6 +208,8 @@ export class MakeSaleCommand extends Command<{
     readonly customerName: string | null,
     readonly mobileNo: string | null,
     readonly loyalMemberId: string | null,
+    readonly corporateClientId: string | null,
+    readonly staffId: string | null,
     readonly lines: readonly SaleLineInput[],
     readonly method: PaymentMethod,
     readonly reference: string | null,
@@ -178,6 +244,34 @@ export class CollectDueCommand extends Command<{ id: string; number: string; vou
   }
 }
 
+/** A company pays against its pharmacy credit sales, oldest first. */
+export class CollectCorporateDueCommand extends Command<{ id: string; number: string; voucherNumber: string | null }> {
+  constructor(
+    readonly actor: Actor,
+    readonly corporateClientId: string,
+    readonly collectedOn: string,
+    readonly amount: number,
+    readonly method: PaymentMethod,
+    readonly reference: string | null,
+  ) {
+    super();
+  }
+}
+
+/** A staff member pays at the pharmacy against their staff ledger. */
+export class CollectStaffDueCommand extends Command<{ id: string; number: string; voucherNumber: string | null }> {
+  constructor(
+    readonly actor: Actor,
+    readonly staffId: string,
+    readonly collectedOn: string,
+    readonly amount: number,
+    readonly method: PaymentMethod,
+    readonly reference: string | null,
+  ) {
+    super();
+  }
+}
+
 export class ListSalesQuery extends Query<Page<SaleSummary>> {
   constructor(
     readonly actor: Actor,
@@ -200,6 +294,24 @@ export class GetMemberDuesQuery extends Query<MemberDues> {
   constructor(
     readonly actor: Actor,
     readonly loyalMemberId: string,
+  ) {
+    super();
+  }
+}
+
+export class GetCorporateDuesQuery extends Query<CorporateDues> {
+  constructor(
+    readonly actor: Actor,
+    readonly corporateClientId: string,
+  ) {
+    super();
+  }
+}
+
+export class GetStaffDuesQuery extends Query<StaffDues> {
+  constructor(
+    readonly actor: Actor,
+    readonly staffId: string,
   ) {
     super();
   }

@@ -276,7 +276,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
         now: opd.clock.now(),
       });
       if (client?.payment === 'credit' && client.creditLimit !== null) {
-        const owed = await opd.bills.corporateDue(client.id);
+        const owed = await opd.corporate.owed(client.id);
         if (owed + bill.due > client.creditLimit) {
           throw new DomainError(
             'credit_limit',

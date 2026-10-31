@@ -6,13 +6,23 @@ import { escapeLike } from '../../../../shared/infrastructure/persistence/pg-err
 import type { ProductRef } from '../../application/purchase.messages.js';
 import {
   SaleReadRepository,
+  type CollectionView,
+  type DueSale,
   type MemberDues,
   type SaleFilter,
   type SaleSummary,
   type SaleView,
 } from '../../application/sale.messages.js';
 import { productRef, productsById } from './drizzle-pharmacy.read-repository.js';
-import { loyalMembers, outlets, pharmacyLots, pharmacySaleLines, pharmacySales } from './pharmacy.schema.js';
+import {
+  dueCollectionLines,
+  dueCollections,
+  loyalMembers,
+  outlets,
+  pharmacyLots,
+  pharmacySaleLines,
+  pharmacySales,
+} from './pharmacy.schema.js';
 
 const cents = (value: number) => Math.round(value * 100) / 100;
 
@@ -34,6 +44,11 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
         mobileNo: pharmacySales.mobileNo,
         loyalMemberId: pharmacySales.loyalMemberId,
         loyalMemberName: loyalMembers.name,
+        corporateClientId: pharmacySales.corporateClientId,
+        // Named by the handler from the hospital and HR.
+        corporateClientName: sql<string | null>`null`,
+        staffId: pharmacySales.staffId,
+        staffName: sql<string | null>`null`,
         amount: pharmacySales.amount,
         discount: pharmacySales.discount,
         total: pharmacySales.total,
@@ -61,6 +76,8 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
     const where = and(
       filter.outletId ? eq(pharmacySales.outletId, filter.outletId) : undefined,
       filter.loyalMemberId ? eq(pharmacySales.loyalMemberId, filter.loyalMemberId) : undefined,
+      filter.corporateClientId ? eq(pharmacySales.corporateClientId, filter.corporateClientId) : undefined,
+      filter.staffId ? eq(pharmacySales.staffId, filter.staffId) : undefined,
       filter.status ? eq(pharmacySales.status, filter.status as 'completed') : undefined,
       filter.from ? gte(pharmacySales.soldOn, filter.from) : undefined,
       filter.to ? lte(pharmacySales.soldOn, filter.to) : undefined,
@@ -159,6 +176,75 @@ export class DrizzleSaleReadRepository extends SaleReadRepository {
       due: cents(owing.reduce((sum, sale) => sum + sale.due - sale.collected, 0)),
       sales: owing,
     };
+  }
+
+  private dueSales() {
+    return this.context.db
+      .select({
+        saleId: pharmacySales.id,
+        number: pharmacySales.number,
+        soldOn: pharmacySales.soldOn,
+        total: pharmacySales.total,
+        due: pharmacySales.due,
+        collected: sql<number>`${pharmacySales.collected} + ${pharmacySales.dueReturned}`.mapWith(Number),
+      })
+      .from(pharmacySales);
+  }
+
+  async corporateSales(corporateClientId: string): Promise<DueSale[]> {
+    return this.dueSales()
+      .where(
+        and(
+          eq(pharmacySales.corporateClientId, corporateClientId),
+          eq(pharmacySales.status, 'completed'),
+          sql`${pharmacySales.due} > ${pharmacySales.collected} + ${pharmacySales.dueReturned}`,
+        ),
+      )
+      .orderBy(asc(pharmacySales.soldOn), asc(pharmacySales.number));
+  }
+
+  async staffSales(staffId: string, limit: number): Promise<DueSale[]> {
+    return this.dueSales()
+      .where(
+        and(eq(pharmacySales.staffId, staffId), eq(pharmacySales.status, 'completed'), sql`${pharmacySales.due} > 0`),
+      )
+      .orderBy(desc(pharmacySales.soldOn), desc(pharmacySales.number))
+      .limit(limit);
+  }
+
+  async collection(id: string): Promise<CollectionView | null> {
+    const [header] = await this.context.db
+      .select({
+        id: dueCollections.id,
+        number: dueCollections.number,
+        collectedOn: dueCollections.collectedOn,
+        method: dueCollections.method,
+        reference: dueCollections.reference,
+        amount: dueCollections.amount,
+        voucherNumber: dueCollections.voucherNumber,
+        loyalMemberId: dueCollections.loyalMemberId,
+        loyalMemberName: loyalMembers.name,
+        corporateClientId: dueCollections.corporateClientId,
+        corporateClientName: sql<string | null>`null`,
+        staffId: dueCollections.staffId,
+        staffName: sql<string | null>`null`,
+      })
+      .from(dueCollections)
+      .leftJoin(loyalMembers, eq(loyalMembers.id, dueCollections.loyalMemberId))
+      .where(eq(dueCollections.id, id));
+    if (!header) return null;
+    const lines = await this.context.db
+      .select({
+        saleId: dueCollectionLines.saleId,
+        number: pharmacySales.number,
+        soldOn: pharmacySales.soldOn,
+        amount: dueCollectionLines.amount,
+      })
+      .from(dueCollectionLines)
+      .innerJoin(pharmacySales, eq(pharmacySales.id, dueCollectionLines.saleId))
+      .where(eq(dueCollectionLines.collectionId, id))
+      .orderBy(asc(pharmacySales.soldOn), asc(pharmacySales.number));
+    return { ...header, lines };
   }
 
   async lotLabels(lotIds: readonly string[]) {

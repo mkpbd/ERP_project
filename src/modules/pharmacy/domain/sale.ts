@@ -5,6 +5,12 @@ import { lineDiscount } from './discount.js';
 export type PaymentMethod = 'cash' | 'card' | 'mobile';
 export type SaleStatus = 'completed' | 'cancelled';
 
+/** Who owes a sale's due: a loyal member, a company on credit, or a staff member (on their staff ledger). */
+export interface SaleDebtor {
+  readonly kind: 'member' | 'corporate' | 'staff';
+  readonly id: string;
+}
+
 /** A lot part of a sale line, as allocated. */
 export interface SalePart {
   readonly productId: string;
@@ -46,6 +52,8 @@ export interface SaleProps {
   customerName: string | null;
   mobileNo: string | null;
   loyalMemberId: string | null;
+  corporateClientId: string | null;
+  staffId: string | null;
   amount: number;
   discount: number;
   total: number;
@@ -77,8 +85,9 @@ const sum = <T>(rows: readonly T[], pick: (row: T) => number) =>
 /**
  * Old pharmacy OPD invoice (CreatePharmacySale): medicines sold over the counter from an outlet, each lot part at
  * its sale rate less the product's discount. What the customer hands over pays it (cash may be more: the rest is
- * change); what is left unpaid is a due, allowed only for a loyal member. A sale with nothing collected against
- * its due may be cancelled; returns of some units come in step 8f.
+ * change); what is left unpaid is a due, owed by a loyal member, a company on credit or a staff member (step 15d),
+ * and by no one else. A sale with nothing collected against its due may be cancelled; returns of some units come in
+ * step 8f.
  */
 export class PharmacySale {
   private constructor(private readonly props: SaleProps) {}
@@ -91,6 +100,8 @@ export class PharmacySale {
     customerName: string | null;
     mobileNo: string | null;
     loyalMemberId: string | null;
+    corporateClientId?: string | null;
+    staffId?: string | null;
     parts: readonly SalePart[];
     method: PaymentMethod;
     reference: string | null;
@@ -114,8 +125,17 @@ export class PharmacySale {
       throw new DomainError('overpaid', 'Only cash is handed over beyond the total');
     }
     const due = taka(paisa(total) - paisa(paid));
-    if (due > 0 && !params.loyalMemberId) {
-      throw new DomainError('due_needs_member', 'Only a loyal member may leave a due');
+    const corporateClientId = params.corporateClientId ?? null;
+    const staffId = params.staffId ?? null;
+    const debtors = [params.loyalMemberId, corporateClientId, staffId].filter((id) => id !== null).length;
+    if (debtors > 1) {
+      throw new DomainError('one_debtor', 'A sale is owed by one: a loyal member, a company or a staff member');
+    }
+    if (due > 0 && debtors === 0) {
+      throw new DomainError(
+        'due_needs_debtor',
+        'Only a loyal member, a company on credit or a staff member may leave a due',
+      );
     }
     const mobileNo = text(params.mobileNo, 20, 'mobile number', 'Sale');
     return new PharmacySale({
@@ -126,6 +146,8 @@ export class PharmacySale {
       customerName: text(params.customerName, 150, 'customer name', 'Sale'),
       mobileNo,
       loyalMemberId: params.loyalMemberId,
+      corporateClientId,
+      staffId,
       amount: sum(lines, (line) => line.amount),
       discount: sum(lines, (line) => line.discount),
       total,
@@ -170,6 +192,13 @@ export class PharmacySale {
   }
   get loyalMemberId(): string | null {
     return this.props.loyalMemberId;
+  }
+  /** Who owes the due, or null for a sale paid in full to no one in particular. */
+  get debtor(): SaleDebtor | null {
+    if (this.props.loyalMemberId) return { kind: 'member', id: this.props.loyalMemberId };
+    if (this.props.corporateClientId) return { kind: 'corporate', id: this.props.corporateClientId };
+    if (this.props.staffId) return { kind: 'staff', id: this.props.staffId };
+    return null;
   }
   get method(): PaymentMethod {
     return this.props.method;
@@ -314,7 +343,7 @@ export class PharmacySale {
   }
 }
 
-/** What is still owed on a loyal member's sale. */
+/** What is still owed on a member's or a company's sale. */
 export interface SaleDue {
   readonly saleId: string;
   readonly soldOn: string;
@@ -325,8 +354,8 @@ export interface SaleDue {
 }
 
 /**
- * Old loyal member due collection: an amount paid against the member's dues, oldest sale first, never more than
- * all of them. Returns the part of the amount that goes to each sale.
+ * Old loyal member (and corporate client) due collection: an amount paid against the dues, oldest sale first, never
+ * more than all of them. Returns the part of the amount that goes to each sale.
  */
 export function allocateCollection(amount: number, dues: readonly SaleDue[]): { saleId: string; amount: number }[] {
   if (!Number.isFinite(amount) || amount <= 0 || Math.abs(Math.round(amount * 100) - amount * 100) > 1e-6) {
@@ -338,7 +367,7 @@ export function allocateCollection(amount: number, dues: readonly SaleDue[]): { 
     .sort((a, b) => a.soldOn.localeCompare(b.soldOn) || a.number.localeCompare(b.number));
   const total = owed.reduce((sum, due) => sum + due.left, 0);
   let left = paisa(amount);
-  if (left > total) throw new DomainError('overpayment', `Only ${taka(total).toFixed(2)} is due from the member`);
+  if (left > total) throw new DomainError('overpayment', `Only ${taka(total).toFixed(2)} is due`);
   const parts: { saleId: string; amount: number }[] = [];
   for (const due of owed) {
     if (left <= 0) break;

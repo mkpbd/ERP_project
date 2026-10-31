@@ -16,7 +16,8 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core';
 import { glAccounts, vouchers } from '../../../accounts/infrastructure/persistence/accounts.schema.js';
-import { admissions } from '../../../hospital/infrastructure/persistence/hospital.schema.js';
+import { admissions, corporateClients } from '../../../hospital/infrastructure/persistence/hospital.schema.js';
+import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
 import { suppliers } from '../../../supply-chain/infrastructure/persistence/supply-chain.schema.js';
 
@@ -768,6 +769,10 @@ export const pharmacySales = pgTable(
     customerName: text('customer_name'),
     mobileNo: text('mobile_no'),
     loyalMemberId: uuid('loyal_member_id').references(() => loyalMembers.id, { onDelete: 'restrict' }),
+    /** Step 15d: the company the due is left with (old Invoices.CorporateClientId). */
+    corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
+    /** Step 15d: the staff member whose ledger the due goes to (old Invoices.StaffRecordId). */
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
     /** Gross: units × sale rate. */
     amount: money('amount').notNull(),
     discount: money('discount').notNull(),
@@ -799,13 +804,20 @@ export const pharmacySales = pgTable(
     uniqueIndex('pharmacy_sales_number_uq').on(t.number),
     index('pharmacy_sales_outlet_idx').on(t.outletId, t.soldOn),
     index('pharmacy_sales_member_idx').on(t.loyalMemberId),
+    index('pharmacy_sales_client_idx').on(t.corporateClientId),
+    index('pharmacy_sales_staff_idx').on(t.staffId),
     check('pharmacy_sales_status_ck', sql`${t.status} in ('completed', 'cancelled')`),
     check('pharmacy_sales_method_ck', sql`${t.method} in ('cash', 'card', 'mobile')`),
     check(
       'pharmacy_sales_amounts_ck',
       sql`${t.total} = ${t.amount} - ${t.discount} and ${t.paid} + ${t.due} = ${t.total} and ${t.collected} + ${t.dueReturned} between 0 and ${t.due} and ${t.returned} between 0 and ${t.total}`,
     ),
-    check('pharmacy_sales_due_member_ck', sql`${t.due} = 0 or ${t.loyalMemberId} is not null`),
+    // Who owes the due: one of a loyal member, a company or a staff member, and someone when there is a due.
+    check(
+      'pharmacy_sales_debtor_ck',
+      sql`num_nonnulls(${t.loyalMemberId}, ${t.corporateClientId}, ${t.staffId}) <= 1
+        and (${t.due} = 0 or num_nonnulls(${t.loyalMemberId}, ${t.corporateClientId}, ${t.staffId}) = 1)`,
+    ),
   ],
 );
 
@@ -840,15 +852,16 @@ export const pharmacySaleLines = pgTable(
   ],
 );
 
-// Old PLoyalMemberLedger "due collection": money a loyal member pays against dues, oldest invoice first.
+// Old PLoyalMemberLedger "due collection": money a loyal member pays against dues, oldest invoice first; step 15d: a
+// company against its credit sales the same way, or a staff member against their staff ledger (no lines).
 export const dueCollections = pgTable(
   'pharmacy_due_collections',
   {
     id: uuid('id').primaryKey(),
     number: text('number').notNull(),
-    loyalMemberId: uuid('loyal_member_id')
-      .notNull()
-      .references(() => loyalMembers.id, { onDelete: 'restrict' }),
+    loyalMemberId: uuid('loyal_member_id').references(() => loyalMembers.id, { onDelete: 'restrict' }),
+    corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
+    staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
     collectedOn: day('collected_on').notNull(),
     method: text('method', { enum: ['cash', 'card', 'mobile'] }).notNull(),
     reference: text('reference'),
@@ -860,7 +873,13 @@ export const dueCollections = pgTable(
   (t) => [
     uniqueIndex('pharmacy_due_collections_number_uq').on(t.number),
     index('pharmacy_due_collections_member_idx').on(t.loyalMemberId),
+    index('pharmacy_due_collections_client_idx').on(t.corporateClientId),
+    index('pharmacy_due_collections_staff_idx').on(t.staffId),
     check('pharmacy_due_collections_amount_ck', sql`${t.amount} > 0`),
+    check(
+      'pharmacy_due_collections_payer_ck',
+      sql`num_nonnulls(${t.loyalMemberId}, ${t.corporateClientId}, ${t.staffId}) = 1`,
+    ),
   ],
 );
 

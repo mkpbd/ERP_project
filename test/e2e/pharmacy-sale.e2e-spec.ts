@@ -175,7 +175,7 @@ describe('pharmacy counter sales', () => {
       { productId: napa, qty: 60 },
       { productId: seclo, qty: 2 },
     ];
-    expect((await sale(lines, { tendered: 50 })).body.code).toBe('due_needs_member');
+    expect((await sale(lines, { tendered: 50 })).body.code).toBe('due_needs_debtor');
     expect((await sale(lines, { tendered: 100, method: 'card' })).body.code).toBe('overpaid');
     expect((await sale(lines, { tendered: 100, outletId: indoor })).body.code).toBe('no_outlet_access');
     const sold = await sale(lines, { tendered: 100, customerName: 'Rahim', mobileNo: '01711000000' }).expect(201);

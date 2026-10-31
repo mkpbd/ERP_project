@@ -3,13 +3,16 @@ import { Command, CommandHandler, Query, QueryHandler, type ICommandHandler, typ
 import type { Actor } from '../../../shared/application/actor.js';
 import { AccessControl } from '../../../shared/application/contracts/access-control.js';
 import { StaffDirectory, type StaffSummary } from '../../../shared/application/contracts/staff-directory.js';
+import { StaffLedger } from '../../../shared/application/contracts/staff-ledger.js';
 import { AuditTrail } from '../../../shared/application/ports/audit-trail.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { allocateInterest, pfPosition, type PfPosition } from '../domain/pf.js';
-import { PfLedgerRepository } from '../domain/repositories.js';
+import { PfLedgerRepository, SalarySheetRepository, StaffDueRepository } from '../domain/repositories.js';
+import { assertPayPeriod } from '../domain/salary.js';
 import { PAYROLL_MANAGE, PAYROLL_READ } from './payroll.constants.js';
 import { PayrollReadRepository, type LedgerStatement } from './read-models.js';
+import { SalarySheetBuilder } from './salary-sheet.handlers.js';
 
 /** Without a staff id: the actor's own PF account. */
 export class GetPfStatementQuery extends Query<LedgerStatement> {
@@ -276,10 +279,99 @@ export class GetPfSettlementHandler implements IQueryHandler<GetPfSettlementQuer
   }
 }
 
+export interface StaffDueRecovery {
+  readonly staffId: string;
+  readonly employeeNo: string;
+  readonly fullName: string;
+  /** On the staff ledger before the recovery. */
+  readonly owed: number;
+  /** Taken from the month's salary: up to the net pay. */
+  readonly recovered: number;
+}
+
+export class RecoverStaffDuesCommand extends Command<{ lines: StaffDueRecovery[]; total: number }> {
+  constructor(
+    readonly actor: Actor,
+    readonly year: number,
+    readonly month: number,
+  ) {
+    super();
+  }
+}
+
+const RECOVERED = 'Staff dues recovered';
+
+/**
+ * What staff owe on the staff ledger (the pharmacy's credit sales, dues from the old system) taken from a month's
+ * salary: each person's balance up to the net pay the month's sheet gives them now, added to their other deduction
+ * and credited on the ledger. Before the sheet is committed; approve it again after. Someone with no pay that month
+ * keeps their due for the next; running it again takes only what fell due since.
+ */
+@CommandHandler(RecoverStaffDuesCommand)
+export class RecoverStaffDuesHandler implements ICommandHandler<RecoverStaffDuesCommand> {
+  constructor(
+    private readonly builder: SalarySheetBuilder,
+    private readonly sheets: SalarySheetRepository,
+    private readonly dues: StaffDueRepository,
+    private readonly ledger: StaffLedger,
+    private readonly staff: StaffDirectory,
+    private readonly access: AccessControl,
+    private readonly tx: TransactionManager,
+    private readonly audit: AuditTrail,
+  ) {}
+
+  async execute({ actor, year, month }: RecoverStaffDuesCommand) {
+    assertPayPeriod(year, month);
+    await this.access.authorize(actor.userId, { permissions: [PAYROLL_MANAGE] });
+    return this.tx.run(async () => {
+      await this.tx.lock(`payroll:sheet:${year}-${month}`);
+      if ((await this.sheets.lock(year, month))?.status === 'committed') {
+        throw new ConflictError('salary_sheet_committed', 'The salary sheet of this month is committed');
+      }
+      const owing = await this.dues.owing();
+      const pay = new Map((await this.builder.lines(year, month)).map((line) => [line.staffId, line.netPayable]));
+      const people = await this.staff.findSummaries([...owing.keys()]);
+      const period = `${year}-${String(month).padStart(2, '0')}`;
+      const entryDate = new Date(Date.UTC(year, month, 0)).toISOString().slice(0, 10);
+      const lines: StaffDueRecovery[] = [];
+      for (const person of people) {
+        const owed = await this.ledger.lockBalance(person.id);
+        const recovered =
+          Math.max(0, Math.min(Math.round(owed * 100), Math.round((pay.get(person.id) ?? 0) * 100))) / 100;
+        if (recovered > 0) {
+          await this.dues.addOtherDeduction(person.id, year, month, recovered, RECOVERED);
+          await this.ledger.post({
+            staffId: person.id,
+            entryDate,
+            particulars: `Recovered from the salary of ${period}`,
+            debit: 0,
+            credit: recovered,
+            reference: `salary ${period}`,
+          });
+        }
+        if (owed > 0) {
+          lines.push({ staffId: person.id, employeeNo: person.employeeNo, fullName: person.fullName, owed, recovered });
+        }
+      }
+      lines.sort((a, b) => a.employeeNo.localeCompare(b.employeeNo));
+      const total = lines.reduce((sum, line) => sum + Math.round(line.recovered * 100), 0) / 100;
+      await this.audit.record({
+        action: 'payroll.staff_dues_recovered',
+        actorUserId: actor.userId,
+        resourceType: 'salary_sheet',
+        resourceId: period,
+        metadata: { people: lines.filter((line) => line.recovered > 0).length, total },
+      });
+      return { lines, total };
+    });
+  }
+}
+
 export const LEDGER_HANDLERS = [
   GetPfStatementHandler,
   GetDuesStatementHandler,
   PreviewPfInterestHandler,
   DistributePfInterestHandler,
   GetPfSettlementHandler,
+  RecoverStaffDuesHandler,
 ];

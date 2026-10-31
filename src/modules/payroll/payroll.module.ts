@@ -1,7 +1,8 @@
-import { Module, type OnModuleInit } from '@nestjs/common';
+import { Global, Module, type OnModuleInit } from '@nestjs/common';
 import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { AccessControl } from '../../shared/application/contracts/access-control.js';
 import { StaffDirectory } from '../../shared/application/contracts/staff-directory.js';
+import { StaffLedger } from '../../shared/application/contracts/staff-ledger.js';
 import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { BONUS_HANDLERS, BonusCalculator } from './application/bonus.handlers.js';
@@ -19,6 +20,7 @@ import {
   SalaryIncrementRepository,
   SalaryPolicyRepository,
   SalarySheetRepository,
+  StaffDueRepository,
   StaffSalaryRepository,
 } from './domain/repositories.js';
 import {
@@ -55,6 +57,7 @@ import {
   LedgerStatementsController,
   PfFundController,
   PfLedgerController,
+  StaffDueRecoveryController,
   StaffDuesController,
 } from './presentation/bonus.controllers.js';
 import {
@@ -80,6 +83,7 @@ import {
   DrizzleSalaryPolicyRepository,
   DrizzleStaffSalaryRepository,
 } from './infrastructure/persistence/drizzle-salary.repositories.js';
+import { DrizzleStaffDueRepository, DrizzleStaffLedger } from './infrastructure/persistence/drizzle-staff-dues.js';
 import { payrollRecordTypes } from './infrastructure/persistence/payroll.record-stores.js';
 import { incrementStatementReport, salaryStructureReport } from './infrastructure/reports/salary.reports.js';
 import {
@@ -93,8 +97,10 @@ import {
  * Payroll: salary policies, each person's salary structure and yearly increments (step 5a);
  * monthly inputs, the salary sheet with approval and commit, payslips and payment statements (step 5b);
  * festival bonuses, leave encashment, the PF ledger and staff dues (step 5c);
- * income tax: tax years and slabs, monthly deductions, certificates (step 5d).
+ * income tax: tax years and slabs, monthly deductions, certificates (step 5d); staff dues recovered from salary
+ * (step 15d). Global: it publishes the staff ledger other units sell to staff on credit through (StaffLedger).
  */
+@Global()
 @Module({
   controllers: [
     SalaryPoliciesController,
@@ -115,6 +121,7 @@ import {
     PfLedgerController,
     PfFundController,
     StaffDuesController,
+    StaffDueRecoveryController,
     LedgerStatementsController,
     TaxYearsController,
     IncomeTaxController,
@@ -140,7 +147,10 @@ import {
     { provide: SalaryPolicyRepository, useClass: DrizzleSalaryPolicyRepository },
     { provide: SalaryIncrementRepository, useClass: DrizzleSalaryIncrementRepository },
     { provide: PayrollReadRepository, useClass: DrizzlePayrollReadRepository },
+    { provide: StaffLedger, useClass: DrizzleStaffLedger },
+    { provide: StaffDueRepository, useClass: DrizzleStaffDueRepository },
   ],
+  exports: [StaffLedger],
 })
 export class PayrollModule implements OnModuleInit {
   constructor(

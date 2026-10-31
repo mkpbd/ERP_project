@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { and, asc, eq, inArray, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { DbContext } from '../../../../database/drizzle-transaction-manager.js';
 import { NotFoundError } from '../../../../shared/domain/errors.js';
 import { foreignKeyViolationConstraint } from '../../../../shared/infrastructure/persistence/pg-errors.js';
@@ -82,7 +82,10 @@ export class DrizzleSaleRepository extends SaleRepository {
     try {
       await this.context.db.insert(pharmacySales).values(row);
     } catch (error) {
-      if (foreignKeyViolationConstraint(error)?.includes('loyal_member')) throw new NotFoundError('loyal_member');
+      const constraint = foreignKeyViolationConstraint(error);
+      if (constraint?.includes('loyal_member')) throw new NotFoundError('loyal_member');
+      if (constraint?.includes('corporate_client')) throw new NotFoundError('corporate_client');
+      if (constraint?.includes('staff')) throw new NotFoundError('staff');
       throw error;
     }
     await this.context.db
@@ -110,6 +113,14 @@ export class DrizzleSaleRepository extends SaleRepository {
   }
 
   async memberDues(loyalMemberId: string): Promise<SaleDue[]> {
+    return this.dues(eq(pharmacySales.loyalMemberId, loyalMemberId));
+  }
+
+  async corporateDues(corporateClientId: string): Promise<SaleDue[]> {
+    return this.dues(eq(pharmacySales.corporateClientId, corporateClientId));
+  }
+
+  private dues(debtor: SQL): Promise<SaleDue[]> {
     return this.context.db
       .select({
         saleId: pharmacySales.id,
@@ -121,7 +132,7 @@ export class DrizzleSaleRepository extends SaleRepository {
       .from(pharmacySales)
       .where(
         and(
-          eq(pharmacySales.loyalMemberId, loyalMemberId),
+          debtor,
           eq(pharmacySales.status, 'completed'),
           sql`${pharmacySales.due} > ${pharmacySales.collected} + ${pharmacySales.dueReturned}`,
         ),
@@ -132,9 +143,11 @@ export class DrizzleSaleRepository extends SaleRepository {
 
   async insertCollection({ lines, ...collection }: CollectionRecord): Promise<void> {
     await this.context.db.insert(dueCollections).values(collection);
-    await this.context.db
-      .insert(dueCollectionLines)
-      .values(lines.map((line) => ({ ...line, collectionId: collection.id })));
+    if (lines.length > 0) {
+      await this.context.db
+        .insert(dueCollectionLines)
+        .values(lines.map((line) => ({ ...line, collectionId: collection.id })));
+    }
     for (const line of lines) {
       await this.context.db
         .update(pharmacySales)

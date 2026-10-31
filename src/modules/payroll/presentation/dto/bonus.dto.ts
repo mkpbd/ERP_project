@@ -163,6 +163,20 @@ export class StaffDueFilterDto extends createZodDto(
 ) {}
 export class StaffDueResponseDto extends responseDto(recordResponseShape({ ...dueFields, entryDate: z.string() })) {}
 
+export class RecoverStaffDuesDto extends createZodDto(z.strictObject({ year, month })) {}
+export class StaffDueRecoveryResponseDto extends responseDto({
+  lines: z.array(
+    z.object({
+      staffId: z.uuid(),
+      employeeNo: z.string(),
+      fullName: z.string(),
+      owed: z.number(),
+      recovered: z.number(),
+    }),
+  ),
+  total: z.number(),
+}) {}
+
 export class StatementQueryDto extends createZodDto(
   z.object({ from: day, to: day, staffId: z.uuid().optional(), serviceUnitId: z.uuid().optional() }),
 ) {}

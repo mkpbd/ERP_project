@@ -3,6 +3,7 @@ import { Inject, Injectable } from '@nestjs/common';
 import { CommandHandler, QueryHandler, type ICommandHandler, type IQueryHandler } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
 import { AccessControl } from '../../../shared/application/contracts/access-control.js';
+import { CorporateAccounts } from '../../../shared/application/contracts/corporate-accounts.js';
 import { LedgerPosting, type LedgerPostingLine } from '../../../shared/application/contracts/ledger-posting.js';
 import { AuditTrail } from '../../../shared/application/ports/audit-trail.js';
 import { Clock } from '../../../shared/application/ports/clock.js';
@@ -94,6 +95,8 @@ export class OpdDesk {
     readonly appointments: AppointmentRepository,
     readonly read: OpdBillReadRepository,
     readonly staff: StaffDirectory,
+    /** What a company owes across the hospital and the pharmacy, for its credit limit. */
+    readonly corporate: CorporateAccounts,
     @Inject(HOSPITAL_SETTINGS) readonly settings: HospitalSettings,
   ) {}
 
@@ -314,7 +317,7 @@ export class CreateOpdBillHandler implements ICommandHandler<CreateOpdBillComman
         now,
       });
       if (client?.payment === 'credit' && client.creditLimit !== null) {
-        const owed = await desk.bills.corporateDue(client.id);
+        const owed = await desk.corporate.owed(client.id);
         if (owed + bill.due > client.creditLimit) {
           throw new DomainError(
             'credit_limit',

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_POLICY, discountPercent, lineDiscount } from '../../../src/modules/pharmacy/domain/discount.js';
+import { receivableRole } from '../../../src/modules/pharmacy/application/sale.handlers.js';
 import { allocateCollection, PharmacySale, type SalePart } from '../../../src/modules/pharmacy/domain/sale.js';
 
 const now = new Date('2026-04-10T08:00:00Z');
@@ -58,9 +59,15 @@ describe('PharmacySale', () => {
     ]);
   });
 
-  it('leaves a due only for a loyal member and takes no card payment above the total', () => {
-    expect(() => make({ tendered: 50 })).toThrow(/Only a loyal member may leave a due/);
+  it('leaves a due only for one debtor and takes no card payment above the total', () => {
+    expect(() => make({ tendered: 50 })).toThrow(/Only a loyal member, a company on credit or a staff member/);
     expect(make({ tendered: 50, loyalMemberId: 'm' }).due).toBe(30.4);
+    expect(make({ tendered: 0, corporateClientId: 'c' }).debtor).toEqual({ kind: 'corporate', id: 'c' });
+    expect(make({ tendered: 0, staffId: 's' }).debtor).toEqual({ kind: 'staff', id: 's' });
+    expect(make({ corporateClientId: 'c' }).due).toBe(0);
+    expect(make().debtor).toBeNull();
+    expect(() => make({ tendered: 0, loyalMemberId: 'm', staffId: 's' })).toThrow(/owed by one/);
+    expect(() => make({ corporateClientId: 'c', staffId: 's' })).toThrow(/owed by one/);
     expect(() => make({ method: 'card' })).toThrow(/Only cash/);
     expect(() => make({ parts: [] })).toThrow(/sells something/);
   });
@@ -80,6 +87,14 @@ describe('PharmacySale', () => {
     expect(() => sale.cancel({ reason: 'x', on: '2026-04-09', by: 'u', now })).toThrow(/before it was made/);
     sale.cancel({ reason: 'Wrong patient', on: '2026-04-10', by: 'u', now });
     expect(() => sale.cancel({ reason: 'x', on: '2026-04-10', by: 'u', now })).toThrow(/cancelled already/);
+  });
+});
+
+describe('receivableRole', () => {
+  it('books a due where its debtor owes it', () => {
+    expect(receivableRole({ kind: 'member', id: 'm' })).toBe('pharmacy_receivable');
+    expect(receivableRole({ kind: 'corporate', id: 'c' })).toBe('corporate_receivable');
+    expect(receivableRole({ kind: 'staff', id: 's' })).toBe('staff_receivable');
   });
 });
 

@@ -209,3 +209,17 @@ export abstract class PfLedgerRepository {
   abstract hasInterestOn(date: string): Promise<boolean>;
   abstract add(entries: readonly NewPfEntry[]): Promise<void>;
 }
+
+/** The staff ledger as the salary recovery uses it. */
+export abstract class StaffDueRepository {
+  /** People whose ledger shows them owing (debits above credits), with what they owe. */
+  abstract owing(): Promise<Map<string, number>>;
+  /** Adds to the person's other deduction of the pay month, making the month's deductions when there are none. */
+  abstract addOtherDeduction(
+    staffId: string,
+    year: number,
+    month: number,
+    amount: number,
+    cause: string,
+  ): Promise<void>;
+}

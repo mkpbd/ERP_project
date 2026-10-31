@@ -22,6 +22,8 @@ import {
   GetPfSettlementQuery,
   GetPfStatementQuery,
   PreviewPfInterestQuery,
+  RecoverStaffDuesCommand,
+  type StaffDueRecovery,
   type PfInterestView,
   type PfSettlementView,
 } from '../application/ledger.handlers.js';
@@ -46,9 +48,11 @@ import {
   PfInterestResultResponseDto,
   PfSettlementQueryDto,
   PfSettlementResponseDto,
+  RecoverStaffDuesDto,
   RemovedResponseDto,
   SheetResultResponseDto,
   StaffDueFilterDto,
+  StaffDueRecoveryResponseDto,
   StaffDueResponseDto,
   StatementQueryDto,
   StatementResponseDto,
@@ -200,6 +204,28 @@ export class LeaveEncashmentsController {
   @ApiOkResponse({ type: RemovedResponseDto })
   remove(@CurrentUser() actor: Actor, @Param() params: EncashmentPeriodParamDto) {
     return this.commandBus.execute(new RemoveLeaveEncashmentCommand(actor, params.year, params.month));
+  }
+}
+
+@ApiTags('payroll-ledgers')
+@ApiBearerAuth()
+@Controller({ path: 'payroll/staff-dues', version: '1' })
+export class StaffDueRecoveryController {
+  constructor(private readonly commandBus: CommandBus) {}
+
+  @Post('recover')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('payroll:manage')
+  @ApiOperation({
+    summary:
+      "Take what staff owe on the staff ledger from a month's salary (up to each one's net pay) as other deductions; before the sheet is committed",
+  })
+  @ApiOkResponse({ type: StaffDueRecoveryResponseDto })
+  recover(
+    @CurrentUser() actor: Actor,
+    @Body() body: RecoverStaffDuesDto,
+  ): Promise<{ lines: StaffDueRecovery[]; total: number }> {
+    return this.commandBus.execute(new RecoverStaffDuesCommand(actor, body.year, body.month));
   }
 }
 
