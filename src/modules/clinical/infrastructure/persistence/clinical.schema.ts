@@ -371,10 +371,14 @@ export const treatmentOrders = pgTable(
     patientId: uuid('patient_id')
       .notNull()
       .references(() => patients.id, { onDelete: 'restrict' }),
+    /** A medicine, or nursing care (old NonMedicationOrder): then drug_name is the order and dose how it is done. */
+    kind: text('kind', { enum: ['medicine', 'care'] })
+      .notNull()
+      .default('medicine'),
     productId: uuid('product_id').references(() => products.id, { onDelete: 'restrict' }),
     drugName: text('drug_name').notNull(),
-    dose: text('dose').notNull(),
-    route: text('route', { enum: ROUTES }).notNull(),
+    dose: text('dose'),
+    route: text('route', { enum: ROUTES }),
     schedule: text('schedule', { enum: SCHEDULES }).notNull(),
     /** Set times of day (HH:MM, the organisation's time) for a `times` schedule. */
     times: text('times').array().notNull(),
@@ -394,6 +398,10 @@ export const treatmentOrders = pgTable(
   },
   (t) => [
     index('clinical_treatment_orders_admission_idx').on(t.admissionId, t.status),
+    check(
+      'clinical_treatment_orders_kind_ck',
+      sql`(${t.kind} = 'care' and ${t.route} is null and ${t.productId} is null) or (${t.kind} = 'medicine' and ${t.dose} is not null and ${t.route} is not null)`,
+    ),
     check(
       'clinical_treatment_orders_schedule_ck',
       sql`(${t.schedule} = 'interval') = (${t.intervalHours} is not null) and (${t.schedule} = 'times') = (cardinality(${t.times}) > 0)`,
@@ -539,5 +547,71 @@ export const historyValues = pgTable(
     primaryKey({ columns: [t.recordId, t.position] }),
     index('clinical_history_values_test_idx').on(sql`lower(${t.test})`),
     check('clinical_history_values_test_ck', sql`char_length(${t.test}) between 1 and 200`),
+  ],
+);
+
+// Old Hospital.FollowUpSheetSchedules: the observation rounds of the wards' day (morning, noon, evening, night), each a
+// window of local time; a night round's end is the next morning.
+export const observationRounds = pgTable(
+  'clinical_observation_rounds',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('clinical_observation_rounds_name_uq').on(sql`lower(${t.name})`),
+    check(
+      'clinical_observation_rounds_times_ck',
+      sql`${t.startTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.endTime} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$' and ${t.startTime} <> ${t.endTime}`,
+    ),
+  ],
+);
+
+// Old Hospital.FollowUpData (a dynamic form per round): an admitted patient's vital signs and observations as taken by
+// a nurse, with the round they answer.
+export const observations = pgTable(
+  'clinical_observations',
+  {
+    id: uuid('id').primaryKey(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    takenAt: tz('taken_at').notNull(),
+    /** The round of that day the observation answers (the one whose window holds it, unless named). */
+    roundId: uuid('round_id').references(() => observationRounds.id, { onDelete: 'set null' }),
+    roundOn: day('round_on'),
+    temperatureF: decimal('temperature_f'),
+    pulse: smallint('pulse'),
+    respRate: smallint('resp_rate'),
+    systolic: smallint('systolic'),
+    diastolic: smallint('diastolic'),
+    spo2: smallint('spo2'),
+    painScore: smallint('pain_score'),
+    bloodSugar: decimal('blood_sugar'),
+    intakeMl: integer('intake_ml'),
+    outputMl: integer('output_ml'),
+    consciousness: text('consciousness', { enum: ['alert', 'voice', 'pain', 'unresponsive'] }),
+    note: text('note'),
+    recordedBy: uuid('recorded_by')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    /** Entered in error: kept, struck through, with why. */
+    struckAt: tz('struck_at'),
+    struckBy: uuid('struck_by').references(() => users.id, { onDelete: 'set null' }),
+    struckReason: text('struck_reason'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('clinical_observations_admission_idx').on(t.admissionId, t.takenAt),
+    index('clinical_observations_round_idx').on(t.roundOn, t.roundId),
+    check('clinical_observations_round_ck', sql`(${t.roundId} is null) = (${t.roundOn} is null)`),
+    check('clinical_observations_struck_ck', sql`(${t.struckAt} is null) = (${t.struckReason} is null)`),
   ],
 );

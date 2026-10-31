@@ -1,7 +1,7 @@
 import { Command, Query } from '@nestjs/cqrs';
 import type { Actor } from '../../../shared/application/actor.js';
 import type { DoseRecordRow, SummaryRow } from '../domain/repositories.js';
-import type { OrderProps, OrderStatus, Route, Schedule, SummaryContent } from '../domain/treatment.js';
+import type { OrderKind, OrderProps, OrderStatus, Route, Schedule, SummaryContent } from '../domain/treatment.js';
 
 /** Doctors ordering, holding and stopping treatment, and writing the discharge summary. */
 export const EMR_ORDER = 'emr:order';
@@ -37,11 +37,14 @@ export abstract class TreatmentReadRepository {
 }
 
 export interface OrderInput {
+  readonly kind: OrderKind;
   readonly productId: string | null;
-  /** Needed when no product is given. */
+  /** The medicine, needed when no product is given; for care, the order. */
   readonly drugName: string | null;
-  readonly dose: string;
-  readonly route: Route;
+  /** The dose; for care, how it is done (optional). */
+  readonly dose: string | null;
+  /** None for care. */
+  readonly route: Route | null;
   readonly schedule: Schedule;
   readonly times: string[];
   readonly intervalHours: number | null;
@@ -133,6 +136,8 @@ export class GetChartQuery extends Query<ChartView> {
     readonly actor: Actor,
     readonly admissionId: string,
     readonly day: string | null,
+    /** Medicines only, care only; all when not given. */
+    readonly kind: OrderKind | null = null,
   ) {
     super();
   }

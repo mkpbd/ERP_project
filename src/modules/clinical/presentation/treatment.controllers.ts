@@ -16,7 +16,7 @@ import {
   StartOrderCommand,
   WriteSummaryCommand,
 } from '../application/treatment.messages.js';
-import { ROUTES, SCHEDULES } from '../domain/treatment.js';
+import { ORDER_KINDS, ROUTES, SCHEDULES } from '../domain/treatment.js';
 
 const version = z.int().min(1);
 const moment = z.iso.datetime({ offset: true }).transform((value) => new Date(value));
@@ -38,6 +38,23 @@ class OrderDto extends createZodDto(
     doctorId: z.uuid().nullable().default(null),
   }),
 ) {}
+const scheduleShape = {
+  schedule: z.enum(SCHEDULES),
+  times: z.array(z.string().max(5)).max(12).default([]),
+  intervalHours: z.int().nullable().default(null),
+  startAt: moment.nullable().default(null),
+  note: note(500),
+  doctorId: z.uuid().nullable().default(null),
+};
+class CareOrderDto extends createZodDto(
+  z.strictObject({
+    /** The care ordered: "Turn the patient", "Catheter care", "Chest physiotherapy" … */
+    order: z.string().max(200),
+    /** How it is done, if more is to be said. */
+    instruction: note(200),
+    ...scheduleShape,
+  }),
+) {}
 class HoldDto extends createZodDto(z.strictObject({ version, reason: z.string().max(300) })) {}
 class ResumeDto extends createZodDto(z.strictObject({ version })) {}
 class DoseDto extends createZodDto(
@@ -49,7 +66,9 @@ class DoseDto extends createZodDto(
   }),
 ) {}
 class OrderQueryDto extends createZodDto(z.object({ status: z.enum(STATUSES).optional() })) {}
-class ChartQueryDto extends createZodDto(z.object({ day: z.iso.date().optional() })) {}
+class ChartQueryDto extends createZodDto(
+  z.object({ day: z.iso.date().optional(), kind: z.enum(ORDER_KINDS).optional() }),
+) {}
 class SummaryDto extends createZodDto(
   z.strictObject({
     version: version.nullable().default(null),
@@ -86,10 +105,11 @@ const orderShape = {
   id: z.uuid(),
   admissionId: z.uuid(),
   patientId: z.uuid(),
+  kind: z.enum(ORDER_KINDS),
   productId: z.uuid().nullable(),
   drugName: z.string(),
-  dose: z.string(),
-  route: z.enum(ROUTES),
+  dose: z.string().nullable(),
+  route: z.enum(ROUTES).nullable(),
   schedule: z.enum(SCHEDULES),
   times: z.array(z.string()),
   intervalHours: z.int().nullable(),
@@ -183,7 +203,28 @@ export class TreatmentController {
   })
   @ApiCreatedResponse({ type: IdResponseDto })
   order(@CurrentUser() actor: Actor, @Param() params: AdmissionParamDto, @Body() dto: OrderDto) {
-    return this.commandBus.execute(new StartOrderCommand(actor, params.admissionId, dto));
+    return this.commandBus.execute(new StartOrderCommand(actor, params.admissionId, { ...dto, kind: 'medicine' }));
+  }
+
+  @Post('admissions/:admissionId/care-orders')
+  @RequirePermissions('emr:order')
+  @ApiOperation({
+    summary:
+      'Nursing care (old non-medication order) at set times, every N hours, once, or when needed; done by nurses',
+  })
+  @ApiCreatedResponse({ type: IdResponseDto })
+  careOrder(@CurrentUser() actor: Actor, @Param() params: AdmissionParamDto, @Body() dto: CareOrderDto) {
+    const { order, instruction, ...schedule } = dto;
+    return this.commandBus.execute(
+      new StartOrderCommand(actor, params.admissionId, {
+        ...schedule,
+        kind: 'care',
+        productId: null,
+        drugName: order,
+        dose: instruction,
+        route: null,
+      }),
+    );
   }
 
   @Post('orders/:id/hold')
@@ -212,10 +253,12 @@ export class TreatmentController {
 
   @Get('admissions/:admissionId/chart')
   @RequirePermissions('emr:read')
-  @ApiOperation({ summary: "The medication chart of a day (today when not given): due doses' states, prn doses" })
+  @ApiOperation({
+    summary: "A day's chart (today when not given): medicines' and care's due times and their states, prn doses",
+  })
   @ApiOkResponse({ type: ChartResponseDto })
   chart(@CurrentUser() actor: Actor, @Param() params: AdmissionParamDto, @Query() query: ChartQueryDto) {
-    return this.queryBus.execute(new GetChartQuery(actor, params.admissionId, query.day ?? null));
+    return this.queryBus.execute(new GetChartQuery(actor, params.admissionId, query.day ?? null, query.kind ?? null));
   }
 
   @Post('orders/:id/doses')

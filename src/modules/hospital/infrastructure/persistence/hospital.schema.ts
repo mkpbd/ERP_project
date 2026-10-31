@@ -742,11 +742,14 @@ export const ipdPolicy = pgTable(
     serviceChargePercent: percent('service_charge_percent').notNull(),
     /** The discount a counter may give on a final bill without ipd:discount, as a share of the bill. */
     counterDiscountPercent: percent('counter_discount_percent').notNull(),
+    /** Visitor passes in force at once for one admitted patient. */
+    visitorPassLimit: smallint('visitor_pass_limit').notNull().default(2),
     updatedAt: tz('updated_at').notNull().defaultNow(),
     updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
   },
   (t) => [
     check('hospital_ipd_policy_single_ck', sql`${t.id} = 1`),
+    check('hospital_ipd_policy_passes_ck', sql`${t.visitorPassLimit} between 1 and 10`),
     check(
       'hospital_ipd_policy_amounts_ck',
       sql`${t.roundFeePerNight} >= 0 and ${t.serviceChargePercent} between 0 and 100 and ${t.counterDiscountPercent} between 0 and 100`,
@@ -1310,5 +1313,30 @@ export const otTeam = pgTable(
   (t) => [
     primaryKey({ columns: [t.caseId, t.doctorId] }),
     check('hospital_ot_team_role_ck', sql`${t.role} in ('assistant', 'anaesthesia_assistant')`),
+  ],
+);
+
+// Old Hospital.VisitingCards: passes for an admitted patient's attendants, good while the patient is in.
+export const visitorPasses = pgTable(
+  'hospital_visitor_passes',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    visitorName: text('visitor_name').notNull(),
+    relation: text('relation'),
+    mobileNo: text('mobile_no'),
+    status: text('status', { enum: ['active', 'returned'] }).notNull(),
+    issuedAt: tz('issued_at').notNull(),
+    issuedBy: uuid('issued_by').references(() => users.id, { onDelete: 'set null' }),
+    returnedAt: tz('returned_at'),
+    returnedBy: uuid('returned_by').references(() => users.id, { onDelete: 'set null' }),
+  },
+  (t) => [
+    uniqueIndex('hospital_visitor_passes_number_uq').on(t.number),
+    index('hospital_visitor_passes_admission_idx').on(t.admissionId, t.status),
+    check('hospital_visitor_passes_returned_ck', sql`(${t.status} = 'returned') = (${t.returnedAt} is not null)`),
   ],
 );

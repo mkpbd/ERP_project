@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiBearerAuth,
@@ -25,9 +25,11 @@ import { HOSPITAL_RECORDS as R } from '../application/hospital.constants.js';
 import {
   AdmitPatientCommand,
   ChangeAdmissionCommand,
+  CorrectAdmissionCommand,
   GetAdmissionQuery,
   GetBedBoardQuery,
   ListAdmissionsQuery,
+  ReopenAdmissionCommand,
   SetBedStatusCommand,
 } from '../application/ipd.messages.js';
 import { ADMISSION_KINDS, DISCHARGE_TYPES } from '../domain/admission.js';
@@ -178,6 +180,27 @@ class DischargeDto extends createZodDto(
   }),
 ) {}
 class CancelAdmissionDto extends createZodDto(z.strictObject({ version, reason: z.string().trim().min(1).max(300) })) {}
+class CorrectAdmissionDto extends createZodDto(
+  z.strictObject({
+    version,
+    kind: z.enum(ADMISSION_KINDS),
+    reason: z.string().trim().max(500).nullable(),
+    referredById: z.uuid().nullable(),
+    /** Null for both: the patient pays. */
+    corporateClientId: z.uuid().nullable(),
+    staffId: z.uuid().nullable(),
+  }),
+) {}
+class ReopenAdmissionDto extends createZodDto(
+  z.strictObject({
+    version,
+    reason: z.string().trim().min(1).max(200),
+    /** Left out: the bed the patient left, if no one else has taken it. */
+    bedId: z.uuid().nullable().default(null),
+  }),
+) {}
+class CorrectedResponseDto extends responseDto({ version: z.int(), changed: z.array(z.string()) }) {}
+class ReopenedResponseDto extends responseDto({ version: z.int(), bill: z.string().nullable(), held: z.number() }) {}
 class BedStatusDto extends createZodDto(z.strictObject({ status: z.enum(['available', 'out_of_order']) })) {}
 class AdmissionListQueryDto extends createZodDto(
   z.object({
@@ -378,6 +401,30 @@ export class AdmissionsController {
     await this.commandBus.execute(
       new ChangeAdmissionCommand(actor, params.id, dto.version, { kind: 'discharge', type: dto.type, note: dto.note }),
     );
+  }
+
+  @Put('admissions/:id')
+  @RequirePermissions('ipd:admit')
+  @ApiOperation({
+    summary:
+      'Put right the kind, reason, referring doctor and who pays while the patient is in (who pays: before the bill)',
+  })
+  @ApiOkResponse({ type: CorrectedResponseDto })
+  correct(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: CorrectAdmissionDto) {
+    const { version: seen, ...correction } = dto;
+    return this.commandBus.execute(new CorrectAdmissionCommand(actor, params.id, seen, correction));
+  }
+
+  @Post('admissions/:id/reopen')
+  @RequirePermissions('ipd:manage')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary:
+      'Undo a discharge with a reason: the unpaid final bill cancelled, the patient back in their bed or the one given',
+  })
+  @ApiOkResponse({ type: ReopenedResponseDto })
+  reopen(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: ReopenAdmissionDto) {
+    return this.commandBus.execute(new ReopenAdmissionCommand(actor, params.id, dto.version, dto.reason, dto.bedId));
   }
 
   @Post('admissions/:id/cancel')

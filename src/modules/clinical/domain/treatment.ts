@@ -7,6 +7,9 @@ export { dayBounds, nextDay, zonedInstant };
 export const ROUTES = ['oral', 'iv', 'im', 'sc', 'topical', 'inhaled', 'rectal', 'other'] as const;
 export type Route = (typeof ROUTES)[number];
 export const SCHEDULES = ['times', 'interval', 'once', 'prn'] as const;
+/** A medicine with its dose and route, or nursing care (turning, dressing, catheter care …) done at its times. */
+export const ORDER_KINDS = ['medicine', 'care'] as const;
+export type OrderKind = (typeof ORDER_KINDS)[number];
 export type Schedule = (typeof SCHEDULES)[number];
 export type OrderStatus = 'active' | 'held' | 'stopped';
 export type OrderEventKind = 'start' | 'hold' | 'resume' | 'stop';
@@ -75,10 +78,14 @@ export interface OrderProps extends DoseSchedule {
   id: string;
   admissionId: string;
   patientId: string;
+  kind: OrderKind;
   productId: string | null;
+  /** The medicine, or for care the order itself ("Turn the patient"). */
   drugName: string;
-  dose: string;
-  route: Route;
+  /** The dose, or for care how it is done; none for care when nothing more is said. */
+  dose: string | null;
+  /** None for care. */
+  route: Route | null;
   note: string | null;
   status: OrderStatus;
   doctorId: string;
@@ -110,7 +117,8 @@ export function checkedSchedule(input: Pick<DoseSchedule, 'schedule' | 'times' |
 }
 
 /**
- * Old RxIpdTreatment: a medicine ordered by the doctor for an admitted patient. It is in force from its start until
+ * Old RxIpdTreatment and NonMedicationOrder / IPDNonMedicationOrder: a medicine, or nursing care, ordered by the
+ * doctor for an admitted patient. It is in force from its start until
  * held or stopped; a held order is resumed; a stopped one is done. Each change is kept as an event with its note.
  */
 export class TreatmentOrder {
@@ -120,10 +128,11 @@ export class TreatmentOrder {
     id: string;
     admissionId: string;
     patientId: string;
+    kind: OrderKind;
     productId: string | null;
     drugName: string;
-    dose: string;
-    route: Route;
+    dose: string | null;
+    route: Route | null;
     schedule: Schedule;
     times: readonly string[];
     intervalHours: number | null;
@@ -133,13 +142,21 @@ export class TreatmentOrder {
     by: string;
     at: Date;
   }): TreatmentOrder {
-    const drugName = text(params.drugName, 200, 'medicine');
-    const dose = text(params.dose, 200, 'dose');
-    if (!drugName || !dose) throw new DomainError('invalid_text', 'Give the medicine and its dose');
+    const care = params.kind === 'care';
+    const drugName = text(params.drugName, 200, care ? 'order' : 'medicine');
+    const dose = text(params.dose, 200, care ? 'instruction' : 'dose');
+    if (care) {
+      if (!drugName) throw new DomainError('invalid_text', 'Give the care ordered');
+      if (params.productId || params.route) throw new DomainError('invalid_order', 'Care has no medicine and no route');
+    } else {
+      if (!drugName || !dose) throw new DomainError('invalid_text', 'Give the medicine and its dose');
+      if (!params.route) throw new DomainError('invalid_order', 'Give the route');
+    }
     return new TreatmentOrder({
       id: params.id,
       admissionId: params.admissionId,
       patientId: params.patientId,
+      kind: params.kind,
       productId: params.productId,
       drugName,
       dose,

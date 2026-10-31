@@ -63,6 +63,7 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
       pharmacy_ward_indent_lines, pharmacy_ward_indents,
       lab_reagent_uses, lab_test_reagents, lab_stock_departments,
       lab_imaging_studies, lab_imaging_templates, lab_imaging_sequences,
+      hospital_visitor_passes, clinical_observations, clinical_observation_rounds,
       lab_culture_sensitivities, lab_culture_organisms, lab_culture_reports, lab_test_forms, lab_antibiotics,
       lab_organisms, lab_growth_types, lab_culture_messages, lab_report_templates,
       lab_result_values, lab_results, lab_samples, lab_parameter_ranges, lab_parameters, lab_sequences,

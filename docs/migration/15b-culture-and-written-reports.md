@@ -1,7 +1,7 @@
 # Step 15b — Laboratory: culture and sensitivity, written reports (histopathology)
 
 Status: **done** (2026-10-31). Previous: [step 15a](15a-operation-theatre.md) · Screens:
-[step 16b](16b-lab-screens.md) · Next: step 15c (inpatient care gaps).
+[step 16b](16b-lab-screens.md) · Next: [step 15c](15c-inpatient-care.md).
 
 The second gap the page-by-page check of the old UI found. Step 10c had left out culture reports and free-text reports
 ("come later"); 14b brought the old ones over as history only. Here they are entered, verified and printed.

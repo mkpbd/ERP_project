@@ -6,7 +6,14 @@ import { MedicineCatalogue } from '../../../shared/application/contracts/medicin
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { text } from '../domain/prescription.js';
 import { TreatmentRepository, type DoseRecordRow, type SummaryRow } from '../domain/repositories.js';
-import { activePeriods, checkedSummary, dayBounds, dueTimes, TreatmentOrder } from '../domain/treatment.js';
+import {
+  activePeriods,
+  checkedSummary,
+  dayBounds,
+  dueTimes,
+  TreatmentOrder,
+  type OrderKind,
+} from '../domain/treatment.js';
 import { EmrDesk } from './emr.handlers.js';
 import { EMR_READ, EMR_WRITE } from './emr.messages.js';
 import {
@@ -69,7 +76,10 @@ export class TreatmentDesk {
   }
 }
 
-/** Old RxIpdTreatment entry: a medicine ordered with its dose, route and times (from now, or a set time). */
+/**
+ * Old RxIpdTreatment and Non Medication Order entry: a medicine with its dose, route and times, or nursing care with
+ * its times (from now, or a set time).
+ */
 @CommandHandler(StartOrderCommand)
 export class StartOrderHandler implements ICommandHandler<StartOrderCommand> {
   constructor(private readonly desk: TreatmentDesk) {}
@@ -81,7 +91,7 @@ export class StartOrderHandler implements ICommandHandler<StartOrderCommand> {
     const admission = await emr.admitted(admissionId);
     const doctorId = await desk.doctorFor(actor, input.doctorId);
     let drugName = input.drugName;
-    if (input.productId) {
+    if (input.productId && input.kind === 'medicine') {
       const product = (await desk.medicines.find([input.productId])).get(input.productId);
       if (!product) throw new NotFoundError('medicine');
       drugName = product.name;
@@ -293,22 +303,24 @@ export class ListOrdersHandler implements IQueryHandler<ListOrdersQuery> {
 export class GetChartHandler implements IQueryHandler<GetChartQuery> {
   constructor(private readonly desk: TreatmentDesk) {}
 
-  async execute({ actor, admissionId, day }: GetChartQuery) {
+  async execute({ actor, admissionId, day, kind }: GetChartQuery) {
     const { desk } = this;
     const { emr } = desk;
     await emr.access.authorize(actor.userId, { permissions: [EMR_READ] });
-    return chart(desk, admissionId, day ?? emr.dayOf(emr.clock.now()));
+    return chart(desk, admissionId, day ?? emr.dayOf(emr.clock.now()), kind);
   }
 }
 
-export async function chart(desk: TreatmentDesk, admissionId: string, day: string) {
+export async function chart(desk: TreatmentDesk, admissionId: string, day: string, kind: OrderKind | null = null) {
   const { emr } = desk;
   const [admission] = await emr.inpatients.find([admissionId]);
   if (!admission) throw new NotFoundError('admission');
   const timeZone = emr.settings.timeZone;
   const [from, to] = dayBounds(day, timeZone);
   const now = emr.clock.now();
-  const orders = await desk.named(await desk.read.orders(admissionId));
+  const orders = (await desk.named(await desk.read.orders(admissionId))).filter(
+    (order) => kind === null || order.kind === kind,
+  );
   const doses = await desk.read.doses(admissionId, from, to);
   const shown = orders
     .map((order) => {

@@ -47,8 +47,16 @@ const moneyShape = {
   reference: z.string().trim().max(100).nullable().default(null),
 };
 
-const policyShape = { roundFeePerNight: money, serviceChargePercent: percent, counterDiscountPercent: percent };
-class IpdPolicyDto extends createZodDto(z.strictObject(policyShape)) {}
+const policyShape = {
+  roundFeePerNight: money,
+  serviceChargePercent: percent,
+  counterDiscountPercent: percent,
+  /** Visitor passes in force at once for one admitted patient (left out: 2). */
+  visitorPassLimit: z.int().min(1).max(10),
+};
+class IpdPolicyDto extends createZodDto(
+  z.strictObject({ ...policyShape, visitorPassLimit: policyShape.visitorPassLimit.default(2) }),
+) {}
 class IpdPolicyResponseDto extends responseDto(policyShape) {}
 
 class ChargeDto extends createZodDto(

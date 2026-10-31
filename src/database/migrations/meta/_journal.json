@@ -428,6 +428,13 @@
       "when": 1793428991619,
       "tag": "0060_lab_culture_and_written_reports",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1793432531061,
+      "tag": "0061_inpatient_care",
+      "breakpoints": true
     }
   ]
 }

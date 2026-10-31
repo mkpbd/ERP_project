@@ -239,4 +239,79 @@ describe('treatment', () => {
     await cl('post', `admissions/${admission}/discharge-summary/reopen`, doctor, { version: 3 }).expect(200);
     expect((await pdf('clinical.discharge-summary', { admissionId: admission })).body.code).toBe('not_signed');
   });
+
+  it('orders nursing care done at its times, and charts observations at the rounds with their flags', async () => {
+    // Care: turning every 2 hours, ordered by the doctor, done by the nurse.
+    const turning = {
+      order: 'Turn the patient',
+      instruction: 'Left, back, right',
+      schedule: 'interval',
+      intervalHours: 2,
+    };
+    expect((await cl('post', `admissions/${admission}/care-orders`, nurse, turning)).status).toBe(403);
+    const care = await cl('post', `admissions/${admission}/care-orders`, doctor, turning).expect(201);
+    const [order] = (await cl('get', `admissions/${admission}/orders`, nurse).expect(200)).body.items;
+    expect(order).toMatchObject({ kind: 'care', drugName: 'Turn the patient', dose: 'Left, back, right', route: null });
+    await cl('post', `orders/${care.body.id}/doses`, nurse, { dueAt: order.startAt, outcome: 'given' }).expect(201);
+    const careChart = await cl('get', `admissions/${admission}/chart?kind=care`, nurse).expect(200);
+    expect(careChart.body.orders[0].slots[0].state).toBe('given');
+    expect((await cl('get', `admissions/${admission}/chart?kind=medicine`, nurse).expect(200)).body.orders).toEqual([]);
+    expect((await pdf('clinical.care-chart', { admissionId: admission, day: today })).status).toBe(200);
+
+    // The wards' rounds cover the day; a reading answers the round of its time.
+    for (const [name, startTime, endTime] of [
+      ['Morning', '06:00', '12:00'],
+      ['Day', '12:00', '18:00'],
+      ['Evening', '18:00', '22:00'],
+      ['Night', '22:00', '06:00'],
+    ]) {
+      await cl('post', 'observation-rounds', admin, { name, startTime, endTime }).expect(201);
+    }
+    const observe = (body: object, token = nurse) => cl('post', `admissions/${admission}/observations`, token, body);
+    expect((await observe({ pulse: 80 }, doctor)).status).toBe(403);
+    expect((await observe({ systolic: 120 })).body.code).toBe('invalid_vitals');
+    expect((await observe({ pulse: 400 })).body.code).toBe('invalid_vitals');
+    expect((await observe({})).body.code).toBe('invalid_vitals');
+    const ahead = new Date(Date.now() + 3_600_000).toISOString();
+    expect((await observe({ pulse: 80, takenAt: ahead })).body.code).toBe('invalid_time');
+    const reading = await observe({
+      temperatureF: 101.2,
+      pulse: 124,
+      respRate: 22,
+      systolic: 128,
+      diastolic: 82,
+      spo2: 95,
+      painScore: 4,
+      note: 'Restless',
+    }).expect(201);
+    expect(reading.body.flags).toEqual(['fever', 'tachycardia']);
+
+    const sheet = await cl('get', `admissions/${admission}/observations`, doctor).expect(200);
+    expect(sheet.body.items).toHaveLength(1);
+    expect(sheet.body.items[0]).toMatchObject({ temperatureF: 101.2, pulse: 124, recordedByName: 'nurse' });
+    expect(['Morning', 'Day', 'Evening', 'Night']).toContain(sheet.body.items[0].roundName);
+    const board = await cl('get', 'observation-board', nurse).expect(200);
+    expect(board.body.rounds.map((round: { name: string }) => round.name)).toEqual([
+      'Morning',
+      'Day',
+      'Evening',
+      'Night',
+    ]);
+    const [bedside] = board.body.patients;
+    expect(bedside.rounds.filter((state: string | null) => state === 'done')).toHaveLength(1);
+    expect(bedside.lastFlags).toEqual(['fever', 'tachycardia']);
+    expect((await pdf('clinical.observation-chart', { admissionId: admission, from: today, to: today })).status).toBe(
+      200,
+    );
+
+    // Entered on the wrong patient: struck through, kept, and no longer counted.
+    expect((await cl('post', `observations/${reading.body.id}/strike`, nurse, { reason: ' ' })).body.code).toBe(
+      'invalid_text',
+    );
+    await cl('post', `observations/${reading.body.id}/strike`, nurse, { reason: 'Wrong patient' }).expect(204);
+    const struck = await cl('get', `admissions/${admission}/observations`, nurse).expect(200);
+    expect(struck.body.items[0]).toMatchObject({ struckReason: 'Wrong patient', struckByName: 'nurse' });
+    const after = (await cl('get', 'observation-board', nurse).expect(200)).body.patients[0];
+    expect([after.rounds.includes('done'), after.lastFlags]).toEqual([false, []]);
+  });
 });

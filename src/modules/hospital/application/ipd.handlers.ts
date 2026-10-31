@@ -17,6 +17,7 @@ import {
   AdmissionReadRepository,
   AdmitPatientCommand,
   ChangeAdmissionCommand,
+  CorrectAdmissionCommand,
   GetAdmissionQuery,
   GetBedBoardQuery,
   IPD_ADMIT,
@@ -290,6 +291,47 @@ export class ChangeAdmissionHandler implements ICommandHandler<ChangeAdmissionCo
   }
 }
 
+/**
+ * Old admission edit after admitting: the kind, the reason, the referring doctor and who pays put right while the
+ * patient is in. Who pays is not changed once the final bill is made (cancel it first); a new credit client is held to
+ * its limit as on admission.
+ */
+@CommandHandler(CorrectAdmissionCommand)
+export class CorrectAdmissionHandler implements ICommandHandler<CorrectAdmissionCommand> {
+  constructor(private readonly desk: IpdDesk) {}
+
+  async execute({ actor, id, version, correction }: CorrectAdmissionCommand) {
+    const { desk } = this;
+    const { opd } = desk;
+    await opd.access.authorize(actor.userId, { permissions: [IPD_ADMIT] });
+    return opd.tx.run(async () => {
+      const admission = await desk.admissions.findForUpdate(id);
+      if (!admission) throw new NotFoundError('admission');
+      admission.assertVersion(version);
+      if (correction.referredById && (await opd.bills.doctors([correction.referredById])).size === 0) {
+        throw new NotFoundError('referring_doctor');
+      }
+      if (admission.payerDiffers(correction)) {
+        if (await desk.billing.liveBill(id)) throw new ConflictError('bill_made', 'Cancel the final bill first');
+        const payer = await opd.payer(correction.corporateClientId, correction.staffId);
+        if (payer.kind === 'corporate' && payer.client.payment === 'credit' && payer.client.creditLimit !== null) {
+          const owed = await opd.bills.corporateDue(payer.client.id);
+          if (owed >= payer.client.creditLimit) {
+            throw new DomainError(
+              'credit_limit',
+              `${payer.client.name} owes ${owed.toFixed(2)}, at or over its limit of ${payer.client.creditLimit.toFixed(2)}`,
+            );
+          }
+        }
+      }
+      const changed = admission.correct(correction, opd.clock.now());
+      await desk.admissions.update(admission);
+      await desk.record('corrected', actor, id, { changed: changed.join(', ') });
+      return { version: admission.toSnapshot().version, changed };
+    });
+  }
+}
+
 /** Old house-keeping dashboard (never reached: nothing set a bed to housekeeping): a bed ready again, or out of order. */
 @CommandHandler(SetBedStatusCommand)
 export class SetBedStatusHandler implements ICommandHandler<SetBedStatusCommand> {
@@ -353,6 +395,7 @@ export const IPD_HANDLERS = [
   IpdDesk,
   AdmitPatientHandler,
   ChangeAdmissionHandler,
+  CorrectAdmissionHandler,
   SetBedStatusHandler,
   ListAdmissionsHandler,
   GetAdmissionHandler,

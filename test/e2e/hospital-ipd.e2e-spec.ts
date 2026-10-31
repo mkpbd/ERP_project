@@ -325,4 +325,67 @@ describe('admissions, beds and discharge', () => {
     expect(occupancy.find((row) => row[0] === 'General')).toEqual(['General', 2, 2, 0, 0]);
     expect(occupancy.find((row) => row[0] === 'ICU')).toEqual(['ICU', 1, 1, 0, 0]);
   });
+
+  it('puts an admission right while the patient is in, and gives visitor passes up to the limit', async () => {
+    const admitted = await api('post', 'admissions', officer, {
+      patientId: rahima,
+      bedId: bed['W-1'],
+      doctorId: nusrat,
+    }).expect(201);
+    const id = admitted.body.id as string;
+    const correct = (body: object) =>
+      request(http).put(`/api/v1/hospital/admissions/${id}`).set(bearer(officer)).send(body);
+    const unchanged = { kind: 'elective', reason: null, referredById: null, corporateClientId: null, staffId: null };
+    expect((await correct({ version: 1, ...unchanged })).body.code).toBe('nothing_changed');
+    const corrected = await correct({
+      version: 1,
+      ...unchanged,
+      kind: 'emergency',
+      reason: '  Chest pain ',
+      referredById: referrer,
+      corporateClientId: acme,
+    }).expect(200);
+    expect(corrected.body).toEqual({
+      version: 2,
+      changed: ['kind', 'reason', 'referredById', 'corporateClientId'],
+    });
+    expect((await api('get', `admissions/${id}`, officer).expect(200)).body).toMatchObject({
+      kind: 'emergency',
+      reason: 'Chest pain',
+      referredById: referrer,
+      corporateClientName: 'Acme Ltd',
+    });
+    expect((await correct({ version: 1, ...unchanged })).body.code).toBe('stale_admission');
+
+    // Two passes in force at once (the policy's default); one handed back makes room for another.
+    const pass = (visitorName: string) =>
+      api('post', `admissions/${id}/visitor-passes`, officer, {
+        visitorName,
+        relation: 'Husband',
+        mobileNo: '01711000001',
+      });
+    const first = await pass('Abdul Rahim').expect(201);
+    expect(first.body.number).toBe(`VP-${year}-00001`);
+    const second = await pass('Fatema Begum').expect(201);
+    const third = await pass('Jamal Uddin');
+    expect([third.status, third.body.code]).toEqual([409, 'pass_limit']);
+    await api('post', `visitor-passes/${first.body.id}/return`, officer).expect(204);
+    expect((await api('post', `visitor-passes/${first.body.id}/return`, officer)).body.code).toBe('pass_state');
+    await pass('Jamal Uddin').expect(201);
+    const passes = await api('get', `admissions/${id}/visitor-passes`, officer).expect(200);
+    expect(
+      passes.body.items.map((row: { visitorName: string; valid: boolean }) => [row.visitorName, row.valid]),
+    ).toEqual([
+      ['Jamal Uddin', true],
+      ['Fatema Begum', true],
+      ['Abdul Rahim', false],
+    ]);
+    const card = (passId: string) =>
+      request(http)
+        .post('/api/v1/reports/hospital.visitor-pass/render')
+        .set(bearer(admin))
+        .send({ format: 'pdf', params: { id: passId } });
+    expect((await card(second.body.id)).status).toBe(200);
+    expect((await card(first.body.id)).body.code).toBe('pass_not_valid');
+  });
 });

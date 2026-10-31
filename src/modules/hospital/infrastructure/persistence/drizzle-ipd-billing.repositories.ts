@@ -32,7 +32,12 @@ import {
 } from './hospital.schema.js';
 
 /** The policy before anyone set one: no round fee or service charge, 10 % at the counter (as at the OPD). */
-const DEFAULT_POLICY: IpdPolicy = { roundFeePerNight: 0, serviceChargePercent: 0, counterDiscountPercent: 10 };
+const DEFAULT_POLICY: IpdPolicy = {
+  roundFeePerNight: 0,
+  serviceChargePercent: 0,
+  counterDiscountPercent: 10,
+  visitorPassLimit: 2,
+};
 
 const lineColumns = {
   head: ipdBillLines.head,
@@ -65,6 +70,7 @@ export class DrizzleIpdBillingRepository extends IpdBillingRepository {
         roundFeePerNight: ipdPolicy.roundFeePerNight,
         serviceChargePercent: ipdPolicy.serviceChargePercent,
         counterDiscountPercent: ipdPolicy.counterDiscountPercent,
+        visitorPassLimit: ipdPolicy.visitorPassLimit,
       })
       .from(ipdPolicy)
       .where(eq(ipdPolicy.id, 1));

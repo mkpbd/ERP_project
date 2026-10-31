@@ -44,7 +44,7 @@ export function medicationChartReport(desk: TreatmentDesk, organization: Organiz
     params: z.strictObject({ admissionId: z.uuid(), day: z.iso.date() }),
     async load(params) {
       const { patient } = await patientOf(desk, organization, params.admissionId);
-      const view = await chart(desk, params.admissionId, params.day);
+      const view = await chart(desk, params.admissionId, params.day, 'medicine');
       const userIds = [
         ...new Set(
           view.orders.flatMap((order) => [
@@ -61,7 +61,7 @@ export function medicationChartReport(desk: TreatmentDesk, organization: Organiz
         patient,
         orders: view.orders.map((order) => ({
           ...order,
-          routeLabel: ROUTE_LABELS[order.route] ?? order.route,
+          routeLabel: order.route ? (ROUTE_LABELS[order.route] ?? order.route) : null,
           scheduleText: scheduleText(order),
           slots: order.slots.map((slot) => ({
             ...slot,
@@ -73,6 +73,47 @@ export function medicationChartReport(desk: TreatmentDesk, organization: Organiz
     },
     describe: (_params, data) => `${data.admission.number} · ${data.patient.name} · ${data.day}`,
     pdf: { engine: 'html', template: template('medication-chart'), landscape: true },
+  });
+}
+
+/** Old non-medication orders' chart: a day's nursing care, each due time done, missed or outstanding. */
+export function careChartReport(desk: TreatmentDesk, organization: OrganizationProfile): ReportDefinition {
+  return defineReport({
+    key: 'clinical.care-chart',
+    title: 'Nursing care chart',
+    group: 'Clinical',
+    description: "An admitted patient's day of nursing care: each order's due times done, missed or outstanding.",
+    params: z.strictObject({ admissionId: z.uuid(), day: z.iso.date() }),
+    async load(params) {
+      const { patient } = await patientOf(desk, organization, params.admissionId);
+      const view = await chart(desk, params.admissionId, params.day, 'care');
+      const userIds = [
+        ...new Set(
+          view.orders.flatMap((order) => [
+            ...order.slots.flatMap((slot) => (slot.record ? [slot.record.recordedBy] : [])),
+            ...order.doses.map((dose) => dose.recordedBy),
+          ]),
+        ),
+      ];
+      const users = new Map(
+        (userIds.length ? await desk.emr.users.findSummaries(userIds) : []).map((user) => [user.id, user.displayName]),
+      );
+      return {
+        ...view,
+        patient,
+        orders: view.orders.map((order) => ({
+          ...order,
+          scheduleText: scheduleText(order),
+          slots: order.slots.map((slot) => ({
+            ...slot,
+            by: slot.record ? (users.get(slot.record.recordedBy) ?? '') : null,
+          })),
+          doses: order.doses.map((dose) => ({ ...dose, by: users.get(dose.recordedBy) ?? '' })),
+        })),
+      };
+    },
+    describe: (_params, data) => `${data.admission.number} · ${data.patient.name} · ${data.day}`,
+    pdf: { engine: 'html', template: template('care-chart'), landscape: true },
   });
 }
 

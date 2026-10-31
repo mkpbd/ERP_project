@@ -86,4 +86,46 @@ describe('Admission', () => {
     expect(mistaken.toSnapshot()).toMatchObject({ status: 'cancelled', cancelReason: 'Wrong patient' });
     expect(() => mistaken.assertVersion(1)).toThrow(/changed by someone else/);
   });
+
+  it('is put right while the patient is in: what changed is told, a client and staff are not both payers', () => {
+    const admission = admit();
+    const same = {
+      kind: 'emergency' as const,
+      reason: 'Chest pain',
+      referredById: null,
+      corporateClientId: null,
+      staffId: null,
+    };
+    expect(() => admission.correct(same, at(3))).toThrow(/Nothing was changed/);
+    expect(() => admission.correct({ ...same, corporateClientId: 'acme', staffId: 's' }, at(3))).toThrow(/not both/);
+    expect(admission.payerDiffers({ corporateClientId: 'acme', staffId: null })).toBe(true);
+    expect(admission.correct({ ...same, kind: 'elective', referredById: 'dr-x' }, at(3))).toEqual([
+      'kind',
+      'referredById',
+    ]);
+    admission.discharge({ type: 'normal', note: null, by: 'officer', at: at(9) });
+    expect(() => admission.correct(same, at(10))).toThrow(/discharged admission cannot be corrected/);
+  });
+
+  it('is reopened after a discharge into a bed from now, under the consultant it had', () => {
+    const admission = admit();
+    expect(() => admission.reopen({ id: 'w1', dailyRate: 1200 }, 'Mistake', 'manager', at(4))).toThrow(
+      /admitted admission is not reopened/,
+    );
+    admission.discharge({ type: 'lama', note: 'Left', by: 'officer', at: at(9) });
+    expect(() => admission.reopen({ id: 'w1', dailyRate: 1200 }, ' ', 'manager', at(10))).toThrow(/reason/);
+    admission.reopen({ id: 'w3', dailyRate: 900 }, 'Wrong patient discharged', 'manager', at(10));
+    const snapshot = admission.toSnapshot();
+    expect(snapshot).toMatchObject({
+      status: 'admitted',
+      dischargedAt: null,
+      dischargeType: null,
+      dischargeNote: null,
+    });
+    expect(admission.currentBedId).toBe('w3');
+    expect(snapshot.stays.at(-1)).toMatchObject({ fromAt: at(10), reason: 'Reopened: Wrong patient discharged' });
+    // The time out of hospital is no stay.
+    expect(snapshot.stays.at(-2)?.toAt).toEqual(at(9));
+    expect(admission.primaryDoctorId).toBe('nusrat');
+  });
 });

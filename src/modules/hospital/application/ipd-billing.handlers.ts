@@ -13,6 +13,7 @@ import { text } from '../domain/patient.js';
 import {
   DiagnosticBillRepository,
   OtCaseRepository,
+  type AdmissionBed,
   type DoctorLedgerEntry,
   type IpdPolicy,
 } from '../domain/repositories.js';
@@ -39,7 +40,7 @@ import {
   type IpdBillLineView,
 } from './ipd-billing.messages.js';
 import { IpdDesk } from './ipd.handlers.js';
-import { IPD_MANAGE, IPD_READ } from './ipd.messages.js';
+import { IPD_MANAGE, IPD_READ, ReopenAdmissionCommand } from './ipd.messages.js';
 import {
   CONSULTANT_PAYABLE_ROLE,
   CORPORATE_RECEIVABLE_ROLE,
@@ -236,6 +237,44 @@ export class IpdCashier {
       payments,
       openIndents: snapshot.status === 'admitted' ? await this.medicine.openIndents(admissionId) : 0,
     };
+  }
+
+  /**
+   * The bill cancelled with a reason: its income, discount, due and shares reversed in one voucher; what was put in
+   * against it is held as advance again. Returns that amount.
+   */
+  async cancelBill(bill: IpdBill, reason: string, actor: Actor, mayCancelLater: boolean): Promise<number> {
+    const { opd } = this;
+    const id = bill.id;
+    const today = opd.today();
+    const { held, dueCleared } = bill.cancel({
+      reason,
+      on: today,
+      by: actor.userId,
+      mayCancelLater,
+      now: opd.clock.now(),
+    });
+    const header = bill.toSnapshot();
+    const narration = `Cancelled final bill ${header.number}`;
+    const voucher = await opd.post(
+      narration,
+      today,
+      bill.id,
+      [
+        ...incomeLines(bill, narration, 'debit'),
+        { account: { role: IPD_DISCOUNT_ROLE }, debit: 0, credit: header.discount, narration },
+        { account: { role: receivableRole(bill.payer) }, debit: 0, credit: dueCleared, narration },
+        { account: { role: IPD_ADVANCE_ROLE }, debit: 0, credit: held, narration },
+        { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: bill.share, credit: 0, narration },
+        { account: { role: DOCTOR_FEE_ROLE }, debit: 0, credit: bill.share, narration },
+      ],
+      actor,
+    );
+    bill.cancelPosted(voucher?.number ?? null);
+    await this.billing.updateBill(bill);
+    await opd.bills.addLedger(shareEntries(bill, 'reversal', today));
+    await this.record('cancelled', actor, id, { reason, held, voucher: voucher?.number ?? null });
+    return held;
   }
 
   record(action: string, actor: Actor, id: string, metadata: Record<string, string | number | null> = {}) {
@@ -505,36 +544,65 @@ export class CancelIpdBillHandler implements ICommandHandler<CancelIpdBillComman
       if (admission.status !== 'admitted') {
         throw new DomainError('admission_state', `The patient is ${admission.status}; the bill stands`);
       }
-      const today = opd.today();
-      const { held, dueCleared } = bill.cancel({
-        reason,
-        on: today,
-        by: actor.userId,
-        mayCancelLater,
-        now: opd.clock.now(),
-      });
-      const header = bill.toSnapshot();
-      const narration = `Cancelled final bill ${header.number}`;
-      const voucher = await opd.post(
-        narration,
-        today,
-        bill.id,
-        [
-          ...incomeLines(bill, narration, 'debit'),
-          { account: { role: IPD_DISCOUNT_ROLE }, debit: 0, credit: header.discount, narration },
-          { account: { role: receivableRole(bill.payer) }, debit: 0, credit: dueCleared, narration },
-          { account: { role: IPD_ADVANCE_ROLE }, debit: 0, credit: held, narration },
-          { account: { role: CONSULTANT_PAYABLE_ROLE }, debit: bill.share, credit: 0, narration },
-          { account: { role: DOCTOR_FEE_ROLE }, debit: 0, credit: bill.share, narration },
-        ],
-        actor,
-      );
-      bill.cancelPosted(voucher?.number ?? null);
-      await cashier.billing.updateBill(bill);
-      await opd.bills.addLedger(shareEntries(bill, 'reversal', today));
-      await cashier.record('cancelled', actor, id, { reason, held, voucher: voucher?.number ?? null });
-      return { held };
+      return { held: await cashier.cancelBill(bill, reason, actor, mayCancelLater) };
     });
+  }
+}
+
+/**
+ * Old Bring Discharged Patient To Live: a discharge undone by a manager, with a reason. The final bill is cancelled as a
+ * bill cancel does (what was put in against it held as advance again); a bill already paid, at the counter or
+ * collected later, stands, and the patient is admitted again instead. The patient goes back into the bed they left
+ * when no one else has taken it, or into the bed given.
+ */
+@CommandHandler(ReopenAdmissionCommand)
+export class ReopenAdmissionHandler implements ICommandHandler<ReopenAdmissionCommand> {
+  constructor(private readonly cashier: IpdCashier) {}
+
+  async execute({ actor, id, version, reason, bedId }: ReopenAdmissionCommand) {
+    const { cashier } = this;
+    const { opd, desk } = cashier;
+    await opd.access.authorize(actor.userId, { permissions: [IPD_MANAGE] });
+    return opd.tx.run(async () => {
+      const admission = await desk.admissions.findForUpdate(id);
+      if (!admission) throw new NotFoundError('admission');
+      admission.assertVersion(version);
+      if (admission.status !== 'discharged') {
+        throw new DomainError('admission_state', `A ${admission.status} admission is not reopened`);
+      }
+      await opd.tx.lock(`hospital:admission:${admission.patientId}`);
+      if (await desk.admissions.activeOf(admission.patientId)) {
+        throw new ConflictError('already_admitted', 'The patient is admitted again already');
+      }
+      const live = await cashier.billing.liveBill(id);
+      if (live) {
+        const { paid, collected } = live.toSnapshot();
+        if (paid + collected > 0) {
+          throw new ConflictError('bill_paid', 'The final bill is paid; admit the patient again instead');
+        }
+      }
+      const bed = await this.bedFor(admission, bedId);
+      admission.reopen(bed, reason, actor.userId, opd.clock.now());
+      await desk.admissions.update(admission);
+      await desk.admissions.setBedStatus(bed.id, 'occupied');
+      const held = live ? await cashier.cancelBill(live, `Reopened: ${reason.trim()}`, actor, true) : 0;
+      await desk.record('reopened', actor, id, { bed: bed.code, bill: live?.number ?? null, held });
+      return { version: admission.toSnapshot().version, bill: live?.number ?? null, held };
+    });
+  }
+
+  /** The bed given (free), or the one the patient left: free, or still being made ready after them. */
+  private async bedFor(admission: Admission, bedId: string | null): Promise<AdmissionBed> {
+    const { desk, opd } = this.cashier;
+    if (bedId) return desk.freeBed(bedId);
+    const lastBedId = admission.lastBedId;
+    if (!lastBedId) throw new DomainError('bed_needed', 'Give the bed');
+    await opd.tx.lock(`hospital:bed:${lastBedId}`);
+    const bed = await desk.admissions.bedForUpdate(lastBedId);
+    if (!bed || !bed.isActive || (bed.status !== 'available' && bed.status !== 'housekeeping')) {
+      throw new ConflictError('bed_unavailable', 'The bed the patient left is taken; give another bed');
+    }
+    return bed;
   }
 }
 
@@ -624,6 +692,7 @@ export const IPD_BILLING_HANDLERS = [
   MoveIpdAdvanceHandler,
   MakeIpdBillHandler,
   CancelIpdBillHandler,
+  ReopenAdmissionHandler,
   CollectIpdDueHandler,
   GetIpdAccountHandler,
   ListIpdBillsHandler,

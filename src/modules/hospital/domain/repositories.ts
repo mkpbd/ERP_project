@@ -6,6 +6,7 @@ import type { InvestigationBill, IpdBill, IpdCharge, StayDays } from './ipd-bill
 import type { OpdBill, PaymentMethod } from './opd-bill.js';
 import type { OtCase } from './ot-case.js';
 import type { IdType, Patient } from './patient.js';
+import type { VisitorPass } from './visitor-pass.js';
 
 export interface PatientMatch {
   readonly id: string;
@@ -195,6 +196,8 @@ export interface IpdPolicy {
   readonly roundFeePerNight: number;
   readonly serviceChargePercent: number;
   readonly counterDiscountPercent: number;
+  /** Visitor passes in force at once for one admitted patient. */
+  readonly visitorPassLimit: number;
 }
 
 export type IpdPaymentKind = 'advance' | 'refund' | 'payment' | 'collection';
@@ -296,6 +299,15 @@ export interface OtRoom {
   readonly id: string;
   readonly name: string;
   readonly isActive: boolean;
+}
+
+/** Visitor passes of admitted patients' attendants (step 15c). */
+export abstract class VisitorPassRepository {
+  /** Passes of the admission still in force. */
+  abstract activeCount(admissionId: string): Promise<number>;
+  abstract insert(pass: VisitorPass): Promise<void>;
+  abstract findForUpdate(id: string): Promise<VisitorPass | null>;
+  abstract update(pass: VisitorPass): Promise<void>;
 }
 
 /** The operation theatre (step 15a): operations of admitted patients and the rooms they are done in. */

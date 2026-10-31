@@ -19,6 +19,7 @@ function order(schedule: 'times' | 'interval' | 'once' | 'prn', extra: object = 
     id: 'o',
     admissionId: 'a',
     patientId: 'p',
+    kind: 'medicine',
     productId: null,
     drugName: 'Inj. Ceftriaxone 1 g',
     dose: '1 g',
@@ -99,6 +100,14 @@ describe('an order', () => {
     expect(activePeriods(ordered.toSnapshot().events)).toEqual([
       [local('2026-10-30', '07:00'), local('2026-10-30', '09:00')],
     ]);
+  });
+
+  it('is nursing care with no medicine and no route, or a medicine with its dose and route', () => {
+    const care = order('interval', { kind: 'care', drugName: ' Turn the patient ', dose: null, route: null });
+    expect(care.toSnapshot()).toMatchObject({ kind: 'care', drugName: 'Turn the patient', dose: null, route: null });
+    expect(() => order('once', { kind: 'care', drugName: 'Dressing', dose: null, route: 'iv' })).toThrow(/no route/);
+    expect(() => order('once', { kind: 'care', drugName: ' ', dose: null, route: null })).toThrow(/care ordered/);
+    expect(() => order('once', { route: null })).toThrow(/Give the route/);
   });
 });
 

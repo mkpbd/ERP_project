@@ -153,4 +153,7 @@ export class GetRecordsQuery extends Query<RecordsOfAdmission> {
 }
 
 /** Kept through the shared record stores (note templates: rx:read / rx:manage). */
-export const CLINICAL_RECORDS = { noteTemplate: 'clinical_note_template' } as const;
+export const CLINICAL_RECORDS = {
+  noteTemplate: 'clinical_note_template',
+  observationRound: 'clinical_observation_round',
+} as const;

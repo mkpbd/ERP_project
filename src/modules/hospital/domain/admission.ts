@@ -203,6 +203,73 @@ export class Admission {
     return left;
   }
 
+  /**
+   * Old admission edit after admitting: the kind, the reason, who referred the patient and who pays, put right while
+   * the patient is in. Returns the fields changed (nothing changed is refused).
+   */
+  correct(
+    fields: {
+      kind: AdmissionKind;
+      reason: string | null;
+      referredById: string | null;
+      corporateClientId: string | null;
+      staffId: string | null;
+    },
+    at: Date,
+  ): string[] {
+    this.assertAdmitted('corrected');
+    if (fields.corporateClientId && fields.staffId) {
+      throw new DomainError('invalid_payer', 'A stay is paid by a client or as a staff member, not both');
+    }
+    const next = { ...fields, reason: text(fields.reason, 500, 'reason for admission') };
+    const changed = (Object.keys(next) as (keyof typeof next)[]).filter((key) => next[key] !== this.props[key]);
+    if (changed.length === 0) throw new DomainError('nothing_changed', 'Nothing was changed');
+    Object.assign(this.props, next);
+    this.touch(at);
+    return changed;
+  }
+
+  /** Who pays is changed: a different client, staff member or the patient. */
+  payerDiffers(fields: { corporateClientId: string | null; staffId: string | null }): boolean {
+    return fields.corporateClientId !== this.props.corporateClientId || fields.staffId !== this.props.staffId;
+  }
+
+  get lastBedId(): string | null {
+    return this.props.stays.at(-1)?.bedId ?? null;
+  }
+
+  get dischargedAt(): Date | null {
+    return this.props.dischargedAt;
+  }
+
+  /**
+   * Old Bring Discharged Patient To Live: a discharge undone, the patient back in a bed from now (the time out of
+   * hospital is not a stay) under the consultant they had. The discharge is forgotten; the reason stays with the bed.
+   */
+  reopen(bed: { id: string; dailyRate: number }, reason: string, by: string, at: Date): void {
+    if (this.props.status !== 'discharged') {
+      throw new DomainError('admission_state', `A ${this.props.status} admission is not reopened`);
+    }
+    const why = text(reason, 200, 'reason');
+    if (!why) throw new DomainError('invalid_remarks', 'Give the reason for reopening');
+    const consultant = this.props.doctors.filter((doctor) => doctor.role === 'primary').at(-1);
+    this.props.stays.push({
+      bedId: bed.id,
+      fromAt: at,
+      toAt: null,
+      dailyRate: bed.dailyRate,
+      reason: `Reopened: ${why}`,
+      movedBy: by,
+    });
+    if (consultant) this.props.doctors.push({ doctorId: consultant.doctorId, role: 'primary', fromAt: at, toAt: null });
+    this.props.status = 'admitted';
+    this.props.dischargedAt = null;
+    this.props.dischargeType = null;
+    this.props.dischargeNote = null;
+    this.props.closedBy = null;
+    this.touch(at);
+  }
+
   assertVersion(version: number): void {
     if (version !== this.props.version) {
       throw new ConflictError('stale_admission', 'The admission was changed by someone else; reload it');

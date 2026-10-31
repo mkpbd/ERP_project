@@ -14,9 +14,22 @@ import { HISTORY_HANDLERS } from './application/history.handlers.js';
 import { HistoryReadRepository } from './application/history.messages.js';
 import { ClinicDesk, RX_HANDLERS } from './application/rx.handlers.js';
 import { CLINICAL_SETTINGS, ClinicalReadRepository, type ClinicalSettings } from './application/rx.messages.js';
+import { OBSERVATION_HANDLERS, ObservationDesk } from './application/observation.handlers.js';
+import { ObservationReadRepository } from './application/observation.messages.js';
 import { TREATMENT_HANDLERS, TreatmentDesk } from './application/treatment.handlers.js';
 import { TreatmentReadRepository } from './application/treatment.messages.js';
-import { ClinicalRepository, EmrRepository, TreatmentRepository } from './domain/repositories.js';
+import {
+  ClinicalRepository,
+  EmrRepository,
+  ObservationRepository,
+  TreatmentRepository,
+} from './domain/repositories.js';
+import {
+  DrizzleObservationReadRepository,
+  DrizzleObservationRepository,
+} from './infrastructure/persistence/drizzle-observation.repositories.js';
+import { observationChartReport } from './infrastructure/reports/observation.reports.js';
+import { OBSERVATION_CONTROLLERS } from './presentation/observation.controllers.js';
 import { clinicalRecordTypes } from './infrastructure/persistence/clinical.record-stores.js';
 import {
   DrizzleEmrReadRepository,
@@ -34,7 +47,11 @@ import {
 import { DrizzleHistoryReadRepository } from './infrastructure/persistence/drizzle-history.repository.js';
 import { historyRecordReport } from './infrastructure/reports/history.reports.js';
 import { prescriptionReport } from './infrastructure/reports/rx.reports.js';
-import { dischargeSummaryReport, medicationChartReport } from './infrastructure/reports/treatment.reports.js';
+import {
+  careChartReport,
+  dischargeSummaryReport,
+  medicationChartReport,
+} from './infrastructure/reports/treatment.reports.js';
 import {
   DrizzleTreatmentReadRepository,
   DrizzleTreatmentRepository,
@@ -56,14 +73,17 @@ import { RxController } from './presentation/rx.controllers.js';
  * History (step 13f): the old system's prescriptions, reports, discharge certificates and notes, brought over read-only.
  */
 @Module({
-  controllers: [RxController, ...EMR_CONTROLLERS, TreatmentController, HistoryController],
+  controllers: [RxController, ...EMR_CONTROLLERS, TreatmentController, HistoryController, ...OBSERVATION_CONTROLLERS],
   providers: [
     ...RX_HANDLERS,
     ...EMR_HANDLERS,
     ...TREATMENT_HANDLERS,
+    ...OBSERVATION_HANDLERS,
     ...HISTORY_HANDLERS,
     { provide: HistoryReadRepository, useClass: DrizzleHistoryReadRepository },
     { provide: TreatmentRepository, useClass: DrizzleTreatmentRepository },
+    { provide: ObservationRepository, useClass: DrizzleObservationRepository },
+    { provide: ObservationReadRepository, useClass: DrizzleObservationReadRepository },
     { provide: TreatmentReadRepository, useClass: DrizzleTreatmentReadRepository },
     { provide: EmrRepository, useClass: DrizzleEmrRepository },
     { provide: EmrReadRepository, useClass: DrizzleEmrReadRepository },
@@ -84,6 +104,7 @@ export class ClinicalModule implements OnModuleInit {
     private readonly desk: ClinicDesk,
     private readonly emr: EmrDesk,
     private readonly treatment: TreatmentDesk,
+    private readonly observations: ObservationDesk,
     private readonly organization: OrganizationProfile,
     private readonly documents: PatientDocumentRegistry,
     private readonly history: HistoryReadRepository,
@@ -99,6 +120,8 @@ export class ClinicalModule implements OnModuleInit {
     this.reports.register(deathCertificateReport(this.emr, this.organization));
     this.reports.register(birthCertificateReport(this.emr, this.organization));
     this.reports.register(medicationChartReport(this.treatment, this.organization));
+    this.reports.register(careChartReport(this.treatment, this.organization));
+    this.reports.register(observationChartReport(this.observations, this.organization));
     this.reports.register(dischargeSummaryReport(this.treatment, this.organization));
     this.reports.register(historyRecordReport(this.history, this.patients, this.organization));
   }

@@ -150,6 +150,43 @@ export class ChangeAdmissionCommand extends Command<void> {
   }
 }
 
+/** The admission's own fields put right while the patient is in (who pays only before the final bill). */
+export interface AdmissionCorrection {
+  readonly kind: AdmissionKind;
+  readonly reason: string | null;
+  readonly referredById: string | null;
+  readonly corporateClientId: string | null;
+  readonly staffId: string | null;
+}
+
+export class CorrectAdmissionCommand extends Command<{ version: number; changed: string[] }> {
+  constructor(
+    readonly actor: Actor,
+    readonly id: string,
+    readonly version: number,
+    readonly correction: AdmissionCorrection,
+  ) {
+    super();
+  }
+}
+
+/**
+ * A discharge undone (the patient discharged by mistake, or back before leaving): the final bill is cancelled and the
+ * patient goes back into their bed, or the bed given.
+ */
+export class ReopenAdmissionCommand extends Command<{ version: number; bill: string | null; held: number }> {
+  constructor(
+    readonly actor: Actor,
+    readonly id: string,
+    readonly version: number,
+    readonly reason: string,
+    /** Null: the bed the patient left, if it is free (or still being made ready). */
+    readonly bedId: string | null,
+  ) {
+    super();
+  }
+}
+
 /** A bed made ready after housekeeping, taken out of order, or back in order. */
 export class SetBedStatusCommand extends Command<void> {
   constructor(

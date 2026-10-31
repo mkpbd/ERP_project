@@ -396,4 +396,44 @@ describe('the indoor bill', () => {
     await api('post', `admissions/${mistaken.body.id}/cancel`, manager, { version: 1, reason: 'Wrong' }).expect(204);
     expect(await closing('advance')).toBe(0);
   });
+
+  it('undoes a discharge made by mistake, cancelling the unpaid bill, but not once the bill is paid', async () => {
+    const admitted = await api('post', 'admissions', cashier, {
+      patientId: rahima,
+      bedId: bed['W-1'],
+      doctorId: nusrat,
+      advance: { amount: 1000, method: 'cash' },
+    }).expect(201);
+    const id = admitted.body.id as string;
+    await backdate(id, 1);
+    const billed = await api('post', `admissions/${id}/final-bill`, cashier, {}).expect(201);
+    await api('post', `admissions/${id}/discharge`, manager, { version: 1 }).expect(204);
+
+    // A manager undoes it: the bill is cancelled, the advance held again, the patient back in W-1.
+    expect(
+      (await api('post', `admissions/${id}/reopen`, cashier, { version: 2, reason: 'Wrong patient' })).status,
+    ).toBe(403);
+    const reopened = await api('post', `admissions/${id}/reopen`, manager, {
+      version: 2,
+      reason: 'Wrong patient discharged',
+    }).expect(200);
+    expect(reopened.body).toEqual({ version: 3, bill: billed.body.number, held: 1000 });
+    const back = await api('get', `admissions/${id}`, manager).expect(200);
+    expect(back.body).toMatchObject({ status: 'admitted', bedCode: 'W-1', dischargedAt: null, dischargeType: null });
+    expect((await api('get', `ipd-bills/${billed.body.id}`, manager).expect(200)).body.status).toBe('cancelled');
+    expect((await api('get', `admissions/${id}/account`, manager).expect(200)).body.held).toBe(1000);
+    const twice = await api('post', `admissions/${id}/reopen`, manager, { version: 3, reason: 'Again' });
+    expect(twice.body.code).toBe('admission_state');
+
+    // Billed again and paid at the counter: the discharge stands; the patient is admitted again instead.
+    const rebilled = await api('post', `admissions/${id}/final-bill`, cashier, {}).expect(201);
+    expect(rebilled.body.due).toBeGreaterThan(0);
+    await api('post', `ipd-bills/${rebilled.body.id}/collections`, cashier, {
+      version: 1,
+      amount: rebilled.body.due,
+    }).expect(201);
+    await api('post', `admissions/${id}/discharge`, cashier, { version: 3 }).expect(204);
+    const paid = await api('post', `admissions/${id}/reopen`, manager, { version: 4, reason: 'Came back' });
+    expect([paid.status, paid.body.code]).toEqual([409, 'bill_paid']);
+  });
 });

@@ -1,4 +1,5 @@
 import type { BirthDetails, ClinicalNote, DeathDetails } from './emr.js';
+import type { ObservationInput, ObservationRound } from './observation.js';
 import type { PhraseKind, Prescription, TemplateProps } from './prescription.js';
 import type { SummaryContent, TreatmentOrder } from './treatment.js';
 
@@ -108,4 +109,27 @@ export abstract class TreatmentRepository {
   abstract insertDose(dose: DoseRecordRow): Promise<void>;
   abstract summaryForUpdate(admissionId: string): Promise<SummaryRow | null>;
   abstract saveSummary(summary: SummaryRow, isNew: boolean): Promise<void>;
+}
+
+/** An observation as kept (step 15c). */
+export interface ObservationRow extends ObservationInput {
+  readonly id: string;
+  readonly admissionId: string;
+  readonly patientId: string;
+  readonly takenAt: Date;
+  readonly roundId: string | null;
+  readonly roundOn: string | null;
+  readonly recordedBy: string;
+  readonly struckAt: Date | null;
+  readonly struckBy: string | null;
+  readonly struckReason: string | null;
+  readonly createdAt: Date;
+}
+
+export abstract class ObservationRepository {
+  /** The active rounds, by start time. */
+  abstract rounds(): Promise<ObservationRound[]>;
+  abstract insert(row: ObservationRow): Promise<void>;
+  abstract findForUpdate(id: string): Promise<ObservationRow | null>;
+  abstract strike(id: string, by: string, at: Date, reason: string): Promise<void>;
 }

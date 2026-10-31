@@ -1,0 +1,40 @@
+{{#with data}}
+<p>
+  <b>{{patient.name}}</b> · UHID {{patient.uhidLabel}} · Admission <b>{{admission.number}}</b> · Observations from
+  <b>{{date from}}</b> to <b>{{date to}}</b>
+</p>
+{{#if observations.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 12%">Taken</th><th style="width: 8%">Round</th><th>Temp °F</th><th>Pulse</th><th>RR</th>
+      <th>BP</th><th>SpO2</th><th>Pain</th><th>Sugar</th><th>In / out ml</th><th style="width: 18%">Note</th>
+      <th style="width: 11%">By</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each observations}}
+    <tr{{#if struckAt}} style="text-decoration: line-through; color: #777"{{/if}}>
+      <td>{{datetime takenAt}}</td>
+      <td>{{roundName}}</td>
+      <td>{{temperatureF}}</td>
+      <td>{{pulse}}</td>
+      <td>{{respRate}}</td>
+      <td>{{bp}}</td>
+      <td>{{spo2}}</td>
+      <td>{{painScore}}</td>
+      <td>{{bloodSugar}}</td>
+      <td>{{intakeMl}}{{#if outputMl}} / {{outputMl}}{{/if}}</td>
+      <td>{{#if flagText}}<b>{{flagText}}</b>{{#if note}}<br />{{/if}}{{/if}}{{note}}{{#if consciousness}} ({{consciousness}}){{/if}}</td>
+      <td>{{recordedByName}}</td>
+    </tr>
+    {{#if struckAt}}
+    <tr><td colspan="12" class="muted">Struck through by {{struckByName}}: {{struckReason}}</td></tr>
+    {{/if}}
+    {{/each}}
+  </tbody>
+</table>
+{{else}}
+<p>No observation was taken in this period.</p>
+{{/if}}
+{{/with}}
