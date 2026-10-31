@@ -33,6 +33,7 @@ import {
   testAppointments,
   testAppointmentTests,
   testAppointmentWindows,
+  testPreparations,
 } from './hospital.schema.js';
 
 const LIVE_APPOINTMENT = ['booked', 'billed'] as const;
@@ -329,6 +330,27 @@ export class DrizzleDiagnosticBookingReadRepository extends DiagnosticBookingRea
         .orderBy(asc(homeCollectionWindows.displayOrder), asc(homeCollectionWindows.label)),
     ]);
     return { areas, windows };
+  }
+
+  async preparations() {
+    return this.context.db
+      .select({
+        id: testPreparations.id,
+        departmentId: testPreparations.departmentId,
+        departmentName: diagnosticDepartments.name,
+        testId: testPreparations.testId,
+        testName: diagnosticTests.name,
+        title: testPreparations.title,
+        titleBn: testPreparations.titleBn,
+        instructions: testPreparations.instructions,
+        instructionsBn: testPreparations.instructionsBn,
+        videoUrl: testPreparations.videoUrl,
+      })
+      .from(testPreparations)
+      .leftJoin(diagnosticDepartments, eq(diagnosticDepartments.id, testPreparations.departmentId))
+      .leftJoin(diagnosticTests, eq(diagnosticTests.id, testPreparations.testId))
+      .where(eq(testPreparations.isActive, true))
+      .orderBy(asc(testPreparations.displayOrder), asc(testPreparations.title));
   }
 
   /** The tests of each booking, in their order. */

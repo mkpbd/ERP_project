@@ -184,6 +184,47 @@ describe('income tax', () => {
       .set(bearer(officer))
       .expect(200);
 
+    // The tax deducted in July is deposited with a treasury challan; the certificate shows both.
+    const challan = {
+      staffId: jane.staffId,
+      payYear: 2025,
+      payMonth: 7,
+      challanNo: 'TC-0811',
+      challanDate: '2025-08-10',
+      bank: 'Sonali Bank, Kolatoli',
+      amount: 25_994,
+    };
+    await create('payroll/tax-challans', challan, officer);
+    const again = await request(http).post('/api/v1/payroll/tax-challans').set(bearer(officer)).send(challan);
+    expect([again.status, again.body.code]).toEqual([409, 'tax_challan_month_taken']);
+    expect(
+      (await request(http).post('/api/v1/payroll/tax-challans').set(bearer(jane.token)).send(challan)).status,
+    ).toBe(403);
+    const listed = await request(http)
+      .get(`/api/v1/payroll/tax-challans?staffId=${jane.staffId}&payYear=2025`)
+      .set(bearer(officer))
+      .expect(200);
+    expect(listed.body).toEqual([expect.objectContaining({ challanNo: 'TC-0811', amount: 25_994 })]);
+    const certificate = await request(http)
+      .get(`/api/v1/payroll/tax-certificates/${taxYear}`)
+      .set(bearer(jane.token))
+      .expect(200);
+    expect(certificate.body).toMatchObject({
+      deposits: [
+        {
+          payYear: 2025,
+          payMonth: 7,
+          deducted: 25_994,
+          challanNo: 'TC-0811',
+          challanDate: '2025-08-10',
+          bank: 'Sonali Bank, Kolatoli',
+          deposited: 25_994,
+        },
+      ],
+      deducted: 25_994,
+      deposited: 25_994,
+    });
+
     for (const [key, params, formats] of [
       ['payroll.tax-certificate', { taxYearId: taxYear, staffId: jane.staffId }, ['pdf']],
       ['payroll.tax-monthly', { year: 2025, month: 7 }, ['pdf', 'xlsx']],

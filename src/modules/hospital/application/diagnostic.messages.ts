@@ -142,6 +142,8 @@ export interface DiagnosticBillInput {
   /** Left out: the patient's own corporate client, if any. */
   readonly corporateClientId?: string | null | undefined;
   readonly staffId: string | null;
+  /** A patient paying with a bank card that gives a discount (old CreditCards). */
+  readonly cardProviderId?: string | null | undefined;
   readonly testIds: readonly string[];
   readonly packageIds: readonly string[];
   /** The test appointment billed (on its day), if any. */

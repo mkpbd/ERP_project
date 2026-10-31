@@ -24,6 +24,8 @@ export const HOSPITAL_RECORDS = {
   testAppointmentWindow: 'hospital_test_appointment_window',
   homeCollectionArea: 'hospital_home_collection_area',
   homeCollectionWindow: 'hospital_home_collection_window',
+  cardProvider: 'hospital_card_provider',
+  testPreparation: 'hospital_test_preparation',
   otRoom: 'hospital_ot_room',
   operation: 'hospital_operation',
   otType: 'hospital_ot_type',

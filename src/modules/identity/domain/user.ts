@@ -24,6 +24,8 @@ export interface UserProps {
   lastLoginAt: Date | null;
   passwordChangedAt: Date;
   mfaEnabled: boolean;
+  /** The account stops signing in from this moment (old UserExpireDateSetup); null: never. */
+  expiresAt: Date | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -35,7 +37,7 @@ export interface LockoutPolicy {
 }
 
 /** Why an account that presented the correct password still may not sign in. */
-export type SignInBlock = 'deactivated' | 'email_not_verified';
+export type SignInBlock = 'deactivated' | 'expired' | 'email_not_verified';
 
 export class User extends AggregateRoot {
   private constructor(private readonly props: UserProps) {
@@ -64,6 +66,7 @@ export class User extends AggregateRoot {
       lastLoginAt: null,
       passwordChangedAt: params.now,
       mfaEnabled: false,
+      expiresAt: null,
       version: 1,
       createdAt: params.now,
       updatedAt: params.now,
@@ -112,13 +115,21 @@ export class User extends AggregateRoot {
   get version(): number {
     return this.props.version;
   }
+  get expiresAt(): Date | null {
+    return this.props.expiresAt;
+  }
+
+  isExpired(now: Date): boolean {
+    return this.props.expiresAt !== null && this.props.expiresAt <= now;
+  }
 
   isLocked(now: Date): boolean {
     return this.props.lockedUntil !== null && this.props.lockedUntil > now;
   }
 
-  signInBlock(requireVerifiedEmail: boolean): SignInBlock | null {
+  signInBlock(requireVerifiedEmail: boolean, now: Date): SignInBlock | null {
     if (!this.isActive) return 'deactivated';
+    if (this.isExpired(now)) return 'expired';
     if (requireVerifiedEmail && !this.isEmailVerified) return 'email_not_verified';
     return null;
   }
@@ -177,6 +188,12 @@ export class User extends AggregateRoot {
     this.props.status = 'deactivated';
     this.touch(now);
     this.raise(new UserDeactivatedEvent(this.id, now));
+  }
+
+  /** Sets or clears the moment the account stops signing in. */
+  setExpiry(expiresAt: Date | null, now: Date): void {
+    this.props.expiresAt = expiresAt;
+    this.touch(now);
   }
 
   activate(now: Date): void {

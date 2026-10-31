@@ -35,6 +35,8 @@ export interface DiagnosticBillProps {
   referredById: string | null;
   corporateClientId: string | null;
   staffId: string | null;
+  /** The bank card the discount was given for. */
+  cardProviderId: string | null;
   admissionId: string | null;
   gross: number;
   discount: number;
@@ -91,6 +93,8 @@ export class DiagnosticBill {
     payer: BillPayer;
     /** An admitted patient's tests: charged to the stay, with no discount or payment here. */
     admissionId?: string | null;
+    /** A patient paying with a bank card that gives a discount. */
+    cardProviderId?: string | null;
     lines: readonly {
       testId: string;
       packageId: string | null;
@@ -174,6 +178,7 @@ export class DiagnosticBill {
       referredById: params.referredById,
       corporateClientId: params.payer.kind === 'corporate' ? params.payer.clientId : null,
       staffId: params.payer.kind === 'staff' ? params.payer.staffId : null,
+      cardProviderId: params.cardProviderId ?? null,
       admissionId,
       gross,
       discount,

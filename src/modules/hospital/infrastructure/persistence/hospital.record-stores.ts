@@ -16,6 +16,7 @@ import { IPD_MANAGE, IPD_READ } from '../../application/ipd.messages.js';
 import { OT_MANAGE, OT_READ } from '../../application/ot.messages.js';
 import {
   bedCategories,
+  cardProviders,
   beds,
   corporateClients,
   diagnosticDepartments,
@@ -24,6 +25,7 @@ import {
   homeCollectionAreas,
   homeCollectionWindows,
   testAppointmentWindows,
+  testPreparations,
   doctorClosures,
   doctors,
   doctorSchedules,
@@ -239,6 +241,36 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
         orderBy: [homeCollectionWindows.displayOrder, homeCollectionWindows.label],
         filters: { isActive: homeCollectionWindows.isActive },
         unique: { hospital_home_collection_windows_label_uq: taken('window_label_taken', 'This window exists') },
+      },
+      diag,
+    ),
+    record(
+      R.cardProvider,
+      cardProviders,
+      {
+        orderBy: [cardProviders.name],
+        filters: { isActive: cardProviders.isActive },
+        search: [cardProviders.name],
+        unique: { hospital_card_providers_name_uq: taken('card_provider_name_taken', 'This card provider exists') },
+      },
+      diag,
+    ),
+    record(
+      R.testPreparation,
+      testPreparations,
+      {
+        orderBy: [testPreparations.displayOrder, testPreparations.title],
+        filters: {
+          isActive: testPreparations.isActive,
+          departmentId: testPreparations.departmentId,
+          testId: testPreparations.testId,
+        },
+        search: [testPreparations.title, testPreparations.titleBn],
+        references: {
+          [fk('hospital_test_preparations', 'department_id', 'hospital_diagnostic_departments')]:
+            R.diagnosticDepartment,
+          [fk('hospital_test_preparations', 'test_id', 'hospital_diagnostic_tests')]: R.diagnosticTest,
+        },
       },
       diag,
     ),

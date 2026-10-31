@@ -96,4 +96,46 @@ export class TaxCertificateResponseDto extends responseDto({
     taxDue: money,
     monthlyTax: money,
   }),
+  deposits: z.array(
+    z.object({
+      payYear: z.int(),
+      payMonth: z.int(),
+      deducted: money.nullable(),
+      challanNo: z.string().nullable(),
+      challanDate: z.string().nullable(),
+      bank: z.string().nullable(),
+      deposited: money.nullable(),
+    }),
+  ),
+  deducted: money,
+  deposited: money,
 }) {}
+
+const challanFields = {
+  staffId: z.uuid(),
+  payYear: z.int().min(2000).max(2100),
+  payMonth: z.int().min(1).max(12),
+  challanNo: z.string().trim().min(1).max(50),
+  challanDate: day,
+  bank: z.string().trim().max(150).nullable(),
+  amount: z.number().positive().max(100_000_000).multipleOf(0.01),
+  note: z.string().trim().max(300).nullable(),
+};
+export class CreateTaxChallanDto extends createZodDto(
+  z.strictObject({
+    ...challanFields,
+    bank: challanFields.bank.default(null),
+    note: challanFields.note.default(null),
+  }),
+) {}
+export class UpdateTaxChallanDto extends createZodDto(updateSchema(challanFields)) {}
+export class TaxChallanFilterDto extends createZodDto(
+  z.object({
+    staffId: z.uuid().optional(),
+    payYear: z
+      .string()
+      .regex(/^\d{4}$/)
+      .optional(),
+  }),
+) {}
+export class TaxChallanResponseDto extends responseDto(recordResponseShape(challanFields)) {}

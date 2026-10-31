@@ -6,6 +6,7 @@ import type { TaxableMonth } from '../../domain/income-tax.js';
 import {
   IncomeTaxRepository,
   type IncomeTaxDeduction,
+  type TaxDeposit,
   type TaxYear,
   type TaxYearFacts,
 } from '../../domain/repositories.js';
@@ -18,6 +19,7 @@ import {
   salarySheetLines,
   salarySheets,
   staffSalaries,
+  taxChallans,
 } from './payroll.schema.js';
 
 type TaxYearRow = typeof incomeTaxYears.$inferSelect;
@@ -180,6 +182,48 @@ export class DrizzleIncomeTaxRepository extends IncomeTaxRepository {
         target: [incomeTaxDeductions.staffId, incomeTaxDeductions.payYear, incomeTaxDeductions.payMonth],
         set: values,
       });
+  }
+
+  async deposits(staffId: string, startsOn: string, endsOn: string): Promise<TaxDeposit[]> {
+    const from = monthIndex(startsOn);
+    const to = monthIndex(endsOn);
+    const within = (year: PgColumn, month: PgColumn) => sql`${year} * 12 + ${month} between ${from} and ${to}`;
+    const [deductions, challans] = await Promise.all([
+      this.context.db
+        .select({
+          payYear: incomeTaxDeductions.payYear,
+          payMonth: incomeTaxDeductions.payMonth,
+          deducted: incomeTaxDeductions.monthlyTax,
+        })
+        .from(incomeTaxDeductions)
+        .where(
+          and(
+            eq(incomeTaxDeductions.staffId, staffId),
+            within(incomeTaxDeductions.payYear, incomeTaxDeductions.payMonth),
+          ),
+        ),
+      this.context.db
+        .select({
+          payYear: taxChallans.payYear,
+          payMonth: taxChallans.payMonth,
+          challanNo: taxChallans.challanNo,
+          challanDate: taxChallans.challanDate,
+          bank: taxChallans.bank,
+          deposited: taxChallans.amount,
+        })
+        .from(taxChallans)
+        .where(and(eq(taxChallans.staffId, staffId), within(taxChallans.payYear, taxChallans.payMonth))),
+    ]);
+    const months = new Map<number, TaxDeposit>();
+    const empty = { deducted: null, challanNo: null, challanDate: null, bank: null, deposited: null };
+    for (const row of deductions) {
+      months.set(row.payYear * 12 + row.payMonth, { ...empty, ...row });
+    }
+    for (const { payYear, payMonth, ...challan } of challans) {
+      const key = payYear * 12 + payMonth;
+      months.set(key, { ...(months.get(key) ?? { ...empty, payYear, payMonth }), ...challan });
+    }
+    return [...months].sort(([a], [b]) => a - b).map(([, month]) => month);
   }
 
   async removeManual(staffId: string, payYear: number, payMonth: number): Promise<boolean> {

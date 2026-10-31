@@ -7,6 +7,7 @@ import {
   type PatientHomeCollection,
   type PatientTestAppointment,
   type TestAppointmentRequest,
+  type TestPreparationGuide,
   type WindowAvailability,
 } from '../../../shared/application/contracts/diagnostic-bookings.js';
 import type { PortalClaims } from './portal.ports.js';
@@ -27,6 +28,8 @@ export class PortalWindowsQuery extends Query<WindowAvailability[]> {
 }
 
 export class PortalHomeCollectionOfferQuery extends Query<HomeCollectionOffer> {}
+
+export class PortalPreparationsQuery extends Query<TestPreparationGuide[]> {}
 
 export class PortalBookingsQuery extends Query<{
   appointments: PatientTestAppointment[];
@@ -93,6 +96,16 @@ export class PortalHomeCollectionOfferHandler implements IQueryHandler<PortalHom
   }
 }
 
+/** What to do before a test (no sign-in needed). */
+@QueryHandler(PortalPreparationsQuery)
+export class PortalPreparationsHandler implements IQueryHandler<PortalPreparationsQuery> {
+  constructor(private readonly bookings: DiagnosticBookings) {}
+
+  execute() {
+    return this.bookings.preparations();
+  }
+}
+
 /** The signed-in patient's test appointments and home collections (old: the app's "my bookings"). */
 @QueryHandler(PortalBookingsQuery)
 export class PortalBookingsHandler implements IQueryHandler<PortalBookingsQuery> {
@@ -140,6 +153,7 @@ export const PORTAL_BOOKING_HANDLERS = [
   PortalTestCatalogueHandler,
   PortalWindowsHandler,
   PortalHomeCollectionOfferHandler,
+  PortalPreparationsHandler,
   PortalBookingsHandler,
   PortalBookAppointmentHandler,
   PortalBookHomeCollectionHandler,

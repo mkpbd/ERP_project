@@ -3,8 +3,8 @@ import type { RecordType } from '../../../../shared/application/records.js';
 import { and, gte, lte, ne } from 'drizzle-orm';
 import { ConflictError } from '../../../../shared/domain/errors.js';
 import { DrizzleRecordStore } from '../../../../shared/infrastructure/persistence/drizzle-record-store.js';
-import { INCOME_TAX_YEAR, PAYROLL_MANAGE } from '../../application/payroll.constants.js';
-import { incomeTaxYears } from './payroll.schema.js';
+import { INCOME_TAX_YEAR, PAYROLL_MANAGE, PAYROLL_READ, TAX_CHALLAN } from '../../application/payroll.constants.js';
+import { incomeTaxYears, taxChallans } from './payroll.schema.js';
 
 export function incomeTaxRecordTypes(context: DbContext): RecordType[] {
   return [
@@ -40,6 +40,24 @@ export function incomeTaxRecordTypes(context: DbContext): RecordType[] {
             throw new ConflictError('income_tax_year_overlaps', 'The dates overlap another tax year');
           }
         },
+      }),
+    },
+    {
+      name: TAX_CHALLAN,
+      readPermission: PAYROLL_READ,
+      managePermission: PAYROLL_MANAGE,
+      store: new DrizzleRecordStore(context, taxChallans, {
+        name: TAX_CHALLAN,
+        orderBy: [taxChallans.payYear, taxChallans.payMonth],
+        filters: { staffId: taxChallans.staffId, payYear: taxChallans.payYear },
+        search: [taxChallans.challanNo],
+        unique: {
+          payroll_tax_challans_month_uq: {
+            code: 'tax_challan_month_taken',
+            message: 'The person has a challan for this pay month',
+          },
+        },
+        references: { payroll_tax_challans_staff_id_staff_records_id_fk: 'staff' },
       }),
     },
   ];

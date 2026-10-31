@@ -63,6 +63,10 @@ export function taxCertificateReport(
           label: INCOME_LABELS[key],
           amount: view.certificate.received[key],
         })),
+        depositRows: view.deposits.map((month) => ({
+          ...month,
+          month: `${MONTHS[month.payMonth - 1]} ${month.payYear}`,
+        })),
       };
     },
     describe: (_params, data) => `${data.taxYear.label} · ${data.staff.employeeNo} ${data.staff.fullName}`,

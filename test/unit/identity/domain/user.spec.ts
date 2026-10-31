@@ -49,11 +49,20 @@ describe('User aggregate', () => {
   });
 
   it('reports why a correct password still cannot sign in', () => {
-    expect(makeUser({ verified: false }).signInBlock(true)).toBe('email_not_verified');
-    expect(makeUser({ verified: false }).signInBlock(false)).toBeNull();
+    expect(makeUser({ verified: false }).signInBlock(true, new Date())).toBe('email_not_verified');
+    expect(makeUser({ verified: false }).signInBlock(false, new Date())).toBeNull();
     const user = makeUser();
     user.deactivate(now);
-    expect(user.signInBlock(false)).toBe('deactivated');
+    expect(user.signInBlock(false, new Date())).toBe('deactivated');
+  });
+
+  it('stops signing in once its expiry has come, until it is cleared', () => {
+    const user = makeUser();
+    user.setExpiry(new Date(now.getTime() + 60_000), now);
+    expect(user.signInBlock(false, now)).toBeNull();
+    expect(user.signInBlock(false, new Date(now.getTime() + 60_000))).toBe('expired');
+    user.setExpiry(null, now);
+    expect(user.signInBlock(false, new Date(now.getTime() + 60_000))).toBeNull();
   });
 
   it('changing the password clears lockout and raises an event', () => {

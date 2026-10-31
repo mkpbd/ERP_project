@@ -596,3 +596,28 @@ export const incomeTaxDeductions = pgTable(
     check('income_tax_deductions_source_ck', sql`${t.source} in ('computed', 'manual')`),
   ],
 );
+
+// Old Payroll.EmployeeTaxChallans: the treasury challan the tax deducted from a person's salary in a pay month was
+// deposited with (one a month, as the old grid had).
+export const taxChallans = pgTable(
+  'payroll_tax_challans',
+  {
+    id: uuid('id').primaryKey(),
+    staffId: staffRef(),
+    ...payPeriod,
+    challanNo: text('challan_no').notNull(),
+    challanDate: day('challan_date').notNull(),
+    /** Where it was deposited (the old entry had no bank). */
+    bank: text('bank'),
+    amount: money('amount').notNull(),
+    note: text('note'),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex('payroll_tax_challans_month_uq').on(t.staffId, t.payYear, t.payMonth),
+    index('payroll_tax_challans_period_idx').on(t.payYear, t.payMonth),
+    payPeriodCheck('payroll_tax_challans', t),
+    check('payroll_tax_challans_amount_ck', sql`${t.amount} > 0`),
+    check('payroll_tax_challans_no_ck', sql`char_length(${t.challanNo}) between 1 and 50`),
+  ],
+);

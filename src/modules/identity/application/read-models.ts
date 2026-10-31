@@ -9,6 +9,8 @@ export interface UserView {
   readonly status: UserStatus;
   readonly emailVerified: boolean;
   readonly lastLoginAt: Date | null;
+  /** Signing in stops from this moment; null: never. */
+  readonly expiresAt: Date | null;
   readonly createdAt: Date;
   readonly updatedAt: Date;
 }

@@ -36,6 +36,20 @@ export interface HomeCollectionOffer {
   readonly windows: readonly { readonly id: string; readonly label: string }[];
 }
 
+/** What a patient does before a test (old: a video per test group), for a department's tests or for one test. */
+export interface TestPreparationGuide {
+  readonly id: string;
+  readonly departmentId: string | null;
+  readonly departmentName: string | null;
+  readonly testId: string | null;
+  readonly testName: string | null;
+  readonly title: string;
+  readonly titleBn: string | null;
+  readonly instructions: string | null;
+  readonly instructionsBn: string | null;
+  readonly videoUrl: string | null;
+}
+
 export interface BookedTest {
   readonly testId: string;
   readonly testName: string;
@@ -100,6 +114,8 @@ export abstract class DiagnosticBookings {
   abstract appointmentDay(date: string, departmentId: string | null): Promise<WindowAvailability[]>;
   /** The areas served and the windows offered. */
   abstract homeCollectionOffer(): Promise<HomeCollectionOffer>;
+  /** The preparation guides in use, in their order. */
+  abstract preparations(): Promise<TestPreparationGuide[]>;
   abstract bookAppointment(
     patientId: string,
     request: TestAppointmentRequest,

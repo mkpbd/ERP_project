@@ -1,7 +1,7 @@
 # Step 16f — Diagnostic booking screens (Angular)
 
 Status: **done** (2026-10-31). Previous: [step 15f](15f-diagnostic-appointments-home-collection.md) (its API) ·
-Next: step 15g (small items).
+Next: [step 15g](15g-small-items.md) (small items).
 
 The screens for step 15f in `D:\Pratices\ERP_Frontend` (`mkpbd/ERP_frontend`, commit `55da081`). They are under
 `/diagnostic`, with three entries in the Hospital menu.

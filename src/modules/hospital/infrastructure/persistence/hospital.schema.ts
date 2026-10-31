@@ -1035,6 +1035,56 @@ export const diagnosticPolicy = pgTable(
   ],
 );
 
+// Old Admin/Diag.CreditCards (a page with no handler behind it, discounts by a group of tests): a bank's card whose
+// holders get a share off what may be discounted on their diagnostic bills.
+export const cardProviders = pgTable(
+  'hospital_card_providers',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    address: text('address'),
+    contactNo: text('contact_no'),
+    discountPercent: percent('discount_percent').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_card_providers_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_card_providers_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+    check('hospital_card_providers_percent_ck', sql`${t.discountPercent} between 0 and 100`),
+  ],
+);
+
+// Old Diag.TestGroupVideos (a clip per test group, no words): what a patient does before a test, in English and
+// Bangla, with a video link; for a department's tests or for one test.
+export const testPreparations = pgTable(
+  'hospital_test_preparations',
+  {
+    id: uuid('id').primaryKey(),
+    departmentId: uuid('department_id').references(() => diagnosticDepartments.id, { onDelete: 'restrict' }),
+    testId: uuid('test_id').references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    titleBn: text('title_bn'),
+    instructions: text('instructions'),
+    instructionsBn: text('instructions_bn'),
+    videoUrl: text('video_url'),
+    displayOrder: smallint('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    index('hospital_test_preparations_department_idx').on(t.departmentId),
+    index('hospital_test_preparations_test_idx').on(t.testId),
+    check('hospital_test_preparations_target_ck', sql`num_nonnulls(${t.departmentId}, ${t.testId}) = 1`),
+    check('hospital_test_preparations_title_ck', sql`char_length(${t.title}) between 1 and 200`),
+    check('hospital_test_preparations_content_ck', sql`${t.instructions} is not null or ${t.videoUrl} is not null`),
+    check('hospital_test_preparations_video_ck', sql`${t.videoUrl} is null or ${t.videoUrl} ~ '^https://[^ ]+$'`),
+    check('hospital_test_preparations_order_ck', sql`${t.displayOrder} >= 0`),
+  ],
+);
+
 // Old Diag.InvestigationInvoices with their details and ledger (the due never stored, always worked out): tests billed
 // to a registered patient, each with when its report is due, and the commission of the doctor who referred them.
 export const diagnosticBills = pgTable(
@@ -1050,6 +1100,8 @@ export const diagnosticBills = pgTable(
     referredById: uuid('referred_by_id').references(() => doctors.id, { onDelete: 'restrict' }),
     corporateClientId: uuid('corporate_client_id').references(() => corporateClients.id, { onDelete: 'restrict' }),
     staffId: uuid('staff_id').references(() => staffRecords.id, { onDelete: 'restrict' }),
+    /** The bank card the patient's discount was given for. */
+    cardProviderId: uuid('card_provider_id').references(() => cardProviders.id, { onDelete: 'restrict' }),
     /** Tests of an admitted patient: charged to the stay, paid with its final bill (old IPDPatientRecordId). */
     admissionId: uuid('admission_id').references((): AnyPgColumn => admissions.id, { onDelete: 'restrict' }),
     gross: money('gross').notNull(),
@@ -1080,6 +1132,10 @@ export const diagnosticBills = pgTable(
       sql`${t.admissionId} is null or (${t.corporateClientId} is null and ${t.staffId} is null and ${t.discount} = 0 and ${t.paid} = 0)`,
     ),
     check('hospital_diagnostic_bills_payer_ck', sql`${t.corporateClientId} is null or ${t.staffId} is null`),
+    check(
+      'hospital_diagnostic_bills_card_ck',
+      sql`${t.cardProviderId} is null or (${t.corporateClientId} is null and ${t.staffId} is null and ${t.admissionId} is null)`,
+    ),
     check(
       'hospital_diagnostic_bills_amounts_ck',
       sql`${t.discount} >= 0 and ${t.discount} <= ${t.gross} and ${t.net} = ${t.gross} - ${t.discount} and ${t.cancelled} between 0 and ${t.net} and ${t.paid} >= 0 and ${t.collected} >= 0 and ${t.refunded} >= 0 and ${t.paid} + ${t.collected} - ${t.refunded} <= ${t.net} - ${t.cancelled}`,

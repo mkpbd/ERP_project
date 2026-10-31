@@ -526,6 +526,10 @@ export class HospitalDiagnosticBookings extends DiagnosticBookings {
     return this.desk.read.homeCollectionOffer();
   }
 
+  preparations() {
+    return this.desk.read.preparations();
+  }
+
   async bookAppointment(patientId: string, request: TestAppointmentRequest) {
     const { desk } = this;
     await desk.assertPortalRoom(patientId, 'appointments');

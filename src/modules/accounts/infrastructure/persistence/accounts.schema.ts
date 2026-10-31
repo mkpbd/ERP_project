@@ -601,3 +601,26 @@ export const tdsRules = pgTable(
     check('tds_rules_description_len_ck', sql`char_length(${t.description}) between 1 and 500`),
   ],
 );
+
+// Old Account.Budgets (one company-wide income and expense total a year, read by nothing): what each income and
+// expense account is expected to come to in a fiscal year, compared with what was posted.
+export const accountBudgets = pgTable(
+  'account_budgets',
+  {
+    fiscalYearId: uuid('fiscal_year_id')
+      .notNull()
+      .references(() => fiscalYears.id, { onDelete: 'restrict' }),
+    glAccountId: uuid('gl_account_id')
+      .notNull()
+      .references(() => glAccounts.id, { onDelete: 'restrict' }),
+    amount: amount('amount').notNull(),
+    note: text('note'),
+    updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.fiscalYearId, t.glAccountId] }),
+    index('account_budgets_account_idx').on(t.glAccountId),
+    check('account_budgets_amount_ck', sql`${t.amount} >= 0`),
+  ],
+);

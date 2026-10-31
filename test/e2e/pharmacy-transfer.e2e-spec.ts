@@ -279,3 +279,56 @@ describe('outlet indents and transfers', () => {
     expect(self.body.code).toBe('same_outlet');
   });
 });
+
+describe('lot corrections', () => {
+  it('moves a lot entered wrong to the lot it should have been, at every outlet, at its cost', async () => {
+    type Lot = { lotId: string; batchNo: string; expiryDate: string; saleRate: number; qty: number; value: number };
+    const lotsAt = async (outletId: string) => (await stockOf(outletId)).lots as unknown as Lot[];
+    const before = await stockOf(central);
+    const lotA = (await lotsAt(central)).find((lot) => lot.batchNo === 'A')!;
+    const fix = (lotId: string, body: Record<string, unknown>, token = admin) =>
+      ph('post', `lots/${lotId}/correct`, token, {
+        batchNo: 'A',
+        expiryDate: '2027-03-31',
+        saleRate: 1.2,
+        reason: 'The year of the expiry was typed wrong',
+        correctedOn: '2026-04-01',
+        ...body,
+      });
+
+    expect((await fix(lotA.lotId, {}, keeper)).status).toBe(403);
+    const same = await fix(lotA.lotId, { expiryDate: lotA.expiryDate });
+    expect([same.status, same.body.code]).toEqual([422, 'lot_unchanged']);
+
+    // The lot printed 2027 was entered as 2026 and had expired: it moves, and can be sent again.
+    const fixed = await fix(lotA.lotId, {}).expect(201);
+    expect(fixed.body).toMatchObject({ number: expect.stringMatching(/^LC-2026-/), units: 50 });
+    const after = await stockOf(central);
+    expect([after.qty, after.value]).toEqual([before.qty, before.value]);
+    expect(after.lots.find((lot) => lot.lotId === lotA.lotId)).toBeUndefined();
+    expect((await lotsAt(central)).find((lot) => lot.lotId === fixed.body.toLotId)).toMatchObject({
+      batchNo: 'A',
+      expiryDate: '2027-03-31',
+      qty: 50,
+      value: 40,
+    });
+    const empty = await fix(lotA.lotId, { saleRate: 1.5 });
+    expect([empty.status, empty.body.code]).toEqual([422, 'lot_not_in_stock']);
+    await ph('post', 'transfers', keeper, {
+      fromOutletId: central,
+      toOutletId: outdoor,
+      transferDate: '2026-04-10',
+      lines: [{ productId: napa, qty: 5, lotId: fixed.body.toLotId }],
+    }).expect(201);
+
+    // A lot corrected into one that exists already joins it.
+    const lots = await lotsAt(central);
+    const lotB = lots.find((lot) => lot.batchNo === 'B')!;
+    const lotC = lots.find((lot) => lot.batchNo === 'C')!;
+    const merged = await fix(lotC.lotId, { batchNo: 'B', expiryDate: '2026-12-31', reason: 'Strip says B' }).expect(
+      201,
+    );
+    expect(merged.body.toLotId).toBe(lotB.lotId);
+    expect((await lotsAt(central)).find((lot) => lot.lotId === lotB.lotId)).toMatchObject({ qty: 300, value: 265 });
+  });
+});

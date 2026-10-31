@@ -7,7 +7,13 @@ import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { ConflictError, DomainError, NotFoundError } from '../../../shared/domain/errors.js';
 import { incomeTaxCertificate, type IncomeTaxCertificate } from '../domain/income-tax.js';
-import { IncomeTaxRepository, PayPeriods, type IncomeTaxDeduction, type TaxYear } from '../domain/repositories.js';
+import {
+  IncomeTaxRepository,
+  PayPeriods,
+  type IncomeTaxDeduction,
+  type TaxDeposit,
+  type TaxYear,
+} from '../domain/repositories.js';
 import { assertPayPeriod } from '../domain/salary.js';
 import { PAYROLL_MANAGE, PAYROLL_READ } from './payroll.constants.js';
 import { PayrollReadRepository } from './read-models.js';
@@ -24,6 +30,10 @@ export interface TaxCertificateView {
   readonly staff: StaffSummary;
   readonly taxYear: { readonly id: string; readonly label: string; readonly startsOn: string; readonly endsOn: string };
   readonly certificate: IncomeTaxCertificate;
+  /** Month by month: the tax deducted and the treasury challan it was deposited with (old: never printed). */
+  readonly deposits: readonly TaxDeposit[];
+  readonly deducted: number;
+  readonly deposited: number;
 }
 
 /** Works out every salaried person's tax deduction for a pay month (deductions entered by hand are kept). */
@@ -249,9 +259,17 @@ export async function taxCertificate(
   const [taxYear, [person]] = await Promise.all([taxes.taxYear(taxYearId), staff.findSummaries([staffId])]);
   if (!taxYear) throw new NotFoundError('income_tax_year');
   if (!person) throw new NotFoundError('staff');
-  const [fact] = await taxes.facts(taxYear.startsOn, taxYear.endsOn, [staffId]);
+  const [[fact], deposits] = await Promise.all([
+    taxes.facts(taxYear.startsOn, taxYear.endsOn, [staffId]),
+    taxes.deposits(staffId, taxYear.startsOn, taxYear.endsOn),
+  ]);
   if (!fact) throw new NotFoundError('staff_salary');
+  const sum = (values: (number | null)[]) =>
+    values.reduce<number>((total, value) => total + Math.round((value ?? 0) * 100), 0) / 100;
   return {
+    deposits,
+    deducted: sum(deposits.map((month) => month.deducted)),
+    deposited: sum(deposits.map((month) => month.deposited)),
     staff: person,
     taxYear: { id: taxYear.id, label: taxYear.label, startsOn: taxYear.startsOn, endsOn: taxYear.endsOn },
     certificate: incomeTaxCertificate({ ...fact, joiningDate: person.joiningDate, sex: person.sex }, taxYear),

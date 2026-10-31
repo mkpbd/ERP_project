@@ -26,6 +26,10 @@ import {
 } from './presentation/voucher.controllers.js';
 import { ACCOUNTS_RECORD_CONTROLLERS, ChartOfAccountsController } from './presentation/accounts.controllers.js';
 import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { BUDGET_HANDLERS, BudgetRepository } from './application/budget.js';
+import { DrizzleBudgetRepository } from './infrastructure/persistence/drizzle-budget.repository.js';
+import { budgetReport } from './infrastructure/reports/budget.reports.js';
+import { BudgetsController } from './presentation/budget.controllers.js';
 import { moneyDashboard } from './infrastructure/reports/money.dashboard.js';
 
 /**
@@ -43,11 +47,14 @@ import { moneyDashboard } from './infrastructure/reports/money.dashboard.js';
     PostingSchedulesController,
     VouchersController,
     BooksController,
+    BudgetsController,
   ],
   providers: [
     GetChartOfAccountsHandler,
     ...VOUCHER_HANDLERS,
     ...BOOK_HANDLERS,
+    ...BUDGET_HANDLERS,
+    { provide: BudgetRepository, useClass: DrizzleBudgetRepository },
     { provide: BooksReadRepository, useClass: DrizzleBooksReadRepository },
     VoucherBook,
     { provide: ChartReadRepository, useClass: DrizzleChartReadRepository },
@@ -67,6 +74,7 @@ export class AccountsModule implements OnModuleInit {
     private readonly vouchers: VoucherReadRepository,
     private readonly books: BooksReadRepository,
     private readonly dashboards: DashboardRegistry,
+    private readonly budgets: BudgetRepository,
   ) {}
 
   onModuleInit(): void {
@@ -74,6 +82,7 @@ export class AccountsModule implements OnModuleInit {
     this.reports.register(chartOfAccountsReport(this.chart));
     this.reports.register(voucherReport(this.vouchers));
     for (const report of bookReports(this.books)) this.reports.register(report);
+    this.reports.register(budgetReport(this.budgets, this.books));
     this.dashboards.register(moneyDashboard(this.context));
   }
 }

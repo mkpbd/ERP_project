@@ -1,0 +1,34 @@
+{{#with data}}
+<p>{{fiscalYear.label}} ({{date fiscalYear.startsOn}} to {{date fiscalYear.endsOn}}): posted to {{date to}}</p>
+{{#each sections}}
+<h3 style="margin: 8px 0 4px">{{title}}</h3>
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 12%">Code</th><th>Account</th><th class="num">Budget</th><th class="num">Actual</th>
+      <th class="num">Actual less budget</th><th class="num" style="width: 9%">Used</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each lines}}
+    <tr>
+      <td>{{code}}</td>
+      <td>{{name}}{{#unless budgeted}} <small>(no budget)</small>{{/unless}}{{#if note}}<br /><small>{{note}}</small>{{/if}}</td>
+      <td class="num">{{money budget}}</td>
+      <td class="num">{{money actual}}</td>
+      <td class="num">{{money variance}}</td>
+      <td class="num">{{#unless (eq usedPercent null)}}{{usedPercent}}%{{/unless}}</td>
+    </tr>
+    {{else}}
+    <tr><td colspan="6">Nothing budgeted or posted.</td></tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="2">Total</td><td class="num">{{money total.budget}}</td><td class="num">{{money total.actual}}</td><td colspan="2"></td></tr>
+  </tbody>
+</table>
+{{/each}}
+<table class="report" style="margin-top: 8px; width: 60%">
+  <tbody>
+    <tr class="group-row"><td>Profit (income less expenses)</td><td class="num">Budget {{money profit.budget}}</td><td class="num">Actual {{money profit.actual}}</td></tr>
+  </tbody>
+</table>
+{{/with}}

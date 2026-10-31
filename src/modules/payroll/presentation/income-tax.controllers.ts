@@ -12,18 +12,22 @@ import {
   type IncomeTaxDeductionView,
   type TaxCertificateView,
 } from '../application/income-tax.handlers.js';
-import { INCOME_TAX_YEAR } from '../application/payroll.constants.js';
+import { INCOME_TAX_YEAR, TAX_CHALLAN } from '../application/payroll.constants.js';
 import {
   CertificateParamDto,
   CertificateQueryDto,
   ComputeResultResponseDto,
+  CreateTaxChallanDto,
   CreateTaxYearDto,
   IncomeTaxDeductionResponseDto,
   SetIncomeTaxDto,
   TaxCertificateResponseDto,
+  TaxChallanFilterDto,
+  TaxChallanResponseDto,
   TaxOverrideParamDto,
   TaxPeriodParamDto,
   TaxYearResponseDto,
+  UpdateTaxChallanDto,
   UpdateTaxYearDto,
 } from './dto/income-tax.dto.js';
 
@@ -37,6 +41,21 @@ export const TaxYearsController = createRecordController({
   create: CreateTaxYearDto,
   update: UpdateTaxYearDto,
   response: TaxYearResponseDto,
+});
+
+/** Old Tax Challan Entry (step 15g): the treasury challan each person's tax of a pay month was deposited with. */
+export const TaxChallansController = createRecordController({
+  tag: 'payroll-income-tax',
+  readPermission: 'payroll:read',
+  managePermission: 'payroll:manage',
+  className: 'TaxChallansController',
+  path: 'payroll/tax-challans',
+  type: TAX_CHALLAN,
+  label: 'tax challan',
+  create: CreateTaxChallanDto,
+  update: UpdateTaxChallanDto,
+  response: TaxChallanResponseDto,
+  filter: TaxChallanFilterDto,
 });
 
 @ApiTags('payroll-income-tax')

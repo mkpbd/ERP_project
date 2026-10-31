@@ -32,6 +32,17 @@ export class DeactivateUserCommand extends Command<void> {
   }
 }
 
+/** Old UserExpireDateSetup: the moment the account stops signing in, or null to clear it. */
+export class SetUserExpiryCommand extends Command<void> {
+  constructor(
+    readonly actor: Actor,
+    readonly userId: string,
+    readonly expiresAt: Date | null,
+  ) {
+    super();
+  }
+}
+
 export class ActivateUserCommand extends Command<void> {
   constructor(
     readonly actor: Actor,

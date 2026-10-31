@@ -19,6 +19,7 @@ import {
   type DiagnosticPolicy,
 } from '../../domain/repositories.js';
 import {
+  cardProviders,
   corporateClients,
   diagnosticBillLines,
   diagnosticBills,
@@ -85,6 +86,19 @@ export class DrizzleDiagnosticBillRepository extends DiagnosticBillRepository {
       .from(diagnosticTests)
       .where(inArray(diagnosticTests.id, [...new Set(ids)]));
     return new Map(rows.map((row) => [row.id, row]));
+  }
+
+  async cardProvider(id: string) {
+    const [row] = await this.context.db
+      .select({
+        id: cardProviders.id,
+        name: cardProviders.name,
+        discountPercent: cardProviders.discountPercent,
+        isActive: cardProviders.isActive,
+      })
+      .from(cardProviders)
+      .where(eq(cardProviders.id, id));
+    return row ?? null;
   }
 
   async package(id: string) {

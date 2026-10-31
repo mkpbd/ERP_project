@@ -92,7 +92,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `GET /users` | `users:read` |
 | `POST /users` | `users:create` |
 | `GET/PATCH /users/:id` | self, or `users:read` / `users:update` |
-| `POST /users/:id/deactivate`, `/activate` | `users:deactivate` |
+| `POST /users/:id/deactivate`, `/activate`, `PUT /users/:id/expiry` (not one's own account) | `users:deactivate` |
 | `DELETE /users/:id/sessions` | `sessions:revoke` |
 | `GET /users/:id/roles`, `/users/:id/permissions` | self, or `permissions:read` |
 | `POST /users/:id/roles`, `DELETE /users/:id/roles/:roleId` | `permissions:assign` + must hold every permission of the role |
@@ -139,14 +139,15 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | festival bonuses and their sheets, leave encashments, PF ledger, staff dues, anyone's statements and PF settlement, PF interest preview | `payroll:read` |
 | the same (write), bonus approve / commit / reverse, encashment save / remove, `POST /payroll/pf/interest` | `payroll:manage` |
 | `GET /payroll/tax-years`, own `GET /payroll/tax-certificates/:taxYearId` | authenticated |
-| `GET /payroll/income-tax/:y/:m`, anyone's certificate | `payroll:read` |
-| tax years (write), income tax compute / hand entries | `payroll:manage` |
+| `GET /payroll/income-tax/:y/:m`, anyone's certificate, `GET /payroll/tax-challans` | `payroll:read` |
+| tax years (write), income tax compute / hand entries, tax challans (write) | `payroll:manage` |
 | `GET /accounts/chart`, accounting masters, PF deposits / fixed deposits, TDS rules (read) | `accounts:read` |
 | accounting masters (write) | `accounts:manage` |
 | `GET /accounts/vouchers[/:id]` | `accounts:read` |
 | draft vouchers and attachments | `vouchers:write` |
 | post / reverse vouchers | `vouchers:post` |
-| `GET /accounts/books/*`, `GET /accounts/statements/*` | `accounts:read` |
+| `GET /accounts/books/*`, `GET /accounts/statements/*`, `GET /accounts/budgets/:fiscalYearId` | `accounts:read` |
+| `PUT /accounts/budgets/:fiscalYearId` (income and expense accounts of the main books) | `accounts:manage` |
 | `GET /scm/*` (stores, store access, item catalogue, suppliers) | `scm:read` |
 | the same (write), purchase and comparative study approval levels | `scm:manage` |
 | `GET /scm/{purchase-requisitions,comparative-studies,purchase-orders}[/:id]` | `scm:read` |
@@ -179,6 +180,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | return periods | `pharmacy:manage` |
 | stock counts (open, count, add a lot found, cancel) | `pharmacy:count` + works at the outlet |
 | applying a stock count (someone other than who opened it) | `pharmacy:manage` |
+| `POST /pharmacy/lots/:id/correct` (a lot entered with the wrong batch, expiry or sale rate) | `pharmacy:manage` |
 | discount policy and product discounts, loyal members, cancelling sales (sellers: their own the same day) | `pharmacy:manage` |
 | `GET /hospital/patients/*` (search, view, matches, photo) | `patient:read` |
 | registering patients, changing their details and photos | `patient:register` |
@@ -193,7 +195,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | a corporate client's payment against its OPD and indoor bills (oldest first) | `opd:bill` |
 | paying a doctor their shares | `doctor:pay` |
 | `GET` diagnostic departments, tests, packages, the diagnostic policy and diagnostic bills; test appointment windows and their places, test appointments, home collection areas, windows and home collections | `diag:read` |
-| diagnostic departments, tests, packages and their tests, the diagnostic policy (with the home collection service); test appointment windows, home collection areas and windows; cancelling tests after the bill's day | `diag:manage` |
+| diagnostic departments, tests, packages and their tests, the diagnostic policy (with the home collection service); test appointment windows, home collection areas and windows; card providers and test preparation guides; cancelling tests after the bill's day | `diag:manage` |
 | diagnostic bills (an admitted patient's charged to the stay), collecting their dues, cancelling tests on the bill's day | `diag:bill` |
 | a diagnostic discount above the counter's limit | `diag:discount` |
 | booking test appointments and home collections (a registered patient, or a name and mobile); no-shows, cancelling, attaching the registered patient; giving a home collection its collector (`GET /hospital/home-collectors`) | `diag:book` |

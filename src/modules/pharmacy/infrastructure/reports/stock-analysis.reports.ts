@@ -34,6 +34,7 @@ const KIND_LABELS: Record<MovementKind, string> = {
   count_adjustment: 'Stock count',
   ward_issue: 'Sent to a ward',
   ward_return: 'Returned from a ward',
+  lot_correction: 'Lot corrected',
 };
 
 function assertPeriod(from: string, to: string): void {
@@ -182,7 +183,8 @@ const BUCKETS = [
 type Bucket = (typeof BUCKETS)[number];
 const OUTWARD = new Set<Bucket>(['sold', 'transferOut', 'supplierReturns', 'countLoss']);
 
-function bucketOf(kind: MovementKind, inward: boolean): Bucket {
+/** Null: moved between two lots of the product at one outlet, which leaves its stock as it was. */
+function bucketOf(kind: MovementKind, inward: boolean): Bucket | null {
   switch (kind) {
     case 'opening':
     case 'receive':
@@ -203,6 +205,8 @@ function bucketOf(kind: MovementKind, inward: boolean): Bucket {
       return 'supplierReturns';
     case 'count_adjustment':
       return inward ? 'countGain' : 'countLoss';
+    case 'lot_correction':
+      return null;
   }
 }
 
@@ -262,7 +266,7 @@ export function stockMovementReport(context: DbContext): ReportDefinition {
         if (sum.before) add(row.opening, sum.qty, sum.value);
         else {
           const bucket = bucketOf(sum.kind, sum.inward);
-          row.moves[bucket] += OUTWARD.has(bucket) ? -sum.qty : sum.qty;
+          if (bucket) row.moves[bucket] += OUTWARD.has(bucket) ? -sum.qty : sum.qty;
         }
         add(row.closing, sum.qty, sum.value);
       }

@@ -152,6 +152,17 @@ export class DiagnosticDesk {
     }
   }
 
+  /** A bank card's discount is for a patient paying their own (outpatient) bill, with a card in use. */
+  async card(id: string, payer: 'corporate' | 'staff' | 'patient', admissionId: string | null) {
+    if (payer !== 'patient' || admissionId) {
+      throw new DomainError('invalid_payer', 'A card discount is for a patient paying their own bill');
+    }
+    const card = await this.bills.cardProvider(id);
+    if (!card) throw new NotFoundError('card_provider');
+    if (!card.isActive) throw new DomainError('inactive_card', `${card.name} cards are not taken now`);
+    return card;
+  }
+
   record(action: string, actorUserId: string, id: string, metadata: Record<string, string | number | null> = {}) {
     return this.opd.audit.record({
       action: `hospital.diagnostic_bill_${action}`,
@@ -342,12 +353,19 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
         };
       });
       if (booking) lines.push(...booking.lines);
-      // A corporate client's own discount is given on what may be discounted unless another is asked for.
+      // A corporate client's or a bank card's own discount is given on what may be discounted unless another is asked
+      // for; it is also how far the counter may go.
       const client = payer.kind === 'corporate' ? payer.client : null;
+      const card = input.cardProviderId ? await desk.card(input.cardProviderId, payer.kind, input.admissionId) : null;
+      const own = client
+        ? { label: `Corporate: ${client.name}`, percent: client.discountPercent }
+        : card
+          ? { label: `Card: ${card.name}`, percent: card.discountPercent }
+          : null;
       const discountable = lines
         .filter((line) => line.discountAllowed)
         .reduce((total, line) => total + Math.round(line.rate * 100), 0);
-      const clientDiscount = client ? Math.floor((discountable * client.discountPercent) / 100) / 100 : 0;
+      const ownDiscount = own ? Math.floor((discountable * own.percent) / 100) / 100 : 0;
       const today = opd.today();
       const bill = DiagnosticBill.create({
         id: randomUUID(),
@@ -357,11 +375,11 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
         referredById: referrer?.id ?? null,
         payer: payer.payer,
         admissionId: input.admissionId,
+        cardProviderId: card?.id ?? null,
         lines,
-        discount: input.discount ?? (input.admissionId ? 0 : clientDiscount),
-        discountReason:
-          input.discountReason ?? (input.discount === null && clientDiscount > 0 ? `Corporate: ${client!.name}` : null),
-        discountLimitPercent: Math.max(policy.counterDiscountPercent, client?.discountPercent ?? 0),
+        discount: input.discount ?? (input.admissionId ? 0 : ownDiscount),
+        discountReason: input.discountReason ?? (input.discount === null && ownDiscount > 0 ? own!.label : null),
+        discountLimitPercent: Math.max(policy.counterDiscountPercent, own?.percent ?? 0),
         mayDiscountMore,
         payment: input.payment,
         by: actor.userId,

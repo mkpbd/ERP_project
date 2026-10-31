@@ -26,6 +26,7 @@ import {
   BootstrapAdministratorHandler,
   CreateUserHandler,
   DeactivateUserHandler,
+  SetUserExpiryHandler,
   UpdateUserHandler,
 } from './application/handlers/user-admin.handlers.js';
 import {
@@ -90,6 +91,7 @@ const commandHandlers = [
   CreateUserHandler,
   UpdateUserHandler,
   DeactivateUserHandler,
+  SetUserExpiryHandler,
   ActivateUserHandler,
   BootstrapAdministratorHandler,
 ];

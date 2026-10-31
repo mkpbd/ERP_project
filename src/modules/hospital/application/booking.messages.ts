@@ -6,6 +6,7 @@ import type {
   HomeCollectionOffer,
   HomeCollectionRequest,
   TestAppointmentRequest,
+  TestPreparationGuide,
   WindowAvailability,
 } from '../../../shared/application/contracts/diagnostic-bookings.js';
 import type { BookedVia, HomeCollectionStatus, TestAppointmentStatus } from '../domain/diagnostic-booking.js';
@@ -141,6 +142,7 @@ export abstract class DiagnosticBookingReadRepository {
   /** The active windows (for a department: its own and those of any department) with their places taken that day. */
   abstract windowsOn(date: string, departmentId: string | null): Promise<Omit<WindowAvailability, 'left' | 'over'>[]>;
   abstract homeCollectionOffer(): Promise<HomeCollectionOffer>;
+  abstract preparations(): Promise<TestPreparationGuide[]>;
   abstract appointments(filter: TestAppointmentFilter): Promise<TestAppointmentView[]>;
   abstract appointment(id: string): Promise<TestAppointmentView | null>;
   abstract homeCollections(filter: HomeCollectionFilter): Promise<HomeCollectionView[]>;

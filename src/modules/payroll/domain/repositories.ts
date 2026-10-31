@@ -177,6 +177,17 @@ export interface IncomeTaxDeduction {
   readonly remarks: string | null;
 }
 
+/** A pay month of a tax year: the tax deducted from the person and the challan it was deposited with. */
+export interface TaxDeposit {
+  readonly payYear: number;
+  readonly payMonth: number;
+  readonly deducted: number | null;
+  readonly challanNo: string | null;
+  readonly challanDate: string | null;
+  readonly bank: string | null;
+  readonly deposited: number | null;
+}
+
 export abstract class IncomeTaxRepository {
   /** The tax year a date falls in. */
   abstract taxYearOn(date: string): Promise<TaxYear | null>;
@@ -194,6 +205,8 @@ export abstract class IncomeTaxRepository {
   abstract setManual(row: IncomeTaxDeduction, updatedBy: string, updatedAt: Date): Promise<void>;
   /** Removes a deduction entered by hand; false when there is none. */
   abstract removeManual(staffId: string, payYear: number, payMonth: number): Promise<boolean>;
+  /** The pay months between the dates with a deduction or a challan, in order. */
+  abstract deposits(staffId: string, startsOn: string, endsOn: string): Promise<TaxDeposit[]>;
 }
 
 export interface NewPfEntry {

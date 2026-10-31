@@ -174,6 +174,8 @@ class CreateDiagnosticBillDto extends createZodDto(
       /** Left out: the patient's own corporate client, if any; null: the patient pays. */
       corporateClientId: z.uuid().nullable().optional(),
       staffId: z.uuid().nullable().default(null),
+      /** A bank card whose discount the patient is given (their own bill only). */
+      cardProviderId: z.uuid().nullable().default(null),
       testIds: z.array(z.uuid()).max(60).default([]),
       packageIds: z.array(z.uuid()).max(10).default([]),
       /** The test appointment billed, on its day. */

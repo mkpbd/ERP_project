@@ -41,10 +41,14 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     }
 
     // The password was correct, so revealing the account state no longer aids enumeration.
-    const block = user.signInBlock(this.settings.emailVerificationRequired);
+    const block = user.signInBlock(this.settings.emailVerificationRequired, now);
     if (block === 'deactivated') {
       await this.recordFailure(user, 'deactivated');
       throw new AuthenticationError('account_disabled', 'This account has been deactivated');
+    }
+    if (block === 'expired') {
+      await this.recordFailure(user, 'expired');
+      throw new AuthenticationError('account_expired', 'This account has expired');
     }
     if (block === 'email_not_verified') {
       await this.recordFailure(user, 'email_not_verified');
@@ -60,7 +64,7 @@ export class LoginHandler implements ICommandHandler<LoginCommand> {
     const opened = await this.tx.run(async () => {
       const current = await this.users.findByIdForUpdate(user.id);
       // Re-check under the row lock: the account may have changed since the password check.
-      if (!current || current.isLocked(now) || current.signInBlock(this.settings.emailVerificationRequired)) {
+      if (!current || current.isLocked(now) || current.signInBlock(this.settings.emailVerificationRequired, now)) {
         throw new AuthenticationError();
       }
       current.recordSuccessfulSignIn(now);

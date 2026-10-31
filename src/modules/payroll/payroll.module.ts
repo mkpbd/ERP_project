@@ -37,6 +37,7 @@ import {
   IncomeTaxController,
   TaxCertificatesController,
   TaxYearsController,
+  TaxChallansController,
 } from './presentation/income-tax.controllers.js';
 import {
   DrizzleFestivalBonusRepository,
@@ -124,6 +125,7 @@ import {
     StaffDueRecoveryController,
     LedgerStatementsController,
     TaxYearsController,
+    TaxChallansController,
     IncomeTaxController,
     TaxCertificatesController,
   ],

@@ -57,7 +57,7 @@ export class RefreshTokensHandler implements ICommandHandler<RefreshTokensComman
       if (!session || !session.isActive(now) || consumption.expiresAt <= now) return { kind: 'invalid' };
 
       const user = await this.users.findById(session.userId);
-      if (!user || user.signInBlock(this.settings.emailVerificationRequired)) {
+      if (!user || user.signInBlock(this.settings.emailVerificationRequired, now)) {
         await this.sessions.revoke(session.id, 'account_inactive', now);
         return { kind: 'invalid' };
       }

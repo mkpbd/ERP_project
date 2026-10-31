@@ -70,6 +70,8 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
       hospital_test_appointment_tests, hospital_test_appointments, hospital_test_appointment_windows,
       hospital_home_collection_tests, hospital_home_collections, hospital_home_collection_windows,
       hospital_home_collection_areas,
+      hospital_test_preparations, hospital_card_providers, account_budgets, payroll_tax_challans,
+      pharmacy_lot_corrections,
       hospital_diagnostic_payments, hospital_diagnostic_bill_lines, hospital_diagnostic_bills,
       hospital_diagnostic_package_tests, hospital_diagnostic_packages, hospital_diagnostic_tests,
       hospital_diagnostic_departments, hospital_diagnostic_policy,

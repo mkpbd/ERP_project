@@ -58,6 +58,16 @@ export class CreateUserDto extends createZodDto(
 
 export class UpdateUserDto extends createZodDto(z.strictObject({ displayName: z.string().trim().min(1).max(100) })) {}
 
+/** The moment the account stops signing in; null clears it. */
+export class UserExpiryDto extends createZodDto(
+  z.strictObject({
+    expiresAt: z.iso
+      .datetime({ offset: true })
+      .transform((value) => new Date(value))
+      .nullable(),
+  }),
+) {}
+
 export class ListUsersQueryDto extends createZodDto(
   z.object({
     ...paginationShape,
@@ -78,6 +88,7 @@ const userShape = {
   status: z.enum(['active', 'deactivated']),
   emailVerified: z.boolean(),
   lastLoginAt: isoDate.nullable(),
+  expiresAt: isoDate.nullable(),
   createdAt: isoDate,
   updatedAt: isoDate,
 };

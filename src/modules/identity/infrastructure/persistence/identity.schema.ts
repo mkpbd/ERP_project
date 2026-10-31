@@ -29,6 +29,8 @@ export const users = pgTable(
     lastLoginAt: tz('last_login_at'),
     passwordChangedAt: tz('password_changed_at').notNull(),
     mfaEnabled: boolean('mfa_enabled').notNull().default(false),
+    /** Signing in stops from this moment (old UserExpireDateSetup); null: never. */
+    expiresAt: tz('expires_at'),
     version: integer('version').notNull().default(1),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),

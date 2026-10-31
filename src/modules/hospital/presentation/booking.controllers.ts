@@ -95,6 +95,80 @@ class UpdateHomeWindowDto extends createZodDto(homeWindow.update) {}
 class HomeWindowFilterDto extends createZodDto(z.object({ isActive: flag })) {}
 class HomeWindowResponseDto extends responseDto(homeWindow.response) {}
 
+const card = shapes(
+  {
+    name: z.string().trim().min(1).max(100),
+    address: z.string().trim().max(300).nullable(),
+    contactNo: z.string().trim().max(40).nullable(),
+    /** The share off what may be discounted on a card holder's diagnostic bill. */
+    discountPercent: z.number().min(0).max(100).multipleOf(0.01),
+    isActive: z.boolean(),
+  },
+  ['address', 'contactNo'],
+  { isActive: true },
+);
+class CreateCardDto extends createZodDto(card.create) {}
+class UpdateCardDto extends createZodDto(card.update) {}
+class CardFilterDto extends createZodDto(
+  z.object({ isActive: flag, q: z.string().trim().min(1).max(100).optional() }),
+) {}
+class CardResponseDto extends responseDto(card.response) {}
+
+const httpsUrl = z
+  .string()
+  .trim()
+  .max(600)
+  .regex(/^https:\/\/\S+$/, 'A full https:// address');
+const preparation = shapes(
+  {
+    /** A department's tests, or one test (exactly one of the two). */
+    departmentId: z.uuid().nullable(),
+    testId: z.uuid().nullable(),
+    title: z.string().trim().min(1).max(200),
+    titleBn: z.string().trim().max(200).nullable(),
+    instructions: z.string().trim().max(4000).nullable(),
+    instructionsBn: z.string().trim().max(4000).nullable(),
+    /** Where the centre hosts the video (the old system kept the file in the database). */
+    videoUrl: httpsUrl.nullable(),
+    displayOrder: z.int().min(0).max(999),
+    isActive: z.boolean(),
+  },
+  ['departmentId', 'testId', 'titleBn', 'instructions', 'instructionsBn', 'videoUrl'],
+  { displayOrder: 0, isActive: true },
+);
+class CreatePreparationDto extends createZodDto(preparation.create) {}
+class UpdatePreparationDto extends createZodDto(preparation.update) {}
+class PreparationFilterDto extends createZodDto(
+  z.object({ isActive: flag, departmentId: z.uuid().optional(), testId: z.uuid().optional() }),
+) {}
+class PreparationResponseDto extends responseDto(preparation.response) {}
+
+/** Old Admin.CreditCards: bank cards whose holders get a discount on their diagnostic bills. */
+export const CardProvidersController = createRecordController({
+  ...diag,
+  className: 'CardProvidersController',
+  path: 'hospital/card-providers',
+  type: R.cardProvider,
+  label: 'card provider',
+  create: CreateCardDto,
+  update: UpdateCardDto,
+  response: CardResponseDto,
+  filter: CardFilterDto,
+});
+
+/** Old Diag.TestGroupVideos: what to do before a test, in English and Bangla, with a video link; on the portal. */
+export const TestPreparationsController = createRecordController({
+  ...diag,
+  className: 'TestPreparationsController',
+  path: 'hospital/test-preparations',
+  type: R.testPreparation,
+  label: 'test preparation',
+  create: CreatePreparationDto,
+  update: UpdatePreparationDto,
+  response: PreparationResponseDto,
+  filter: PreparationFilterDto,
+});
+
 /** Old Diag.TestAppointmentSlots: the windows tests are booked into, each with its daily capacity. */
 export const TestAppointmentWindowsController = createRecordController({
   ...diag,
@@ -472,6 +546,8 @@ export class HomeCollectionsController {
 }
 
 export const BOOKING_CONTROLLERS = [
+  CardProvidersController,
+  TestPreparationsController,
   TestAppointmentWindowsController,
   HomeCollectionAreasController,
   HomeCollectionWindowsController,

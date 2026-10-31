@@ -35,4 +35,28 @@
   <tr class="total"><td>Tax still to deduct</td><td class="n">{{money certificate.taxDue}}</td></tr>
   <tr><td>Monthly deduction</td><td class="n">{{money certificate.monthlyTax}}</td></tr>
 </table>
+
+<h2>Deducted and deposited (treasury challans)</h2>
+{{#if depositRows.length}}
+<table class="report" style="width: 90%">
+  <thead>
+    <tr><th>Pay month</th><th class="num">Deducted</th><th>Challan</th><th>Date</th><th>Bank</th><th class="num">Deposited</th></tr>
+  </thead>
+  <tbody>
+    {{#each depositRows}}
+    <tr>
+      <td>{{month}}</td>
+      <td class="num">{{#unless (eq deducted null)}}{{money deducted}}{{/unless}}</td>
+      <td>{{challanNo}}</td>
+      <td>{{#if challanDate}}{{date challanDate}}{{/if}}</td>
+      <td>{{bank}}</td>
+      <td class="num">{{#unless (eq deposited null)}}{{money deposited}}{{/unless}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td>Total</td><td class="num">{{money deducted}}</td><td colspan="3"></td><td class="num">{{money deposited}}</td></tr>
+  </tbody>
+</table>
+{{else}}
+<p>No tax deducted or deposited yet this year.</p>
+{{/if}}
 {{/with}}

@@ -14,6 +14,7 @@ import {
   BootstrapAdministratorCommand,
   CreateUserCommand,
   DeactivateUserCommand,
+  SetUserExpiryCommand,
   UpdateUserCommand,
 } from '../commands/user.commands.js';
 import { PasswordHasher } from '../ports.js';
@@ -133,6 +134,47 @@ export class DeactivateUserHandler implements ICommandHandler<DeactivateUserComm
     });
     this.accessControl.invalidateUser(userId);
     this.eventBus.publishAll(events);
+  }
+}
+
+/**
+ * Old UserExpireDateSetup: a temporary account (a locum, a trainee) signs in until its expiry; from then it is refused
+ * like a deactivated one and its sessions end at their next refresh (or at once when the moment is past). Not one's
+ * own account, and never the last active super-admin.
+ */
+@CommandHandler(SetUserExpiryCommand)
+export class SetUserExpiryHandler implements ICommandHandler<SetUserExpiryCommand> {
+  constructor(
+    private readonly users: UserRepository,
+    private readonly sessions: SessionRepository,
+    private readonly accessControl: AccessControl,
+    private readonly tx: TransactionManager,
+    private readonly audit: AuditTrail,
+    private readonly clock: Clock,
+  ) {}
+
+  async execute({ actor, userId, expiresAt }: SetUserExpiryCommand): Promise<void> {
+    await this.accessControl.authorize(actor.userId, { permissions: ['users:deactivate'] });
+    if (actor.userId === userId) {
+      throw new DomainError('cannot_expire_self', 'You cannot set an expiry on your own account');
+    }
+    const now = this.clock.now();
+    await this.tx.run(async () => {
+      const user = await this.users.findByIdForUpdate(userId);
+      if (!user) throw new NotFoundError('user');
+      if (expiresAt) await this.accessControl.assertNotLastActiveSuperAdmin(userId);
+      user.setExpiry(expiresAt, now);
+      await this.users.update(user);
+      const revoked = user.isExpired(now) ? await this.sessions.revokeAllForUser(userId, 'account_inactive', now) : 0;
+      await this.audit.record({
+        action: 'user.expiry_set',
+        actorUserId: actor.userId,
+        resourceType: 'user',
+        resourceId: userId,
+        metadata: { expiresAt: expiresAt?.toISOString() ?? null, sessionsRevoked: revoked },
+      });
+    });
+    this.accessControl.invalidateUser(userId);
   }
 }
 

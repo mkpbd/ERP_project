@@ -284,6 +284,10 @@ export abstract class DiagnosticBillRepository {
     id: string,
   ): Promise<{ id: string; name: string; isActive: boolean; tests: { testId: string; rate: number }[] } | null>;
   abstract setPackageTests(packageId: string, tests: readonly { testId: string; rate: number }[]): Promise<void>;
+  /** A bank card whose holders get a discount, or null. */
+  abstract cardProvider(
+    id: string,
+  ): Promise<{ id: string; name: string; discountPercent: number; isActive: boolean } | null>;
   abstract findForUpdate(id: string): Promise<DiagnosticBill | null>;
   abstract insert(bill: DiagnosticBill): Promise<void>;
   /** Saves the header and each line's state. */

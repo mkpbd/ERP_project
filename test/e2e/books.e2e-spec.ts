@@ -384,3 +384,65 @@ describe('PF book', () => {
     await request(http).get('/api/v1/accounts/tds-rules').set(bearer(plain)).expect(403);
   });
 });
+
+describe('budgets', () => {
+  it("keeps each income and expense account's budget for the year, against what was posted", async () => {
+    const years = await request(http).get('/api/v1/accounts/fiscal-years').set(bearer(accountant)).expect(200);
+    const year = (years.body as { id: string }[])[0]!.id;
+    const budget = (lines: object[], token = accountant) =>
+      request(http).put(`/api/v1/accounts/budgets/${year}`).set(bearer(token)).send({ lines });
+    const view = (query = '') =>
+      request(http).get(`/api/v1/accounts/budgets/${year}${query}`).set(bearer(accountant)).expect(200);
+
+    const cash = await budget([{ glAccountId: gl.cash, amount: 1000 }]);
+    expect([cash.status, cash.body.code]).toEqual([422, 'not_budgetable']);
+    const twice = await budget([
+      { glAccountId: gl.sales, amount: 1 },
+      { glAccountId: gl.sales, amount: 2 },
+    ]);
+    expect([twice.status, twice.body.code]).toEqual([422, 'duplicate_account']);
+    expect((await budget([], plain)).status).toBe(403);
+
+    await budget([
+      { glAccountId: gl.sales, amount: 120_000, note: 'Up a tenth on last year' },
+      { glAccountId: gl.salary, amount: 60_000 },
+    ]).expect(204);
+    const sofar = await view('?to=2025-09-30');
+    expect(sofar.body.lines).toEqual([
+      expect.objectContaining({
+        code: '4001',
+        side: 'income',
+        budget: 120_000,
+        actual: 30_000,
+        variance: -90_000,
+        usedPercent: 25,
+        note: 'Up a tenth on last year',
+      }),
+      expect.objectContaining({ code: '5001', side: 'expense', budget: 60_000, actual: 15_000, usedPercent: 25 }),
+    ]);
+    expect(sofar.body).toMatchObject({
+      to: '2025-09-30',
+      income: { budget: 120_000, actual: 30_000 },
+      expense: { budget: 60_000, actual: 15_000 },
+      profit: { budget: 60_000, actual: 15_000 },
+    });
+    expect((await view()).body.to).toBe('2026-06-30');
+    const outside = await request(http).get(`/api/v1/accounts/budgets/${year}?to=2026-07-01`).set(bearer(accountant));
+    expect([outside.status, outside.body.code]).toEqual([422, 'invalid_period']);
+
+    for (const format of ['pdf', 'xlsx']) {
+      await request(http)
+        .post('/api/v1/reports/accounts.budget-vs-actual/render')
+        .set(bearer(admin))
+        .send({ format, params: { fiscalYearId: year, to: '2025-09-30' } })
+        .expect(200);
+    }
+
+    // The whole budget is replaced: what is left shows what was posted, with no budget.
+    await budget([]).expect(204);
+    expect((await view()).body.lines).toEqual([
+      expect.objectContaining({ code: '4001', budgeted: false, budget: 0, usedPercent: null }),
+      expect.objectContaining({ code: '5001', budgeted: false, actual: 15_000 }),
+    ]);
+  });
+});

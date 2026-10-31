@@ -20,6 +20,7 @@ const userView = {
   status: users.status,
   emailVerifiedAt: users.emailVerifiedAt,
   lastLoginAt: users.lastLoginAt,
+  expiresAt: users.expiresAt,
   createdAt: users.createdAt,
   updatedAt: users.updatedAt,
 };
@@ -117,9 +118,20 @@ export class DrizzleUserDirectory extends UserDirectory {
   async findSummaries(userIds: readonly string[]): Promise<UserSummary[]> {
     if (userIds.length === 0) return [];
     const rows = await this.context.db
-      .select({ id: users.id, email: users.email, displayName: users.displayName, status: users.status })
+      .select({
+        id: users.id,
+        email: users.email,
+        displayName: users.displayName,
+        status: users.status,
+        expiresAt: users.expiresAt,
+      })
       .from(users)
       .where(inArray(users.id, [...userIds]));
-    return rows.map(({ status, ...row }) => ({ ...row, isActive: status === 'active' }));
+    const now = new Date();
+    // An account past its expiry is no longer active anywhere else either.
+    return rows.map(({ status, expiresAt, ...row }) => ({
+      ...row,
+      isActive: status === 'active' && (expiresAt === null || expiresAt > now),
+    }));
   }
 }

@@ -11,6 +11,35 @@ import type { PaymentAllocation, ReceiveDue } from './supplier-payment.js';
 import type { SupplierReturn } from './supplier-return.js';
 import type { WardIndent, WardIssue, WardReturnPart } from './ward.js';
 
+/** A lot as entered, and where its units are. */
+export interface StockedLot {
+  readonly id: string;
+  readonly productId: string;
+  readonly batchNo: string | null;
+  readonly expiryDate: string;
+  readonly saleRate: number;
+}
+
+export interface LotCorrectionRow {
+  readonly id: string;
+  readonly number: string;
+  readonly productId: string;
+  readonly fromLotId: string;
+  readonly toLotId: string;
+  readonly correctedOn: string;
+  readonly units: number;
+  readonly reason: string;
+  readonly correctedBy: string;
+}
+
+/** Lots entered wrong (step 15g). */
+export abstract class LotCorrectionRepository {
+  abstract lot(id: string): Promise<StockedLot | null>;
+  /** The outlets holding units of the lot, with how many. */
+  abstract holdings(lotId: string): Promise<{ outletId: string; qty: number }[]>;
+  abstract insert(row: LotCorrectionRow): Promise<void>;
+}
+
 export abstract class PharmacySequences {
   abstract next(kind: string, year: number): Promise<number>;
 }
@@ -27,7 +56,8 @@ export type MovementKind =
   | 'sale_return'
   | 'count_adjustment'
   | 'ward_issue'
-  | 'ward_return';
+  | 'ward_return'
+  | 'lot_correction';
 
 export interface NewMovement {
   readonly outletId: string;

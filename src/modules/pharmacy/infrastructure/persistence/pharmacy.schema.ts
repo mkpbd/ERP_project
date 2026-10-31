@@ -240,6 +240,7 @@ export const PHARMACY_MOVEMENT_KINDS = [
   'count_adjustment',
   'ward_issue',
   'ward_return',
+  'lot_correction',
 ] as const;
 
 // Every unit in or out of an outlet, by lot, with its unit cost; stock is the sum (old Stocks.AvailableStock and
@@ -272,7 +273,7 @@ export const pharmacyMovements = pgTable(
     check('pharmacy_movements_qty_ck', sql`${t.qty} <> 0 and ${t.unitCost} >= 0`),
     check(
       'pharmacy_movements_kind_ck',
-      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return', 'count_adjustment', 'ward_issue', 'ward_return')`,
+      sql`${t.kind} in ('opening', 'receive', 'supplier_return', 'replacement', 'transfer_out', 'transfer_in', 'sale', 'sale_cancel', 'sale_return', 'count_adjustment', 'ward_issue', 'ward_return', 'lot_correction')`,
     ),
   ],
 );
@@ -1226,5 +1227,35 @@ export const wardReturnLines = pgTable(
   (t) => [
     primaryKey({ columns: [t.returnId, t.position] }),
     check('pharmacy_ward_return_lines_qty_ck', sql`${t.qty} > 0`),
+  ],
+);
+
+// Old UpdateProductInStock (expiry and sale price edited in place, logged in StockRateChangeLogs, no reason): a lot
+// whose batch, expiry or sale rate was entered wrong; its units still in stock moved to the lot it should have been.
+export const pharmacyLotCorrections = pgTable(
+  'pharmacy_lot_corrections',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    productId: uuid('product_id')
+      .notNull()
+      .references(() => products.id, { onDelete: 'restrict' }),
+    fromLotId: uuid('from_lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    toLotId: uuid('to_lot_id')
+      .notNull()
+      .references(() => pharmacyLots.id, { onDelete: 'restrict' }),
+    correctedOn: day('corrected_on').notNull(),
+    /** Units moved, over every outlet. */
+    units: integer('units').notNull(),
+    reason: text('reason').notNull(),
+    correctedBy: uuid('corrected_by').references(() => users.id, { onDelete: 'set null' }),
+    createdAt: tz('created_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('pharmacy_lot_corrections_number_uq').on(t.number),
+    index('pharmacy_lot_corrections_from_idx').on(t.fromLotId),
+    check('pharmacy_lot_corrections_lots_ck', sql`${t.fromLotId} <> ${t.toLotId} and ${t.units} > 0`),
   ],
 );

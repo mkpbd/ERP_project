@@ -18,6 +18,7 @@ import {
   PortalBookingsQuery,
   PortalCancelBookingCommand,
   PortalHomeCollectionOfferQuery,
+  PortalPreparationsQuery,
   PortalTestCatalogueQuery,
   PortalWindowsQuery,
 } from '../application/portal-booking.handlers.js';
@@ -89,6 +90,22 @@ class OfferResponseDto extends responseDto({
   ),
   windows: z.array(z.object({ id: z.uuid(), label: z.string() })),
 }) {}
+class PreparationsResponseDto extends responseDto({
+  items: z.array(
+    z.object({
+      id: z.uuid(),
+      departmentId: z.uuid().nullable(),
+      departmentName: z.string().nullable(),
+      testId: z.uuid().nullable(),
+      testName: z.string().nullable(),
+      title: z.string(),
+      titleBn: z.string().nullable(),
+      instructions: z.string().nullable(),
+      instructionsBn: z.string().nullable(),
+      videoUrl: z.string().nullable(),
+    }),
+  ),
+}) {}
 class BookingsResponseDto extends responseDto({
   appointments: z.array(
     z.object({
@@ -157,6 +174,13 @@ export class PortalBookingController {
   @ApiOkResponse({ type: OfferResponseDto })
   offer() {
     return this.queryBus.execute(new PortalHomeCollectionOfferQuery());
+  }
+
+  @Get('test-preparations')
+  @ApiOperation({ summary: 'What to do before a test, in English and Bangla, with a video link' })
+  @ApiOkResponse({ type: PreparationsResponseDto })
+  async preparations() {
+    return { items: await this.queryBus.execute(new PortalPreparationsQuery()) };
   }
 
   @Get('bookings')

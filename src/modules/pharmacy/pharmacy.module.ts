@@ -16,6 +16,9 @@ import { PharmacyReadRepository } from './application/purchase.messages.js';
 import { SUPPLIER_HANDLERS } from './application/supplier.handlers.js';
 import { SupplierReadRepository } from './application/supplier.messages.js';
 import { COUNT_HANDLERS } from './application/count.handlers.js';
+import { LOT_HANDLERS } from './application/lot.handlers.js';
+import { LotsController } from './presentation/lot.controllers.js';
+import { DrizzleLotCorrectionRepository } from './infrastructure/persistence/drizzle-lot-correction.repository.js';
 import { CountReadRepository } from './application/count.messages.js';
 import { RETURN_HANDLERS } from './application/return.handlers.js';
 import { ReturnReadRepository } from './application/return.messages.js';
@@ -49,6 +52,7 @@ import {
   ReturnPolicies,
   SaleReturnRepository,
   StockCountRepository,
+  LotCorrectionRepository,
 } from './domain/repositories.js';
 import { DrizzleCatalogueReadRepository } from './infrastructure/persistence/drizzle-catalogue.read-repository.js';
 import { DrizzlePharmacyReadRepository } from './infrastructure/persistence/drizzle-pharmacy.read-repository.js';
@@ -133,6 +137,7 @@ import { pharmacyDashboard } from './infrastructure/reports/pharmacy.dashboard.j
     ...RETURN_CONTROLLERS,
     ...COUNT_CONTROLLERS,
     ...WARD_CONTROLLERS,
+    LotsController,
   ],
   providers: [
     ...CATALOGUE_HANDLERS,
@@ -143,6 +148,7 @@ import { pharmacyDashboard } from './infrastructure/reports/pharmacy.dashboard.j
     ...RETURN_HANDLERS,
     ...COUNT_HANDLERS,
     ...WARD_HANDLERS,
+    ...LOT_HANDLERS,
     { provide: CatalogueReadRepository, useClass: DrizzleCatalogueReadRepository },
     { provide: PharmacyReadRepository, useClass: DrizzlePharmacyReadRepository },
     { provide: PharmacySequences, useClass: DrizzlePharmacySequences },
@@ -164,6 +170,7 @@ import { pharmacyDashboard } from './infrastructure/reports/pharmacy.dashboard.j
     { provide: SaleReturnRepository, useClass: DrizzleSaleReturnRepository },
     { provide: ReturnReadRepository, useClass: DrizzleReturnReadRepository },
     { provide: StockCountRepository, useClass: DrizzleStockCountRepository },
+    { provide: LotCorrectionRepository, useClass: DrizzleLotCorrectionRepository },
     { provide: CountReadRepository, useClass: DrizzleCountReadRepository },
     { provide: WardRepository, useClass: DrizzleWardRepository },
     { provide: WardReadRepository, useClass: DrizzleWardReadRepository },

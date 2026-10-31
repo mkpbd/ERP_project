@@ -140,6 +140,7 @@ beforeEach(async () => {
     ['1', 'debit', '1001', 'Cash in hand', 'cash_in_hand'],
     ['1', 'debit', '1250', 'Diagnostic receivable', 'diagnostic_receivable'],
     ['4', 'credit', '4401', 'Diagnostic income', 'diagnostic_income'],
+    ['5', 'debit', '5401', 'Diagnostic discount', 'diagnostic_discount'],
   ] as const) {
     await create('accounts/gl-roles', { role, glAccountId: await glAccount(nature, balance, code, name) });
   }
@@ -549,5 +550,74 @@ describe('bookings on the portal', () => {
       windowId: morning,
       testIds: [cbc],
     }).expect(201);
+  });
+});
+
+describe('card providers and preparation guides', () => {
+  it("gives a card holder the card's discount on their own bill", async () => {
+    const card = await create(
+      'hospital/card-providers',
+      { name: 'City Bank Amex', contactNo: '09612000000', discountPercent: 15 },
+      manager,
+    );
+    await refused(
+      api('post', 'card-providers', manager, { name: 'city bank amex', discountPercent: 5 }),
+      409,
+      'card_provider_name_taken',
+    );
+    const bill = (body: Record<string, unknown>) =>
+      api('post', 'diagnostic-bills', biller, { patientId: karim.id, testIds: [cbc, lipid], ...body });
+    // 15 % of 1,300 is above the counter's 10 %: the card's own share is the limit.
+    const made = await bill({ cardProviderId: card }).expect(201);
+    expect(made.body).toMatchObject({ net: 1105, due: 1105 });
+    const view = await api('get', `diagnostic-bills/${made.body.id}`, biller).expect(200);
+    expect(view.body).toMatchObject({ discount: 195, discountReason: 'Card: City Bank Amex' });
+    await refused(bill({ cardProviderId: card, discount: 300, discountReason: 'More' }), 403, 'discount_limit');
+
+    await api('patch', `card-providers/${card}`, manager, { isActive: false }).expect(200);
+    await refused(bill({ cardProviderId: card }), 422, 'inactive_card');
+  });
+
+  it('keeps what to do before a test, and shows it on the portal', async () => {
+    await create(
+      'hospital/test-preparations',
+      {
+        departmentId: pathology,
+        title: 'Before a blood test',
+        titleBn: 'রক্ত পরীক্ষার আগে',
+        instructions: 'Fast for 10 hours; water is fine.',
+        videoUrl: 'https://videos.example.com/fasting.mp4',
+      },
+      manager,
+    );
+    await create(
+      'hospital/test-preparations',
+      { testId: xray, title: 'Chest X-ray', instructions: 'No metal.' },
+      manager,
+    );
+    await refused(
+      api('post', 'test-preparations', manager, {
+        departmentId: pathology,
+        testId: xray,
+        title: 'Both',
+        instructions: 'x',
+      }),
+      422,
+      'invalid_hospital_test_preparation',
+    );
+    await refused(
+      api('post', 'test-preparations', manager, {
+        testId: cbc,
+        title: 'Link',
+        videoUrl: 'http://insecure.example.com',
+      }),
+      400,
+      'validation_failed',
+    );
+    const guides = await portal('get', 'test-preparations').expect(200);
+    expect(guides.body.items).toEqual([
+      expect.objectContaining({ title: 'Before a blood test', departmentName: 'Pathology', testName: null }),
+      expect.objectContaining({ title: 'Chest X-ray', departmentName: null, testName: 'X-ray chest PA' }),
+    ]);
   });
 });

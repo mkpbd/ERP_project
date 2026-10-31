@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
 import { CommandBus, QueryBus } from '@nestjs/cqrs';
 import {
   ApiBearerAuth,
@@ -17,6 +17,7 @@ import {
   CreateUserCommand,
   DeactivateUserCommand,
   RevokeUserSessionsCommand,
+  SetUserExpiryCommand,
   UpdateUserCommand,
 } from '../application/commands/user.commands.js';
 import {
@@ -34,6 +35,7 @@ import {
   RevokedCountResponseDto,
   SessionResponseDto,
   UpdateUserDto,
+  UserExpiryDto,
   UserPageResponseDto,
   UserResponseDto,
 } from './dto/identity.dto.js';
@@ -102,6 +104,15 @@ export class UsersController {
   @ApiNoContentResponse()
   async deactivate(@CurrentUser() actor: Actor, @Param() params: IdParamDto): Promise<void> {
     await this.commandBus.execute(new DeactivateUserCommand(actor, params.id));
+  }
+
+  @Put(':id/expiry')
+  @RequirePermissions('users:deactivate')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Set when the account stops signing in (null: never); a moment past ends its sessions' })
+  @ApiNoContentResponse()
+  async setExpiry(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: UserExpiryDto): Promise<void> {
+    await this.commandBus.execute(new SetUserExpiryCommand(actor, params.id, dto.expiresAt));
   }
 
   @Post(':id/activate')

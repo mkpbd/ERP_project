@@ -201,6 +201,35 @@ describe('account administration', () => {
       .expect(200);
   });
 
+  it('ends an account at its expiry: refused sign-in, sessions ended, cleared again', async () => {
+    const locum = await createUser('locum@example.com');
+    const expiry = (at: string | null, token = admin) =>
+      request(http).put(`/api/v1/users/${locum.id}/expiry`).set(bearer(token)).send({ expiresAt: at });
+    const signIn = () =>
+      request(http).post('/api/v1/auth/login').send({ identifier: 'locum@example.com', password: PASSWORD });
+
+    const later = new Date(Date.now() + 86_400_000).toISOString();
+    await expiry(later).expect(204);
+    const shown = await request(http).get(`/api/v1/users/${locum.id}`).set(bearer(admin)).expect(200);
+    expect(shown.body.expiresAt).toBe(later);
+    await signIn().expect(200);
+    expect((await expiry(later, locum.token)).status).toBe(403);
+    const own = await request(http)
+      .put(`/api/v1/users/${adminId}/expiry`)
+      .set(bearer(admin))
+      .send({ expiresAt: later });
+    expect([own.status, own.body.code]).toEqual([422, 'cannot_expire_self']);
+
+    // A moment past: refused at once, and the open sessions end.
+    await expiry(new Date(Date.now() - 1000).toISOString()).expect(204);
+    await request(http).get('/api/v1/users/me').set(bearer(locum.token)).expect(401);
+    const refused = await signIn().expect(401);
+    expect(refused.body.code).toBe('account_expired');
+
+    await expiry(null).expect(204);
+    await signIn().expect(200);
+  });
+
   it('lets an administrator revoke all sessions of a user', async () => {
     const member = await createUser('revoked@example.com');
     const result = await request(http).delete(`/api/v1/users/${member.id}/sessions`).set(bearer(admin)).expect(200);
