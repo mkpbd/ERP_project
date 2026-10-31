@@ -140,8 +140,8 @@ longer counted.
 
 * **Old follow-up data and care orders** are not brought over: they were free-text forms without times.
 * **Ward-scoped access** (duty nurses and doctors seeing their floor's patients) is its own gap.
-* **Screens.** The inpatient screens (admissions, bed board, billing, these records) come with the IPD's turn in the
-  UI steps.
+* **Screens.** Corrections, reopening and visitor passes: [step 16c](16c-ipd-screens.md). The nursing records
+  (observations, care orders) come with the next UI step.
 
 ## Verification
 

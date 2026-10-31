@@ -1,6 +1,6 @@
 # Step 16b — Laboratory screens (Angular)
 
-Status: **done** (2026-10-31). Previous: [step 16a](16a-ot-screens.md) · API:
+Status: **done** (2026-10-31). Previous: [step 16a](16a-ot-screens.md) · Next: [step 16c](16c-ipd-screens.md) · API:
 [step 15b](15b-culture-and-written-reports.md) and [10c](10c-laboratory.md).
 
 The laboratory's screens in the Angular frontend (`D:\Pratices\ERP_Frontend`, `mkpbd/ERP_frontend`, commit
