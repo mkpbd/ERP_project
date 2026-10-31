@@ -2,6 +2,15 @@ import { Global, Inject, Module, type OnModuleInit } from '@nestjs/common';
 import { APP_CONFIG } from '../../config/config.module.js';
 import type { AppConfig } from '../../config/configuration.js';
 import { DiagnosticOrders } from '../../shared/application/contracts/diagnostic-orders.js';
+import { DiagnosticBookings } from '../../shared/application/contracts/diagnostic-bookings.js';
+import { BOOKING_HANDLERS, HospitalDiagnosticBookings } from './application/booking.handlers.js';
+import { DiagnosticBookingReadRepository } from './application/booking.messages.js';
+import { BOOKING_CONTROLLERS } from './presentation/booking.controllers.js';
+import { homeCollectionSheetReport, testAppointmentSlipReport } from './infrastructure/reports/booking.reports.js';
+import {
+  DrizzleDiagnosticBookingReadRepository,
+  DrizzleDiagnosticBookingRepository,
+} from './infrastructure/persistence/drizzle-booking.repositories.js';
 import { CorporateAccounts } from '../../shared/application/contracts/corporate-accounts.js';
 import { InpatientRegister } from '../../shared/application/contracts/inpatient-register.js';
 import { PatientDirectory } from '../../shared/application/contracts/patient-directory.js';
@@ -41,6 +50,7 @@ import {
   AdmissionRepository,
   AppointmentRepository,
   DiagnosticBillRepository,
+  DiagnosticBookingRepository,
   IpdBillingRepository,
   OtCaseRepository,
   VisitorPassRepository,
@@ -134,10 +144,12 @@ import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.
  * indoor bill: charges, advances, the final bill and its dues (step 9f); doctor payments, corporate collections
  * across OPD and indoor bills, statements and the UHID merge (step 9g); the test catalogue and diagnostic bills with
  * the referring doctors' commission (step 10a); admitted patients' tests on the indoor bill and diagnostic bills in
- * the statements (step 10b). Global: it publishes the admissions other
+ * the statements (step 10b); test appointments and home collections, booked at the desk or on the portal (step
+ * 15f). Global: it publishes the admissions other
  * modules charge to (InpatientRegister), for the pharmacy's ward medicine, and the diagnostic bills the lab works
  * from (DiagnosticOrders), the reporting doctors' fees it credits (ReportingFees), the patients (PatientDirectory) and
- * the corporate clients the pharmacy sells to on credit (CorporateAccounts).
+ * the corporate clients the pharmacy sells to on credit (CorporateAccounts) and the bookings the portal offers
+ * (DiagnosticBookings).
  */
 @Global()
 @Module({
@@ -151,6 +163,7 @@ import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.
     VisitorPassesController,
     ...IPD_BILLING_CONTROLLERS,
     ...DIAGNOSTIC_CONTROLLERS,
+    ...BOOKING_CONTROLLERS,
   ],
   providers: [
     ...PATIENT_HANDLERS,
@@ -161,6 +174,7 @@ import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.
     ...VISITOR_HANDLERS,
     ...IPD_BILLING_HANDLERS,
     ...DIAGNOSTIC_HANDLERS,
+    ...BOOKING_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
     { provide: PatientReadRepository, useClass: DrizzlePatientReadRepository },
     { provide: AppointmentRepository, useClass: DrizzleAppointmentRepository },
@@ -184,6 +198,9 @@ import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.
     { provide: ReferredBilling, useClass: DrizzleReferredBilling },
     { provide: DiagnosticBillRepository, useClass: DrizzleDiagnosticBillRepository },
     { provide: DiagnosticBillReadRepository, useClass: DrizzleDiagnosticBillReadRepository },
+    { provide: DiagnosticBookingRepository, useClass: DrizzleDiagnosticBookingRepository },
+    { provide: DiagnosticBookingReadRepository, useClass: DrizzleDiagnosticBookingReadRepository },
+    { provide: DiagnosticBookings, useClass: HospitalDiagnosticBookings },
     {
       provide: HOSPITAL_SETTINGS,
       inject: [APP_CONFIG],
@@ -198,6 +215,7 @@ import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.
     PatientDirectory,
     OutpatientClinic,
     ReferredBilling,
+    DiagnosticBookings,
   ],
 })
 export class HospitalModule implements OnModuleInit {
@@ -221,6 +239,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly documents: PatientDocumentRegistry,
     @Inject(HOSPITAL_SETTINGS) private readonly settings: HospitalSettings,
     private readonly dashboards: DashboardRegistry,
+    private readonly bookings: DiagnosticBookingReadRepository,
   ) {}
 
   onModuleInit(): void {
@@ -256,6 +275,8 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(referralCommissionReport(this.context));
     this.reports.register(diagnosticIncomeReport(this.context));
     this.reports.register(diagnosticCollectionReport(this.context, this.users));
+    this.reports.register(testAppointmentSlipReport(this.bookings, this.organization));
+    this.reports.register(homeCollectionSheetReport(this.bookings, this.organization, this.users));
     for (const section of hospitalDashboards(this.context)) this.dashboards.register(section);
   }
 }

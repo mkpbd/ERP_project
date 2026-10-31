@@ -1,7 +1,7 @@
 # Step 16e — The dashboard screen (Angular)
 
-Status: **done** (2026-10-31). Previous: [step 15e](15e-dashboards.md) (its API) · Next: step 15f (diagnostic
-appointments and home collection).
+Status: **done** (2026-10-31). Previous: [step 15e](15e-dashboards.md) (its API) · Next: [step 15f](15f-diagnostic-appointments-home-collection.md)
+(diagnostic appointments and home collection).
 
 The figures of step 15e on the Angular dashboard (`D:\Pratices\ERP_Frontend`, `mkpbd/ERP_frontend`,
 commit `89cb31e`).

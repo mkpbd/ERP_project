@@ -33,7 +33,11 @@ import {
 } from './hospital.schema.js';
 
 /** The policy before anyone set one: 10 % at the counter (as at the OPD), no referral commission. */
-const DEFAULT_POLICY: DiagnosticPolicy = { counterDiscountPercent: 10, defaultReferralPercent: 0 };
+const DEFAULT_POLICY: DiagnosticPolicy = {
+  counterDiscountPercent: 10,
+  defaultReferralPercent: 0,
+  homeCollectionTestId: null,
+};
 
 const due =
   sql<number>`${diagnosticBills.net} - ${diagnosticBills.cancelled} - ${diagnosticBills.paid} - ${diagnosticBills.collected} + ${diagnosticBills.refunded}`.mapWith(
@@ -51,6 +55,7 @@ export class DrizzleDiagnosticBillRepository extends DiagnosticBillRepository {
       .select({
         counterDiscountPercent: diagnosticPolicy.counterDiscountPercent,
         defaultReferralPercent: diagnosticPolicy.defaultReferralPercent,
+        homeCollectionTestId: diagnosticPolicy.homeCollectionTestId,
       })
       .from(diagnosticPolicy)
       .where(eq(diagnosticPolicy.id, 1));

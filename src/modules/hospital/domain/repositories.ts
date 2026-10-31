@@ -2,6 +2,7 @@ import type { StoredFile } from '../../../shared/domain/uploads.js';
 import type { Admission } from './admission.js';
 import type { Appointment, DoctorFees, Sitting } from './appointment.js';
 import type { DiagnosticBill } from './diagnostic-bill.js';
+import type { HomeCollection, TestAppointment, Weekday } from './diagnostic-booking.js';
 import type { InvestigationBill, IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
 import type { OpdBill, PaymentMethod } from './opd-bill.js';
 import type { OtCase } from './ot-case.js';
@@ -246,6 +247,8 @@ export abstract class IpdBillingRepository {
 export interface DiagnosticPolicy {
   readonly counterDiscountPercent: number;
   readonly defaultReferralPercent: number;
+  /** The service a home collection's charge is billed as; null: none set yet. */
+  readonly homeCollectionTestId: string | null;
 }
 
 /** A test as billed. */
@@ -293,6 +296,65 @@ export abstract class DiagnosticBillRepository {
   ): Promise<{ rate: number; percent: number | null; amount: number | null } | null>;
   /** The admission's diagnostic bills with tests still billed, oldest first. */
   abstract indoorCharges(admissionId: string): Promise<InvestigationBill[]>;
+}
+
+/** A test as booked: its rate and the department it is done in. */
+export interface BookableTest {
+  readonly id: string;
+  readonly name: string;
+  readonly rate: number;
+  readonly isActive: boolean;
+  readonly departmentId: string;
+  readonly departmentName: string;
+  readonly departmentKind: 'lab' | 'imaging' | 'other';
+}
+
+export interface AppointmentWindow {
+  readonly id: string;
+  readonly label: string;
+  readonly startTime: string;
+  readonly endTime: string | null;
+  readonly capacity: number;
+  /** Null: any department. */
+  readonly departmentId: string | null;
+  readonly isActive: boolean;
+}
+
+export interface CollectionArea {
+  readonly id: string;
+  readonly name: string;
+  readonly charge: number;
+  readonly minimumOrder: number;
+  /** None: every day. */
+  readonly days: readonly Weekday[];
+  readonly isActive: boolean;
+}
+
+/** Test appointments and home collections (step 15f). */
+export abstract class DiagnosticBookingRepository {
+  abstract tests(ids: readonly string[]): Promise<Map<string, BookableTest>>;
+  abstract appointmentWindow(id: string): Promise<AppointmentWindow | null>;
+  /** Places taken (not cancelled) in the window that day. */
+  abstract takenSerials(windowId: string, date: string): Promise<Set<number>>;
+  /** Whether the patient (by id, else by mobile number) holds a live booking in the window that day. */
+  abstract bookedInWindow(
+    windowId: string,
+    date: string,
+    patient: { id: string | null; mobileNo: string },
+  ): Promise<boolean>;
+  /** The patient's bookings not yet billed, missed or cancelled, from the day on. */
+  abstract liveBookings(patientId: string, from: string): Promise<{ appointments: number; homeCollections: number }>;
+  abstract insertAppointment(appointment: TestAppointment): Promise<void>;
+  abstract appointmentForUpdate(id: string): Promise<TestAppointment | null>;
+  /** Saves the header (the tests never change). */
+  abstract updateAppointment(appointment: TestAppointment): Promise<void>;
+  abstract area(id: string): Promise<CollectionArea | null>;
+  abstract collectionWindow(id: string): Promise<{ id: string; label: string; isActive: boolean } | null>;
+  /** Whether the patient (by id, else by mobile number) holds a live home collection that day. */
+  abstract collectionBooked(date: string, patient: { id: string | null; mobileNo: string }): Promise<boolean>;
+  abstract insertHomeCollection(collection: HomeCollection): Promise<void>;
+  abstract homeCollectionForUpdate(id: string): Promise<HomeCollection | null>;
+  abstract updateHomeCollection(collection: HomeCollection): Promise<void>;
 }
 
 export interface OtRoom {

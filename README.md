@@ -192,10 +192,12 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | service groups, services (rate, doctor share) and corporate clients (cash or credit, limit, discount) | `opd:manage` |
 | a corporate client's payment against its OPD and indoor bills (oldest first) | `opd:bill` |
 | paying a doctor their shares | `doctor:pay` |
-| `GET` diagnostic departments, tests, packages, the diagnostic policy and diagnostic bills | `diag:read` |
-| diagnostic departments, tests, packages and their tests, the diagnostic policy; cancelling tests after the bill's day | `diag:manage` |
+| `GET` diagnostic departments, tests, packages, the diagnostic policy and diagnostic bills; test appointment windows and their places, test appointments, home collection areas, windows and home collections | `diag:read` |
+| diagnostic departments, tests, packages and their tests, the diagnostic policy (with the home collection service); test appointment windows, home collection areas and windows; cancelling tests after the bill's day | `diag:manage` |
 | diagnostic bills (an admitted patient's charged to the stay), collecting their dues, cancelling tests on the bill's day | `diag:bill` |
 | a diagnostic discount above the counter's limit | `diag:discount` |
+| booking test appointments and home collections (a registered patient, or a name and mobile); no-shows, cancelling, attaching the registered patient; giving a home collection its collector (`GET /hospital/home-collectors`) | `diag:book` |
+| a collector's own home collections (`GET /hospital/home-collections`, `/:id`) and recording their samples as taken | `diag:collect` (the desk with `diag:book` may record it for them) |
 | `GET /lab/*` (test parameters and imaging templates, samples, the worklist, results, imaging studies) | `lab:read` |
 | lab test parameters and normal ranges, imaging report templates, what each test uses up and which store department each lab uses; handing a report over while the patient still owes | `lab:manage` |
 | collecting samples | `lab:collect` |
@@ -224,7 +226,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | meal types, the meals each bed category gets, diet plans and their menus | `diet:manage` |
 | ordering an admitted patient's diet or nothing by mouth, and stopping it | `diet:order` |
 | recording meals served to admitted patients, or refused | `diet:serve` |
-| `/portal/*` (patients: one-time code sign-in, their own documents) | none: the patient's own portal token; staff tokens are refused |
+| `/portal/*` (patients: one-time code sign-in, their own documents, their test appointments and home collections) | none: the patient's own portal token; staff tokens are refused. `GET /portal/tests`, `/portal/test-appointment-windows` and `/portal/home-collection-offer` need no sign-in |
 | `GET /canteen/*` (menu, outlets, members, sales, member statements) | `canteen:read` |
 | the canteen menu (groups, items, rates, VAT, store items), outlets and who sells there, members; cancelling sales of past days | `canteen:manage` |
 | selling at one's canteen outlets, cancelling the day's sales, taking members' dues | `canteen:sell` |

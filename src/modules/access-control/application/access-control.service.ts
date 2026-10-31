@@ -95,6 +95,16 @@ export class AccessControlService extends AccessControl {
     return roleIds.length === 0 ? Promise.resolve([]) : this.userRoles.userIdsWithRoleIds(roleIds);
   }
 
+  /** The super-admin role holds every permission; its holders are left out. */
+  async usersWithPermission(permission: string): Promise<string[]> {
+    const [holders, admins] = await Promise.all([
+      this.userRoles.userIdsWithPermission(permission),
+      this.userRoles.userIdsWithRole(SUPER_ADMIN_ROLE),
+    ]);
+    const skipped = new Set(admins);
+    return holders.filter((id) => !skipped.has(id));
+  }
+
   invalidateUser(userId: string): void {
     this.cache.delete(userId);
   }

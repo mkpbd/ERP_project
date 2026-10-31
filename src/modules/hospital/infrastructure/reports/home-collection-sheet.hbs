@@ -1,0 +1,34 @@
+{{#with data}}
+{{#if groups.length}}
+{{#each groups}}
+<h3 style="margin: 8px 0 4px">{{collector}}</h3>
+<table class="report">
+  <thead>
+    <tr>
+      <th style="width: 11%">Window</th><th style="width: 9%">Booking</th><th style="width: 15%">Patient</th>
+      <th style="width: 24%">Address</th><th>Tests</th><th class="num" style="width: 8%">To collect</th>
+      <th style="width: 9%">Bill</th><th style="width: 10%">Signature</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td>{{windowLabel}}</td>
+      <td>{{number}}<br /><small>{{state}}</small></td>
+      <td>{{patientName}}{{#if uhidLabel}}<br /><small>{{uhidLabel}}</small>{{/if}}<br /><small>{{mobileNo}}</small></td>
+      <td><b>{{areaName}}</b><br />{{address}}{{#if landmark}}<br /><small>Near {{landmark}}</small>{{/if}}{{#if patientNote}}<br /><small><i>{{patientNote}}</i></small>{{/if}}</td>
+      <td>{{testNames}}</td>
+      <td class="num">{{money toCollect}}</td>
+      <td>{{billNumber}}</td>
+      <td></td>
+    </tr>
+    {{/each}}
+    <tr class="group-row"><td colspan="5">{{visits}}</td><td class="num">{{money total}}</td><td colspan="2"></td></tr>
+  </tbody>
+</table>
+{{/each}}
+<p style="font-size: 8pt">"To collect" is what is still owed on the bill once billed; before that, the tests and the visit as quoted.</p>
+{{else}}
+<p>No home collection on this day.</p>
+{{/if}}
+{{/with}}

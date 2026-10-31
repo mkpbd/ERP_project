@@ -144,6 +144,10 @@ export interface DiagnosticBillInput {
   readonly staffId: string | null;
   readonly testIds: readonly string[];
   readonly packageIds: readonly string[];
+  /** The test appointment billed (on its day), if any. */
+  readonly testAppointmentId?: string | null | undefined;
+  /** The home collection billed, if any: its charge is billed as the policy's home collection service. */
+  readonly homeCollectionId?: string | null | undefined;
   /** Null: the corporate client's own discount, if any. */
   readonly discount: number | null;
   readonly discountReason: string | null;

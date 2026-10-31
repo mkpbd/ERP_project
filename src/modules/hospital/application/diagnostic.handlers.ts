@@ -8,6 +8,7 @@ import { text } from '../domain/patient.js';
 import {
   AdmissionRepository,
   DiagnosticBillRepository,
+  DiagnosticBookingRepository,
   IpdBillingRepository,
   type DiagnosticPolicy,
   type DoctorLedgerEntry,
@@ -63,7 +64,78 @@ export class DiagnosticDesk {
     readonly read: DiagnosticBillReadRepository,
     readonly admissions: AdmissionRepository,
     readonly indoor: IpdBillingRepository,
+    readonly bookings: DiagnosticBookingRepository,
   ) {}
+
+  /**
+   * The booking a bill is made for, locked: a home collection's charge as a line (the policy's service at the area's
+   * charge, no discount beyond the test's, no referral commission), and the booking marked billed once the bill is in.
+   */
+  async booking(
+    input: { testAppointmentId?: string | null | undefined; homeCollectionId?: string | null | undefined },
+    patient: { id: string; fullName: string; mobileNo: string },
+    homeCollectionTestId: string | null,
+  ): Promise<{
+    lines: {
+      testId: string;
+      packageId: null;
+      rate: number;
+      discountAllowed: boolean;
+      referralPercent: number;
+      reportHours: null;
+    }[];
+    billed: (billId: string, today: string, now: Date) => Promise<void>;
+  } | null> {
+    if (input.testAppointmentId) {
+      const appointment = await this.bookings.appointmentForUpdate(input.testAppointmentId);
+      if (!appointment) throw new NotFoundError('test_appointment');
+      return {
+        lines: [],
+        billed: async (billId, today, now) => {
+          appointment.billed(billId, patient, today, now);
+          await this.bookings.updateAppointment(appointment);
+        },
+      };
+    }
+    if (!input.homeCollectionId) return null;
+    const collection = await this.bookings.homeCollectionForUpdate(input.homeCollectionId);
+    if (!collection) throw new NotFoundError('home_collection');
+    let lines: {
+      testId: string;
+      packageId: null;
+      rate: number;
+      discountAllowed: boolean;
+      referralPercent: number;
+      reportHours: null;
+    }[] = [];
+    if (collection.charge > 0) {
+      if (!homeCollectionTestId) {
+        throw new DomainError(
+          'home_collection_service_unset',
+          'Name the home collection service in the diagnostic policy',
+        );
+      }
+      const service = (await this.bills.tests([homeCollectionTestId])).get(homeCollectionTestId);
+      if (!service?.isActive) throw new DomainError('inactive_test', 'The home collection service is not in use');
+      lines = [
+        {
+          testId: service.id,
+          packageId: null,
+          rate: collection.charge,
+          discountAllowed: service.discountAllowed,
+          referralPercent: 0,
+          reportHours: null,
+        },
+      ];
+    }
+    return {
+      lines,
+      billed: async (billId, _today, now) => {
+        collection.billed(billId, patient, now);
+        await this.bookings.updateHomeCollection(collection);
+      },
+    };
+  }
 
   /** The admission, locked as every charge to it and its final bill lock it: still in, and not billed. */
   async chargeable(admissionId: string, patientId: string): Promise<void> {
@@ -118,6 +190,18 @@ export class SetDiagnosticPolicyHandler implements ICommandHandler<SetDiagnostic
       if (!(percent >= 0 && percent <= 100)) throw new DomainError('invalid_policy', 'Percentages are 0 to 100');
     }
     await opd.tx.run(async () => {
+      if (policy.homeCollectionTestId) {
+        const service = (await this.desk.bookings.tests([policy.homeCollectionTestId])).get(
+          policy.homeCollectionTestId,
+        );
+        if (!service) throw new NotFoundError('diagnostic_test');
+        if (service.departmentKind !== 'other') {
+          throw new DomainError(
+            'not_a_service',
+            `${service.name} is a test; the home collection charge is a service (a test of an 'other' department)`,
+          );
+        }
+      }
       await this.desk.bills.savePolicy(policy, actor.userId, opd.clock.now());
       await opd.audit.record({
         action: 'hospital.diagnostic_policy_set',
@@ -205,6 +289,12 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
     if (input.corporateClientId && input.staffId) {
       throw new DomainError('invalid_payer', 'A bill goes to a corporate client or to a staff member, not both');
     }
+    if (input.testAppointmentId && input.homeCollectionId) {
+      throw new DomainError('invalid_booking', 'A bill is for one booking at most');
+    }
+    if (input.admissionId && (input.testAppointmentId || input.homeCollectionId)) {
+      throw new DomainError('indoor_bill', "An admitted patient's tests are not booked");
+    }
     const mayDiscountMore = await opd.access.isAllowed(actor.userId, { permissions: [DIAG_DISCOUNT] });
     return opd.tx.run(async () => {
       const patient = await opd.appointments.patientContact(input.patientId);
@@ -225,6 +315,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
             input.staffId,
           );
       const policy = await bills.policy();
+      const booking = await desk.booking(input, patient, policy.homeCollectionTestId);
       const picked: { testId: string; packageId: string | null; rate: number | null }[] = input.testIds.map(
         (testId) => ({ testId, packageId: null, rate: null }),
       );
@@ -250,6 +341,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
           reportHours: test.reportHours,
         };
       });
+      if (booking) lines.push(...booking.lines);
       // A corporate client's own discount is given on what may be discounted unless another is asked for.
       const client = payer.kind === 'corporate' ? payer.client : null;
       const discountable = lines
@@ -317,6 +409,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
           voucherNumber: voucher?.number ?? null,
         });
       }
+      await booking?.billed(bill.id, today, opd.clock.now());
       await opd.bills.addLedger(desk.ledger(bill, header.referredById, bill.commission, today));
       await opd.bills.addUhidUse({
         patientId: patient.id,
@@ -329,6 +422,7 @@ export class CreateDiagnosticBillHandler implements ICommandHandler<CreateDiagno
         net: header.net,
         tests: lines.length,
         voucher: voucher?.number ?? null,
+        booking: input.testAppointmentId ?? input.homeCollectionId ?? null,
       });
       return { id: bill.id, number: header.number, net: header.net, due: bill.due };
     });

@@ -21,6 +21,9 @@ import {
   diagnosticDepartments,
   diagnosticPackages,
   diagnosticTests,
+  homeCollectionAreas,
+  homeCollectionWindows,
+  testAppointmentWindows,
   doctorClosures,
   doctors,
   doctorSchedules,
@@ -195,6 +198,47 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
         filters: { isActive: diagnosticPackages.isActive },
         search: [diagnosticPackages.name],
         unique: { hospital_diagnostic_packages_name_uq: taken('package_name_taken', 'This package exists') },
+      },
+      diag,
+    ),
+    record(
+      R.testAppointmentWindow,
+      testAppointmentWindows,
+      {
+        orderBy: [testAppointmentWindows.displayOrder, testAppointmentWindows.startTime],
+        filters: { isActive: testAppointmentWindows.isActive, departmentId: testAppointmentWindows.departmentId },
+        search: [testAppointmentWindows.label],
+        unique: {
+          hospital_test_appointment_windows_label_uq: taken(
+            'window_label_taken',
+            'The department already has a window of this name',
+          ),
+        },
+        references: {
+          [fk('hospital_test_appointment_windows', 'department_id', 'hospital_diagnostic_departments')]:
+            R.diagnosticDepartment,
+        },
+      },
+      diag,
+    ),
+    record(
+      R.homeCollectionArea,
+      homeCollectionAreas,
+      {
+        orderBy: [homeCollectionAreas.name],
+        filters: { isActive: homeCollectionAreas.isActive },
+        search: [homeCollectionAreas.name],
+        unique: { hospital_home_collection_areas_name_uq: taken('area_name_taken', 'This area exists') },
+      },
+      diag,
+    ),
+    record(
+      R.homeCollectionWindow,
+      homeCollectionWindows,
+      {
+        orderBy: [homeCollectionWindows.displayOrder, homeCollectionWindows.label],
+        filters: { isActive: homeCollectionWindows.isActive },
+        unique: { hospital_home_collection_windows_label_uq: taken('window_label_taken', 'This window exists') },
       },
       diag,
     ),

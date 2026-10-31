@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { sql, type SQLWrapper } from 'drizzle-orm';
 import {
   bigint,
   boolean,
@@ -1019,6 +1019,10 @@ export const diagnosticPolicy = pgTable(
     counterDiscountPercent: percent('counter_discount_percent').notNull(),
     /** The referring doctor's commission when neither the doctor nor the test has one. */
     defaultReferralPercent: percent('default_referral_percent').notNull(),
+    /** The service (a test of an 'other' department) a home collection's charge is billed as (old: SERVICES). */
+    homeCollectionTestId: uuid('home_collection_test_id').references((): AnyPgColumn => diagnosticTests.id, {
+      onDelete: 'restrict',
+    }),
     updatedAt: tz('updated_at').notNull().defaultNow(),
     updatedBy: uuid('updated_by').references(() => users.id, { onDelete: 'set null' }),
   },
@@ -1139,6 +1143,230 @@ export const diagnosticPayments = pgTable(
     index('hospital_diagnostic_payments_bill_idx').on(t.billId),
     index('hospital_diagnostic_payments_paid_idx').on(t.paidOn),
     check('hospital_diagnostic_payments_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// ---- Diagnostic appointments and home collection (step 15f). The old tables were written by the patients' mobile
+// app; here the desk books too, and the portal is the patients' way in.
+const WEEKDAYS = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'] as const;
+const BOOKED_VIA = ['desk', 'portal'] as const;
+const clock = (column: SQLWrapper) => sql`${column} ~ '^([01][0-9]|2[0-3]):[0-5][0-9]$'`;
+
+// Old Diag.TestAppointmentSlots: a window tests are booked into, with its daily capacity; for one department (MRI
+// windows are not lab windows) or, without one, for any.
+export const testAppointmentWindows = pgTable(
+  'hospital_test_appointment_windows',
+  {
+    id: uuid('id').primaryKey(),
+    label: text('label').notNull(),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time'),
+    capacity: smallint('capacity').notNull(),
+    departmentId: uuid('department_id').references(() => diagnosticDepartments.id, { onDelete: 'restrict' }),
+    displayOrder: smallint('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    // The same words for the same department are two windows the patient cannot tell apart.
+    uniqueIndex('hospital_test_appointment_windows_label_uq').on(
+      sql`lower(${t.label})`,
+      sql`coalesce(${t.departmentId}, '00000000-0000-0000-0000-000000000000'::uuid)`,
+    ),
+    check('hospital_test_appointment_windows_label_ck', sql`char_length(${t.label}) between 1 and 60`),
+    check(
+      'hospital_test_appointment_windows_time_ck',
+      sql`${clock(t.startTime)} and (${t.endTime} is null or (${clock(t.endTime)} and ${t.endTime} > ${t.startTime}))`,
+    ),
+    check('hospital_test_appointment_windows_capacity_ck', sql`${t.capacity} between 1 and 999`),
+    check('hospital_test_appointment_windows_order_ck', sql`${t.displayOrder} >= 0`),
+  ],
+);
+
+// Old Diag.TestAppointments: tests booked for a day in a window, with a serial; quoted, paid when billed on the day.
+export const testAppointments = pgTable(
+  'hospital_test_appointments',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'restrict' }),
+    patientName: text('patient_name').notNull(),
+    mobileNo: text('mobile_no').notNull(),
+    appointmentDate: day('appointment_date').notNull(),
+    windowId: uuid('window_id')
+      .notNull()
+      .references(() => testAppointmentWindows.id, { onDelete: 'restrict' }),
+    /** The window as booked. */
+    windowLabel: text('window_label').notNull(),
+    startTime: text('start_time').notNull(),
+    endTime: text('end_time'),
+    serial: smallint('serial').notNull(),
+    /** The tests' total as quoted. */
+    amount: money('amount').notNull(),
+    status: text('status', { enum: ['booked', 'billed', 'no_show', 'cancelled'] }).notNull(),
+    statusReason: text('status_reason'),
+    billId: uuid('bill_id').references(() => diagnosticBills.id, { onDelete: 'restrict' }),
+    remarks: text('remarks'),
+    bookedVia: text('booked_via', { enum: BOOKED_VIA }).notNull(),
+    bookedBy: uuid('booked_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_test_appointments_number_uq').on(t.number),
+    // One booking per place; a cancelled booking frees its place.
+    uniqueIndex('hospital_test_appointments_serial_uq')
+      .on(t.windowId, t.appointmentDate, t.serial)
+      .where(sql`${t.status} <> 'cancelled'`),
+    uniqueIndex('hospital_test_appointments_bill_uq').on(t.billId),
+    index('hospital_test_appointments_date_idx').on(t.appointmentDate),
+    index('hospital_test_appointments_patient_idx').on(t.patientId),
+    check('hospital_test_appointments_serial_ck', sql`${t.serial} between 1 and 999`),
+    check('hospital_test_appointments_mobile_ck', sql`${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
+    check('hospital_test_appointments_amount_ck', sql`${t.amount} >= 0`),
+    check('hospital_test_appointments_billed_ck', sql`(${t.status} = 'billed') = (${t.billId} is not null)`),
+  ],
+);
+
+// Old Diag.TestAppointmentTests: a test on the booking, at the rate quoted.
+export const testAppointmentTests = pgTable(
+  'hospital_test_appointment_tests',
+  {
+    appointmentId: uuid('appointment_id')
+      .notNull()
+      .references(() => testAppointments.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    rate: money('rate').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.appointmentId, t.position] }),
+    uniqueIndex('hospital_test_appointment_tests_test_uq').on(t.appointmentId, t.testId),
+    check('hospital_test_appointment_tests_rate_ck', sql`${t.rate} >= 0`),
+  ],
+);
+
+// Old Diag.HomeCollectionServiceAreas: where collectors go, what the visit costs, the smallest order it takes and the
+// days it is served (none listed: every day).
+export const homeCollectionAreas = pgTable(
+  'hospital_home_collection_areas',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    charge: money('charge').notNull(),
+    minimumOrder: money('minimum_order').notNull().default(0),
+    days: text('days', { enum: WEEKDAYS })
+      .array()
+      .notNull()
+      .default(sql`'{}'::text[]`),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_home_collection_areas_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_home_collection_areas_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+    check('hospital_home_collection_areas_money_ck', sql`${t.charge} >= 0 and ${t.minimumOrder} >= 0`),
+    check(
+      'hospital_home_collection_areas_days_ck',
+      sql`${t.days} <@ array['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']::text[]`,
+    ),
+  ],
+);
+
+// Old Diag.HomeCollectionTimeSlots: the windows a collector can be asked for ("08:00 AM - 10:00 AM").
+export const homeCollectionWindows = pgTable(
+  'hospital_home_collection_windows',
+  {
+    id: uuid('id').primaryKey(),
+    label: text('label').notNull(),
+    displayOrder: smallint('display_order').notNull().default(0),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_home_collection_windows_label_uq').on(sql`lower(${t.label})`),
+    check('hospital_home_collection_windows_label_ck', sql`char_length(${t.label}) between 1 and 60`),
+    check('hospital_home_collection_windows_order_ck', sql`${t.displayOrder} >= 0`),
+  ],
+);
+
+// Old Diag.HomeSampleCollections (the app's bookings; no collector was ever recorded): a collector sent to an address.
+export const homeCollections = pgTable(
+  'hospital_home_collections',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    patientId: uuid('patient_id').references(() => patients.id, { onDelete: 'restrict' }),
+    patientName: text('patient_name').notNull(),
+    mobileNo: text('mobile_no').notNull(),
+    areaId: uuid('area_id')
+      .notNull()
+      .references(() => homeCollectionAreas.id, { onDelete: 'restrict' }),
+    address: text('address').notNull(),
+    landmark: text('landmark'),
+    collectionDate: day('collection_date').notNull(),
+    windowId: uuid('window_id')
+      .notNull()
+      .references(() => homeCollectionWindows.id, { onDelete: 'restrict' }),
+    windowLabel: text('window_label').notNull(),
+    /** The tests' total as quoted. */
+    amount: money('amount').notNull(),
+    /** The area's charge for the visit when booked. */
+    charge: money('charge').notNull(),
+    status: text('status', { enum: ['booked', 'assigned', 'collected', 'cancelled'] }).notNull(),
+    statusReason: text('status_reason'),
+    collectorId: uuid('collector_id').references(() => users.id, { onDelete: 'restrict' }),
+    assignedAt: tz('assigned_at'),
+    collectedAt: tz('collected_at'),
+    collectedBy: uuid('collected_by').references(() => users.id, { onDelete: 'set null' }),
+    collectionNote: text('collection_note'),
+    billId: uuid('bill_id').references(() => diagnosticBills.id, { onDelete: 'restrict' }),
+    patientNote: text('patient_note'),
+    bookedVia: text('booked_via', { enum: BOOKED_VIA }).notNull(),
+    bookedBy: uuid('booked_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_home_collections_number_uq').on(t.number),
+    uniqueIndex('hospital_home_collections_bill_uq').on(t.billId),
+    index('hospital_home_collections_date_idx').on(t.collectionDate),
+    index('hospital_home_collections_patient_idx').on(t.patientId),
+    index('hospital_home_collections_collector_idx').on(t.collectorId, t.collectionDate),
+    check('hospital_home_collections_mobile_ck', sql`${t.mobileNo} ~ '^01[3-9][0-9]{8}$'`),
+    check('hospital_home_collections_money_ck', sql`${t.amount} >= 0 and ${t.charge} >= 0`),
+    check(
+      'hospital_home_collections_collector_ck',
+      sql`(${t.status} in ('booked', 'cancelled') or ${t.collectorId} is not null)
+        and (${t.status} <> 'collected' or ${t.collectedAt} is not null)`,
+    ),
+  ],
+);
+
+// Old Diag.HomeSampleCollectionTests.
+export const homeCollectionTests = pgTable(
+  'hospital_home_collection_tests',
+  {
+    homeCollectionId: uuid('home_collection_id')
+      .notNull()
+      .references(() => homeCollections.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    testId: uuid('test_id')
+      .notNull()
+      .references(() => diagnosticTests.id, { onDelete: 'restrict' }),
+    rate: money('rate').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.homeCollectionId, t.position] }),
+    uniqueIndex('hospital_home_collection_tests_test_uq').on(t.homeCollectionId, t.testId),
+    check('hospital_home_collection_tests_rate_ck', sql`${t.rate} >= 0`),
   ],
 );
 

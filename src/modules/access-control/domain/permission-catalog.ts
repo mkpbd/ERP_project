@@ -121,6 +121,11 @@ export const PERMISSION_CATALOG = [
   },
   { key: 'diag:bill', description: "Bill tests, collect their dues and cancel tests on the bill's day" },
   { key: 'diag:discount', description: "Give a diagnostic discount above the counter's limit" },
+  {
+    key: 'diag:book',
+    description: 'Book tests for a day and window and home collections; give home collections their collectors',
+  },
+  { key: 'diag:collect', description: "Take samples at patients' homes: record the home collections given to you" },
   { key: 'lab:read', description: 'See lab samples, the worklist, results and test parameters' },
   {
     key: 'lab:manage',

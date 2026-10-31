@@ -1,0 +1,41 @@
+<style>
+  /* An 80 mm roll: 70 mm of print inside the 5 mm margins. */
+  .slip { width: 70mm; font-size: 8.5pt; line-height: 1.35; }
+  .slip .head { text-align: center; margin-bottom: 2mm; }
+  .slip .head .org { font-weight: 700; font-size: 10pt; }
+  .slip .rule { border-top: 0.2mm dashed #000; margin: 1.5mm 0; }
+  .slip .serial { text-align: center; font-size: 22pt; font-weight: 800; line-height: 1.1; }
+  .slip .time { text-align: center; font-size: 11pt; font-weight: 700; }
+  .slip table { width: 100%; border-collapse: collapse; }
+  .slip td { padding: 0.4mm 0; vertical-align: top; }
+  .slip td.label { width: 22mm; color: #333; }
+  .slip td.num { text-align: right; white-space: nowrap; }
+  .slip tr.total td { border-top: 0.2mm solid #000; font-weight: 700; }
+</style>
+{{#with data}}
+<div class="slip">
+  <div class="head">
+    <div class="org">{{organization}}</div>
+    <div>Test appointment · {{appointment.number}}</div>
+  </div>
+  <div class="rule"></div>
+  <div><b>{{date appointment.appointmentDate}}</b></div>
+  <div class="serial">Serial {{appointment.serial}}</div>
+  <div class="time">{{appointment.windowLabel}}</div>
+  <div class="rule"></div>
+  <table>
+    <tr><td class="label">Patient</td><td>{{appointment.patientName}}</td></tr>
+    {{#if appointment.uhidLabel}}<tr><td class="label">UHID</td><td>{{appointment.uhidLabel}}</td></tr>{{/if}}
+    <tr><td class="label">Mobile</td><td>{{appointment.mobileNo}}</td></tr>
+  </table>
+  <div class="rule"></div>
+  <table>
+    {{#each appointment.tests}}
+    <tr><td>{{testName}}</td><td class="num">{{money rate}}</td></tr>
+    {{/each}}
+    <tr class="total"><td>Total (paid at the counter)</td><td class="num">{{money appointment.amount}}</td></tr>
+  </table>
+  <div class="rule"></div>
+  <div style="text-align: center; font-size: 7pt">Please come at the start of your window and bring this slip.{{#if (eq appointment.status "cancelled")}} <b>CANCELLED</b>{{/if}}</div>
+</div>
+{{/with}}

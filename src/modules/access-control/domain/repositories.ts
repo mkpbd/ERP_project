@@ -20,6 +20,7 @@ export abstract class UserRoleRepository {
   abstract unassign(userId: string, roleId: string): Promise<boolean>;
   abstract userIdsWithRole(roleName: string): Promise<string[]>;
   abstract userIdsWithRoleIds(roleIds: readonly string[]): Promise<string[]>;
+  abstract userIdsWithPermission(permission: string): Promise<string[]>;
 }
 
 export abstract class PermissionRepository {

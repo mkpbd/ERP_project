@@ -21,6 +21,9 @@ export const HOSPITAL_RECORDS = {
   diagnosticDepartment: 'hospital_diagnostic_department',
   diagnosticTest: 'hospital_diagnostic_test',
   diagnosticPackage: 'hospital_diagnostic_package',
+  testAppointmentWindow: 'hospital_test_appointment_window',
+  homeCollectionArea: 'hospital_home_collection_area',
+  homeCollectionWindow: 'hospital_home_collection_window',
   otRoom: 'hospital_ot_room',
   operation: 'hospital_operation',
   otType: 'hospital_ot_type',
@@ -36,3 +39,7 @@ export const DIAG_MANAGE = 'diag:manage';
 export const DIAG_BILL = 'diag:bill';
 /** A diagnostic discount above the counter's limit. */
 export const DIAG_DISCOUNT = 'diag:discount';
+/** Booking tests for a day and window, and home collections; giving home collections their collectors. */
+export const DIAG_BOOK = 'diag:book';
+/** Taking samples at patients' homes: a collector recording a home collection as collected. */
+export const DIAG_COLLECT = 'diag:collect';

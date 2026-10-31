@@ -156,6 +156,16 @@ export class DrizzleUserRoleRepository extends UserRoleRepository {
       .where(inArray(userRoles.roleId, [...roleIds]));
     return rows.map((row) => row.userId);
   }
+
+  async userIdsWithPermission(permission: string): Promise<string[]> {
+    const rows = await this.context.db
+      .selectDistinct({ userId: userRoles.userId })
+      .from(userRoles)
+      .innerJoin(rolePermissions, eq(rolePermissions.roleId, userRoles.roleId))
+      .innerJoin(permissions, eq(permissions.id, rolePermissions.permissionId))
+      .where(eq(permissions.key, permission));
+    return rows.map((row) => row.userId);
+  }
 }
 
 @Injectable()

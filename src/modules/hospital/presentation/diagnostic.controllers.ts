@@ -134,8 +134,15 @@ export const DiagnosticPackagesController = createRecordController({
   filter: PackageFilterDto,
 });
 
-const policyShape = { counterDiscountPercent: percent, defaultReferralPercent: percent };
-class DiagnosticPolicyDto extends createZodDto(z.strictObject(policyShape)) {}
+const policyShape = {
+  counterDiscountPercent: percent,
+  defaultReferralPercent: percent,
+  /** The service (a test of an 'other' department) a home collection's charge is billed as. */
+  homeCollectionTestId: z.uuid().nullable(),
+};
+class DiagnosticPolicyDto extends createZodDto(
+  z.strictObject({ ...policyShape, homeCollectionTestId: policyShape.homeCollectionTestId.default(null) }),
+) {}
 class DiagnosticPolicyResponseDto extends responseDto(policyShape) {}
 class PackageTestsDto extends createZodDto(
   z.strictObject({
@@ -169,6 +176,10 @@ class CreateDiagnosticBillDto extends createZodDto(
       staffId: z.uuid().nullable().default(null),
       testIds: z.array(z.uuid()).max(60).default([]),
       packageIds: z.array(z.uuid()).max(10).default([]),
+      /** The test appointment billed, on its day. */
+      testAppointmentId: z.uuid().nullable().default(null),
+      /** The home collection billed: its charge is added as the policy's home collection service. */
+      homeCollectionId: z.uuid().nullable().default(null),
       discount: money.nullable().default(null),
       discountReason: z.string().trim().max(200).nullable().default(null),
       payment: z.strictObject(moneyShape).nullable().default(null),
@@ -296,7 +307,9 @@ export class DiagnosticBillsController {
   @Put('diagnostic-policy')
   @RequirePermissions('diag:manage')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: "The counter's discount limit and the default referral commission" })
+  @ApiOperation({
+    summary: "The counter's discount limit, the default referral commission and the home collection service",
+  })
   @ApiNoContentResponse()
   async setPolicy(@CurrentUser() actor: Actor, @Body() dto: DiagnosticPolicyDto) {
     await this.commandBus.execute(new SetDiagnosticPolicyCommand(actor, dto));

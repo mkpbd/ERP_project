@@ -13,10 +13,13 @@ import {
   diagnosticDepartments,
   diagnosticTests,
   doctors,
+  homeCollectionAreas,
+  homeCollections,
   ipdBills,
   opdBillLines,
   opdBills,
   patients,
+  testAppointments,
   wards,
 } from '../persistence/hospital.schema.js';
 
@@ -259,6 +262,36 @@ export function hospitalDashboards(context: DbContext): DashboardSection[] {
           dimensions: {
             department: { label: 'Department', expr: sql`${diagnosticDepartments.name}` },
             test: { label: 'Test', expr: sql`${diagnosticTests.name}` },
+          },
+        }),
+        head({
+          key: 'diagnostics.appointments',
+          label: 'Test appointments',
+          unit: 'count',
+          hint: 'Booked for the day, not cancelled',
+          from: sql`${testAppointments}`,
+          day: () => sql`${testAppointments.appointmentDate}`,
+          where: () => sql`${testAppointments.status} <> 'cancelled'`,
+          value: sql`count(*)`,
+          dimensions: {
+            window: { label: 'Window', expr: sql`${testAppointments.windowLabel}` },
+            status: { label: 'Status', expr: sql`${testAppointments.status}` },
+            via: { label: 'Booked through', expr: sql`${testAppointments.bookedVia}` },
+          },
+        }),
+        head({
+          key: 'diagnostics.home-collections',
+          label: 'Home collections',
+          unit: 'count',
+          hint: 'Visits for the day, not cancelled',
+          from: sql`${homeCollections} join ${homeCollectionAreas} on ${homeCollectionAreas.id} = ${homeCollections.areaId}`,
+          day: () => sql`${homeCollections.collectionDate}`,
+          where: () => sql`${homeCollections.status} <> 'cancelled'`,
+          value: sql`count(*)`,
+          dimensions: {
+            area: { label: 'Area', expr: sql`${homeCollectionAreas.name}` },
+            status: { label: 'Status', expr: sql`${homeCollections.status}` },
+            collector: { label: 'Collector', expr: sql`${homeCollections.collectorId}`, users: true },
           },
         }),
         head({

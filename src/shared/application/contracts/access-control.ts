@@ -46,5 +46,8 @@ export abstract class AccessControl {
   /** Users holding any of the roles (by id), each once. */
   abstract usersWithRoles(roleIds: readonly string[]): Promise<string[]>;
 
+  /** Users given the permission through one of their roles, each once (super-admins are not listed). */
+  abstract usersWithPermission(permission: string): Promise<string[]>;
+
   abstract invalidateUser(userId: string): void;
 }

@@ -238,6 +238,9 @@ export class StubAccessControl extends AccessControl {
   usersWithRoles(): Promise<string[]> {
     return Promise.resolve([]);
   }
+  usersWithPermission(permission: string): Promise<string[]> {
+    return Promise.resolve([...this.grants].filter(([, granted]) => granted.has(permission)).map(([id]) => id));
+  }
   invalidateUser(userId: string): void {
     this.invalidated.push(userId);
   }
