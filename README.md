@@ -112,6 +112,7 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | `/admin/settings/{general,editor-margins}` | `GET`: authenticated; `PATCH`: `settings:manage` |
 | `GET /reports`, `GET /reports/:key`, `POST /reports/:key/render` | authenticated; the report must be granted to one of your roles (or `reports:access-all`) |
 | `GET /reports/catalog`, `GET /roles/:id/reports` / `PUT /roles/:id/reports` | `reports:read` / `reports:assign` + may only grant reports you can run |
+| `GET /dashboard`, `GET /dashboard/heads/:key` | authenticated; each section to those with its desk's read permission (`opd:read`, `ipd:read`, `diag:read`, `lab:read`, `pharmacy:read`, `canteen:read`, `hr:read`); money figures and the Money section need `dashboard:finance` |
 | `/hr/{divisions,departments,sub-departments,designations,festivals,govt-holidays}` | read: authenticated; write: `hr-masters:manage` |
 | `/hr/department-incharges` | read: authenticated; write: `hr:manage` |
 | `GET /hr/staff`, `GET /hr/staff/:id[/photo,/documents/:documentId]` | `hr:read`, or your own linked record (`GET /hr/staff/me`) |

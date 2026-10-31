@@ -25,6 +25,8 @@ import {
   VouchersController,
 } from './presentation/voucher.controllers.js';
 import { ACCOUNTS_RECORD_CONTROLLERS, ChartOfAccountsController } from './presentation/accounts.controllers.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { moneyDashboard } from './infrastructure/reports/money.dashboard.js';
 
 /**
  * Accounts: the chart of accounts (nature → category → sub-category → level 4 → level 5 → GL account),
@@ -64,6 +66,7 @@ export class AccountsModule implements OnModuleInit {
     private readonly chart: ChartReadRepository,
     private readonly vouchers: VoucherReadRepository,
     private readonly books: BooksReadRepository,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -71,5 +74,6 @@ export class AccountsModule implements OnModuleInit {
     this.reports.register(chartOfAccountsReport(this.chart));
     this.reports.register(voucherReport(this.vouchers));
     for (const report of bookReports(this.books)) this.reports.register(report);
+    this.dashboards.register(moneyDashboard(this.context));
   }
 }

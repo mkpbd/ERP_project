@@ -107,6 +107,8 @@ import {
   purchaseSummaryReport,
   salesSummaryReport,
 } from './infrastructure/reports/trade-analysis.reports.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { pharmacyDashboard } from './infrastructure/reports/pharmacy.dashboard.js';
 
 /**
  * Pharmacy: the medicine catalogue (generic groups and generics, formations, strengths, units, manufacturers,
@@ -188,6 +190,7 @@ export class PharmacyModule implements OnModuleInit {
     private readonly wards: WardReadRepository,
     private readonly inpatients: InpatientRegister,
     private readonly saleDesk: SaleDesk,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -214,5 +217,6 @@ export class PharmacyModule implements OnModuleInit {
     this.reports.register(salesSummaryReport(this.context, this.users));
     this.reports.register(cashCounterReport(this.context, this.users));
     this.reports.register(wardMedicineReport(this.wards, this.inpatients));
+    this.dashboards.register(pharmacyDashboard(this.context));
   }
 }

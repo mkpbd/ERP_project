@@ -30,6 +30,7 @@ export const PERMISSION_CATALOG = [
   { key: 'reports:read', description: 'See every report and which roles may run it' },
   { key: 'reports:assign', description: 'Grant reports to roles (only reports you can run)' },
   { key: 'reports:access-all', description: 'Run every report without a role grant' },
+  { key: 'dashboard:finance', description: 'See the money on the dashboard: collections, sales, dues, stock value' },
   { key: 'hr:read', description: 'View staff records (personal data), photos and documents' },
   { key: 'hr:manage', description: 'Add and edit staff records, their status, documents and department incharges' },
   { key: 'hr-masters:manage', description: 'Change HR divisions, departments, designations, festivals and holidays' },

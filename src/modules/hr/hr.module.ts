@@ -100,6 +100,8 @@ import {
   RosterController,
   ShiftTypesController,
 } from './presentation/roster.controllers.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { hrDashboard } from './infrastructure/reports/hr.dashboard.js';
 
 /**
  * HR: organization structure, staff records, holidays and festivals (step 4a);
@@ -171,6 +173,7 @@ export class HrModule implements OnModuleInit {
     private readonly reports: ReportRegistry,
     private readonly context: DbContext,
     private readonly locations: LocationDirectory,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -193,5 +196,6 @@ export class HrModule implements OnModuleInit {
     this.reports.register(individualAttendanceReport(this.context));
     this.reports.register(idCardReport(this.context));
     this.reports.register(jobApplicationsReport(this.context));
+    this.dashboards.register(hrDashboard(this.context));
   }
 }

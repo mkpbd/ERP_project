@@ -4,6 +4,7 @@ import type { AppConfig } from '../../config/configuration.js';
 import { DocumentPrinter } from '../../shared/application/contracts/document-printer.js';
 import { RegistryDocumentPrinter } from './application/document-printer.js';
 import { REPORTING_SETTINGS, ReportRenderer } from './application/ports.js';
+import { DASHBOARD_PROVIDERS } from './application/dashboard.handlers.js';
 import { ReportAccessService } from './application/report-access.service.js';
 import {
   GetReportHandler,
@@ -16,17 +17,19 @@ import {
 import { RoleReportRepository } from './domain/repositories.js';
 import { DrizzleRoleReportRepository } from './infrastructure/persistence/drizzle-role-report.repository.js';
 import { ReportRenderingService } from './infrastructure/rendering/report-rendering.service.js';
+import { DashboardController } from './presentation/dashboard.controllers.js';
 import { ReportsController, RoleReportsController } from './presentation/reporting.controllers.js';
 
 /**
  * Report catalog, role grants, rendering (Chromium HTML → PDF, pdfmake, Excel) and run auditing.
  * Replaces the old Web/Report service, ReportAndSps and ReportPermissions. Reports themselves are
- * defined by the module that owns the data and registered in the shared ReportRegistry. Global: it publishes the
+ * defined by the module that owns the data and registered in the shared ReportRegistry. The dashboard (step 15e):
+ * each module registers its section in the shared DashboardRegistry, worked out here on request. Global: it publishes the
  * DocumentPrinter (the patient portal prints patients' own documents through it).
  */
 @Global()
 @Module({
-  controllers: [ReportsController, RoleReportsController],
+  controllers: [ReportsController, RoleReportsController, DashboardController],
   providers: [
     ListMyReportsHandler,
     ListAllReportsHandler,
@@ -43,6 +46,7 @@ import { ReportsController, RoleReportsController } from './presentation/reporti
     { provide: ReportRenderer, useClass: ReportRenderingService },
     { provide: DocumentPrinter, useClass: RegistryDocumentPrinter },
     { provide: RoleReportRepository, useClass: DrizzleRoleReportRepository },
+    ...DASHBOARD_PROVIDERS,
   ],
   exports: [DocumentPrinter],
 })

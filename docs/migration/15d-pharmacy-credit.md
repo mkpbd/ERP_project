@@ -1,7 +1,7 @@
 # Step 15d — Pharmacy credit to corporate clients and staff
 
 Status: **done** (2026-10-31). Previous: [step 15c](15c-inpatient-care.md) · Screens before it:
-[step 16d](16d-nursing-screens.md) · Next: step 15e (dashboards).
+[step 16d](16d-nursing-screens.md) · Next: [step 15e](15e-dashboards.md) (dashboards).
 
 The fourth gap of the page-by-page check: the old counter sold medicine on credit to a company or a staff member, and
 the new pharmacy left a due only for a loyal member.

@@ -124,6 +124,8 @@ import {
 } from './infrastructure/persistence/drizzle-patient.repositories.js';
 import { patientCardReport, patientRegisterReport } from './infrastructure/reports/patient.reports.js';
 import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { hospitalDashboards } from './infrastructure/reports/hospital.dashboard.js';
 
 /**
  * Hospital (old Hospital and OPD areas): patient registration with the UHID kept for every visit (step 9a); doctors,
@@ -218,6 +220,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly diagnostics: DiagnosticBillReadRepository,
     private readonly documents: PatientDocumentRegistry,
     @Inject(HOSPITAL_SETTINGS) private readonly settings: HospitalSettings,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -253,5 +256,6 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(referralCommissionReport(this.context));
     this.reports.register(diagnosticIncomeReport(this.context));
     this.reports.register(diagnosticCollectionReport(this.context, this.users));
+    for (const section of hospitalDashboards(this.context)) this.dashboards.register(section);
   }
 }

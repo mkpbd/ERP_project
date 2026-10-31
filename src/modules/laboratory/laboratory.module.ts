@@ -32,6 +32,8 @@ import { imagingReport, labReport, reagentUsageReport } from './infrastructure/r
 import { ImagingController } from './presentation/imaging.controllers.js';
 import { LAB_MASTER_CONTROLLERS } from './presentation/lab-masters.controllers.js';
 import { LabController } from './presentation/lab.controllers.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { labDashboard } from './infrastructure/reports/lab.dashboard.js';
 
 /**
  * Laboratory (old Diag sample collection, pathology results and report publishing): each lab test's parameters and
@@ -73,6 +75,7 @@ export class LaboratoryModule implements OnModuleInit {
     private readonly stock: DepartmentStock,
     private readonly documents: PatientDocumentRegistry,
     private readonly records: RecordTypeRegistry,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -81,5 +84,6 @@ export class LaboratoryModule implements OnModuleInit {
     this.reports.register(imagingReport(this.imaging, this.orders, this.organization));
     this.reports.register(reagentUsageReport(this.context, this.stock));
     this.documents.register(laboratoryDocuments(this.context, this.orders));
+    this.dashboards.register(labDashboard(this.context));
   }
 }

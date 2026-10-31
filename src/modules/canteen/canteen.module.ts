@@ -18,6 +18,8 @@ import {
   canteenReceiptReport,
 } from './infrastructure/reports/canteen.reports.js';
 import { CANTEEN_CONTROLLERS } from './presentation/canteen.controllers.js';
+import { DashboardRegistry } from '../../shared/application/dashboards.js';
+import { canteenDashboard } from './infrastructure/reports/canteen.dashboard.js';
 
 /**
  * Canteen (old Canteen, step 12a): the menu with general and staff rates and VAT, outlets and who sells there,
@@ -43,6 +45,7 @@ export class CanteenModule implements OnModuleInit {
     private readonly reports: ReportRegistry,
     private readonly context: DbContext,
     private readonly read: CanteenReadRepository,
+    private readonly dashboards: DashboardRegistry,
   ) {}
 
   onModuleInit(): void {
@@ -50,5 +53,6 @@ export class CanteenModule implements OnModuleInit {
     this.reports.register(canteenReceiptReport(this.read));
     this.reports.register(canteenItemSalesReport(this.read));
     this.reports.register(canteenMemberDuesReport(this.read));
+    this.dashboards.register(canteenDashboard(this.context));
   }
 }
