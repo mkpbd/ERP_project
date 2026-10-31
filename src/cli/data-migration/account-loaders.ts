@@ -384,7 +384,7 @@ export function glAccountsLoader(db: DbContext): Loader {
       const query = `SELECT TOP (@n) ${guid('Id')}, [Name], [GLCodeNo], ${guid('Level5HeadId')},
         ${guid('COADescriptionId')}, [IsControlAccount], [IsCostCenter], [BankCashOth], [IsActive], [IsRecurringCost],
         [IsBillingContainDetails], [IsDeleted]
-        FROM [Account].[GeneralLedgers] WHERE [Id] > @after ORDER BY [Id]`;
+        FROM [Account].[GeneralLedgers] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       for await (const page of pages<LegacyGeneralLedger & Record<string, unknown>>(context, query, (row) => row.Id)) {
         for (const row of page) {
           if (!(await isNew(context, report, 'gl-account', row.Id))) continue;
@@ -499,7 +499,7 @@ export function subLedgersLoader(db: DbContext): Loader {
     dependsOn: ['sub-ledger-types'],
     async run(context, report) {
       const query = `SELECT TOP (@n) ${guid('Id')}, ${guid('SubLedgerTypeId')}, [InvoiceNo], [Name], [Address],
-        [MobileNo], [EmailAddress] FROM [Account].[SubLedgers] WHERE [Id] > @after ORDER BY [Id]`;
+        [MobileNo], [EmailAddress] FROM [Account].[SubLedgers] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       type Row = {
         Id: string;
         SubLedgerTypeId: string;

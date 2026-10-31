@@ -237,7 +237,7 @@ export function doctorsLoader(db: DbContext): Loader {
       const query = `SELECT TOP (@n) CAST([Id] AS nvarchar(36)) AS [Id], [Name], [DoctorCodeNo], [PhoneFax],
         CAST([DoctorFieldOfSpecialityId] AS nvarchar(36)) AS [DoctorFieldOfSpecialityId], [OPDChamberVisitFeeMaiden],
         [OPDChamberVisitFeeNew], [OPDChamberVisitFeeOld], [OPDChamberReportConsultancyFee], [IsDeleted]
-        FROM [Marketing].[Doctors] WHERE [Id] > @after ORDER BY [Id]`;
+        FROM [Marketing].[Doctors] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       for await (const page of pages<LegacyDoctor & Record<string, unknown>>(context, query, (row) => row.Id, NIL)) {
         for (const row of page) {
           report.read += 1;
@@ -350,8 +350,9 @@ export function patientsLoader(db: DbContext): Loader {
             set: { last: sql`greatest(${hospitalSequences.last}, ${last})` },
           });
       }
-      if (highest.size)
-        report.notes.push(`UHID counters moved past the UHIDs brought over (${[...highest.keys()].sort().join(', ')})`);
+      // UHIDs of another shape (the old 13-digit ones) give no year and move no counter.
+      const years = [...highest.keys()].filter((year) => year <= 2099).sort();
+      if (years.length) report.notes.push(`UHID counters moved past the UHIDs brought over (${years.join(', ')})`);
     },
   };
 }

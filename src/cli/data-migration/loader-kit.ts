@@ -5,7 +5,11 @@ import { noteRejection, type EtlContext, type Loader, type LoaderReport } from '
 
 export const NIL = '00000000-0000-0000-0000-000000000000';
 
-/** Pages of an old table in key order: the query takes @after (the last key read) and @n (the page size). */
+/**
+ * Pages of an old table in key order: the query takes @after (the last key read) and @n (the page size). Filter and
+ * sort on the table's own key column (qualified, e.g. `t.[Id]`): a Guid read out as text under the same alias would be
+ * sorted as text but compared as a Guid, and pages would overlap or skip rows.
+ */
 export async function* pages<T extends Record<string, unknown>>(
   context: EtlContext,
   query: string,

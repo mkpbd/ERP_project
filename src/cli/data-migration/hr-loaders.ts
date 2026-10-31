@@ -254,7 +254,7 @@ export function staffLoader(db: DbContext): Loader {
         [ShiftAndRelay], [DescriptionOfChangeGroup], [BNMC], [BMDC], [Remarks], [IsSeparated], [IsInActive],
         [InActiveReasons], [ResignationDate], [LastModifiedOn], [IsDeleted], [DivisionId], [DeptId], [SubDeptId],
         [DesignationId], [JoiningDesignationId]
-        FROM [HR].[StaffRecords] WHERE [Id] > @after ORDER BY [Id]`;
+        FROM [HR].[StaffRecords] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       type Row = LegacyStaff & {
         DivisionId: number | null;
         DeptId: number;

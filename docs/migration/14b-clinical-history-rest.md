@@ -1,6 +1,6 @@
 # Step 14b — Data migration gaps: culture reports and the rest of the inpatient notes
 
-Status: **done** (2026-10-31). Previous: [step 14a](14a-access-and-discounts.md).
+Status: **done** (2026-10-31). Previous: [step 14a](14a-access-and-discounts.md) · Next: [step 14c](14c-rehearsal-1.md).
 
 Step 13f left out microbiology culture reports and some of the inpatient notes. This step brings them over too, with
 the same loaders, so a fresh run brings the whole clinical history:

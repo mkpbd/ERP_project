@@ -185,7 +185,7 @@ export function productsLoader(db: DbContext): Loader {
         CAST([GenericId] AS nvarchar(36)) AS [GenericId], CAST([FormationId] AS nvarchar(36)) AS [FormationId],
         CAST([StrengthId] AS nvarchar(36)) AS [StrengthId], [Unit], [PurchasePrice], [SalePrice], [PkgUnit], [QtyPerBox],
         [IsActive], [IsDeleted]
-        FROM [Pharmacy].[BrandExtensions] WHERE [Id] > @after ORDER BY [Id]`;
+        FROM [Pharmacy].[BrandExtensions] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       type Row = {
         Id: string;
         BarCode: string | null;
@@ -512,7 +512,7 @@ export function itemVariantsLoader(db: DbContext): Loader {
       const codes = new Set(existing.flatMap((row) => (row.code ? [row.code.toUpperCase()] : [])));
       const query = `SELECT TOP (@n) CAST([Id] AS nvarchar(36)) AS [Id], CAST([BrandId] AS nvarchar(36)) AS [BrandId], [Name],
         [PurchasePrice], [SalePrice], [ROL], [CodeOrPartNo], [IsExpireDateRequired], [AlternateName], [SpecSizeOrColor],
-        [IsDeleted] FROM [SupplyChain].[BrandExtensions] WHERE [Id] > @after ORDER BY [Id]`;
+        [IsDeleted] FROM [SupplyChain].[BrandExtensions] t WHERE t.[Id] > @after ORDER BY t.[Id]`;
       type Row = {
         Id: string;
         BrandId: string;
