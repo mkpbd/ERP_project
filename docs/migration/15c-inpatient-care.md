@@ -1,6 +1,6 @@
 # Step 15c — Inpatient care gaps: observations, nursing care, reopening, corrections, visitor passes
 
-Status: **done** (2026-10-31). Previous: [step 15b](15b-culture-and-written-reports.md) · Next: step 15d (pharmacy
+Status: **done** (2026-10-31). Previous: [step 15b](15b-culture-and-written-reports.md) · Screens: [step 16d](16d-nursing-screens.md) · Next: step 15d (pharmacy
 credit to corporate clients and staff).
 
 The third and sixth gaps of the page-by-page check: the inpatient nursing records the new EMR lacked, and

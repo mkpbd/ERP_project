@@ -1,6 +1,6 @@
 # Step 16c — Inpatient front desk screens (Angular)
 
-Status: **done** (2026-10-31). Previous: [step 16b](16b-lab-screens.md) · API: steps 9e–9f (admissions, the stay's
+Status: **done** (2026-10-31). Previous: [step 16b](16b-lab-screens.md) · Next: [step 16d](16d-nursing-screens.md) · API: steps 9e–9f (admissions, the stay's
 account) and [15c](15c-inpatient-care.md) (corrections, reopening, visitor passes).
 
 The inpatient front desk's screens in the Angular frontend (`D:\Pratices\ERP_Frontend`, `mkpbd/ERP_frontend`, commit
