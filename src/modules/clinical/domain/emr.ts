@@ -1,10 +1,19 @@
 import { ConflictError, DomainError, ForbiddenError } from '../../../shared/domain/errors.js';
 import { text } from './prescription.js';
 
-export const NOTE_KINDS = ['round', 'consult', 'procedure', 'transfer', 'icu', 'handover'] as const;
+export const NOTE_KINDS = [
+  'round',
+  'consult',
+  'procedure',
+  'transfer',
+  'icu',
+  'handover',
+  'pre_op',
+  'post_op',
+] as const;
 export type NoteKind = (typeof NOTE_KINDS)[number];
 /** Notes a doctor's visit: they name the doctor. */
-export const DOCTOR_NOTES: readonly NoteKind[] = ['round', 'consult'];
+export const DOCTOR_NOTES: readonly NoteKind[] = ['round', 'consult', 'pre_op', 'post_op'];
 /** A note is corrected by its writer within this many hours; later, another note is written. */
 export const NOTE_EDIT_HOURS = 24;
 const HOUR = 3_600_000;

@@ -209,6 +209,11 @@ All routes are under `/api/v1`. Authentication is required unless marked public.
 | opening a patient's visit for a doctor, taking vitals, cancelling a visit the patient left (the doctor may do these for their own patients with `rx:write`) | `rx:vitals` |
 | writing, signing and correcting one's own prescriptions (the user must be a doctor's); one's own pick lists and templates | `rx:write` |
 | pick lists shared by every doctor (complaints, history, findings, diagnoses, advice, doses) and note templates | `rx:manage` |
+| `GET /hospital/ot-board`, `/hospital/ot-cases[/:id]`, the OT masters (`/hospital/ot-rooms`, `/operations`, `/ot-types`, `/anaesthesia-types`, `/surgery-procedures`) | `ot:read` |
+| asking for an operation for an admitted patient; changing the operation and its team before it is done | `ot:request` |
+| giving operations an OT room and a time (no clash), starting, finishing and cancelling them | `ot:schedule` |
+| writing the operation note; signing it (the surgeon's own account only) | `ot:note` |
+| OT rooms, operations, OT and anaesthesia types, surgery procedures | `ot:manage` |
 | `GET /clinical/admissions/:id/notes`, `/records`, pending handovers | `emr:read` |
 | `GET /clinical/patients/:id/history` (and `/trend?test=`), `GET /clinical/history/:id`: the old system's prescriptions, reports, discharge certificates and notes, brought over read-only | `emr:read` |
 | writing notes on admitted patients (rounds, consultations, procedures, transfers, ICU course, handovers), correcting one's own within 24 hours, acknowledging a handover to oneself | `emr:write` |

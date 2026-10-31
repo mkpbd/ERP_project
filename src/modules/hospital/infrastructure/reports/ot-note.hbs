@@ -1,0 +1,33 @@
+{{#with data.operation}}
+<p>
+  <b>{{patientName}}</b> · UHID {{uhidLabel}} · Admission {{admissionNumber}} · Operation <b>{{number}}</b> ({{state}})
+</p>
+<table class="report">
+  <tbody>
+    <tr><th style="width: 22%">Operation</th><td>{{operationName}}{{#if otTypeName}} · {{otTypeName}}{{/if}}</td></tr>
+    <tr><th>Indication</th><td>{{indication}}</td></tr>
+    <tr><th>Surgeon</th><td>{{surgeonName}}</td></tr>
+    <tr><th>Anaesthesia</th><td>{{anaesthesiaTypeName}}{{#if anaesthetistName}} · {{anaesthetistName}}{{/if}}</td></tr>
+    {{#if team.length}}
+    <tr><th>Team</th><td>{{#each team}}{{doctorName}} ({{roleLabel}}){{#unless @last}}, {{/unless}}{{/each}}</td></tr>
+    {{/if}}
+    <tr>
+      <th>Room · time</th>
+      <td>{{otRoomName}}{{#if startedAt}} · started {{datetime startedAt}}{{/if}}{{#if endedAt}} · ended {{datetime endedAt}}{{/if}}</td>
+    </tr>
+  </tbody>
+</table>
+<h4>Incision</h4>
+<div style="white-space: pre-wrap">{{incision}}</div>
+<h4>Findings</h4>
+<div style="white-space: pre-wrap">{{findings}}</div>
+<h4>Procedure</h4>
+<div style="white-space: pre-wrap">{{procedureDone}}</div>
+<h4>Specimen sent</h4>
+<div style="white-space: pre-wrap">{{specimen}}</div>
+<h4>Post-operative orders</h4>
+<div style="white-space: pre-wrap">{{postOpOrders}}</div>
+<p style="margin-top: 32px">
+  {{#if noteSignedAt}}Signed by <b>{{noteSignedByName}}</b> on {{datetime noteSignedAt}}{{else}}<b>Not signed yet</b>{{/if}}
+</p>
+{{/with}}

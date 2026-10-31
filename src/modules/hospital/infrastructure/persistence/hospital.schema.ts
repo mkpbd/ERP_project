@@ -19,6 +19,7 @@ import {
 } from 'drizzle-orm/pg-core';
 import { staffRecords } from '../../../hr/infrastructure/persistence/hr.schema.js';
 import { users } from '../../../identity/infrastructure/persistence/identity.schema.js';
+import { OT_CASE_STATUSES, OT_TEAM_ROLES } from '../../domain/ot-case.js';
 import { districts } from '../../../location/infrastructure/persistence/location.schema.js';
 
 const tz = (name: string) => timestamp(name, { withTimezone: true, mode: 'date' });
@@ -767,6 +768,8 @@ export const ipdCharges = pgTable(
       .references(() => services.id, { onDelete: 'restrict' }),
     /** The doctor who gave it (a consultant's visit, a procedure); needed when it carries a share. */
     doctorId: uuid('doctor_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    /** The operation it was charged for (step 15a), when it was. */
+    otCaseId: uuid('ot_case_id').references((): AnyPgColumn => otCases.id, { onDelete: 'restrict' }),
     chargedOn: day('charged_on').notNull(),
     qty: smallint('qty').notNull(),
     rate: money('rate').notNull(),
@@ -783,6 +786,7 @@ export const ipdCharges = pgTable(
   (t) => [
     index('hospital_ipd_charges_admission_idx').on(t.admissionId),
     index('hospital_ipd_charges_doctor_idx').on(t.doctorId),
+    index('hospital_ipd_charges_ot_case_idx').on(t.otCaseId),
     check(
       'hospital_ipd_charges_amounts_ck',
       sql`${t.qty} between 1 and 1000 and ${t.rate} >= 0 and ${t.amount} = round(${t.qty} * ${t.rate}, 2) and ${t.sharePercent} between 0 and 100`,
@@ -1132,5 +1136,179 @@ export const diagnosticPayments = pgTable(
     index('hospital_diagnostic_payments_bill_idx').on(t.billId),
     index('hospital_diagnostic_payments_paid_idx').on(t.paidOn),
     check('hospital_diagnostic_payments_amount_ck', sql`${t.amount} > 0`),
+  ],
+);
+
+// ---- Operation theatre (step 15a). The old system kept the schedule, the room request, the room booking, the
+// charges, the nurse station's OT info and the assistants' payment in six tables nothing linked; here one case per
+// operation goes from request to schedule to done, its charges are the stay's charges, and its note is on it.
+
+// Old Hospital.OTRoom.
+export const otRooms = pgTable(
+  'hospital_ot_rooms',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    floor: text('floor'),
+    description: text('description'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_ot_rooms_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_ot_rooms_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Hospital.OTNames: the operations done here (LSCS, appendectomy …).
+export const operations = pgTable(
+  'hospital_operations',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_operations_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_operations_name_ck', sql`char_length(${t.name}) between 1 and 150`),
+  ],
+);
+
+// Old Hospital.OTTypes (major, minor …).
+export const otTypes = pgTable(
+  'hospital_ot_types',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_ot_types_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_ot_types_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Hospital.AnaesthesiaTypes (general, spinal, local …).
+export const anaesthesiaTypes = pgTable(
+  'hospital_anaesthesia_types',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_anaesthesia_types_name_uq').on(sql`lower(${t.name})`),
+    check('hospital_anaesthesia_types_name_ck', sql`char_length(${t.name}) between 1 and 100`),
+  ],
+);
+
+// Old Hospital.SurgeryProcedures: the written steps of a procedure, a text library for the operation note.
+export const surgeryProcedures = pgTable(
+  'hospital_surgery_procedures',
+  {
+    id: uuid('id').primaryKey(),
+    title: text('title').notNull(),
+    area: text('area'),
+    description: text('description'),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_surgery_procedures_title_uq').on(sql`lower(${t.title})`),
+    check('hospital_surgery_procedures_title_ck', sql`char_length(${t.title}) between 1 and 200`),
+  ],
+);
+
+// Old OTSchedules + OTRoomBookingRequests + OTRoomBooks + OTServices' header + OTNotes: one operation of an admitted
+// patient, requested by a doctor, given a room and time, done, with the surgeon's operation note.
+export const otCases = pgTable(
+  'hospital_ot_cases',
+  {
+    id: uuid('id').primaryKey(),
+    number: text('number').notNull(),
+    admissionId: uuid('admission_id')
+      .notNull()
+      .references(() => admissions.id, { onDelete: 'restrict' }),
+    patientId: uuid('patient_id')
+      .notNull()
+      .references(() => patients.id, { onDelete: 'restrict' }),
+    operationId: uuid('operation_id')
+      .notNull()
+      .references(() => operations.id, { onDelete: 'restrict' }),
+    otTypeId: uuid('ot_type_id').references(() => otTypes.id, { onDelete: 'restrict' }),
+    anaesthesiaTypeId: uuid('anaesthesia_type_id').references(() => anaesthesiaTypes.id, { onDelete: 'restrict' }),
+    surgeonId: uuid('surgeon_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    anaesthetistId: uuid('anaesthetist_id').references(() => doctors.id, { onDelete: 'restrict' }),
+    indication: text('indication'),
+    /** The day the operation is wanted. */
+    requestedFor: day('requested_for').notNull(),
+    status: text('status', { enum: OT_CASE_STATUSES }).notNull(),
+    otRoomId: uuid('ot_room_id').references(() => otRooms.id, { onDelete: 'restrict' }),
+    scheduledFrom: tz('scheduled_from'),
+    scheduledTo: tz('scheduled_to'),
+    startedAt: tz('started_at'),
+    endedAt: tz('ended_at'),
+    cancelReason: text('cancel_reason'),
+    // The operation note, written by the surgeon's side and signed by the surgeon.
+    incision: text('incision'),
+    findings: text('findings'),
+    procedureDone: text('procedure_done'),
+    specimen: text('specimen'),
+    postOpOrders: text('post_op_orders'),
+    noteSignedAt: tz('note_signed_at'),
+    noteSignedBy: uuid('note_signed_by').references(() => users.id, { onDelete: 'set null' }),
+    requestedBy: uuid('requested_by').references(() => users.id, { onDelete: 'set null' }),
+    version: integer('version').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('hospital_ot_cases_number_uq').on(t.number),
+    index('hospital_ot_cases_admission_idx').on(t.admissionId),
+    index('hospital_ot_cases_room_idx').on(t.otRoomId, t.scheduledFrom),
+    index('hospital_ot_cases_status_idx').on(t.status, t.requestedFor),
+    check(
+      'hospital_ot_cases_status_ck',
+      sql`${t.status} in ('requested', 'scheduled', 'in_progress', 'done', 'cancelled')`,
+    ),
+    // A room and a time once scheduled (kept when done, or when cancelled after being scheduled).
+    check(
+      'hospital_ot_cases_slot_ck',
+      sql`(${t.otRoomId} is null) = (${t.scheduledFrom} is null) and (${t.scheduledFrom} is null) = (${t.scheduledTo} is null)
+        and (${t.scheduledTo} is null or ${t.scheduledTo} > ${t.scheduledFrom})
+        and (${t.status} not in ('scheduled', 'in_progress', 'done') or ${t.otRoomId} is not null)`,
+    ),
+    check(
+      'hospital_ot_cases_times_ck',
+      sql`(${t.status} in ('in_progress', 'done')) = (${t.startedAt} is not null)
+        and (${t.status} = 'done') = (${t.endedAt} is not null) and (${t.endedAt} is null or ${t.endedAt} >= ${t.startedAt})`,
+    ),
+    check('hospital_ot_cases_cancel_ck', sql`(${t.status} = 'cancelled') = (${t.cancelReason} is not null)`),
+    check('hospital_ot_cases_signed_ck', sql`${t.noteSignedAt} is null or ${t.status} = 'done'`),
+  ],
+);
+
+// Old OTInfoNurseStationDetails / OTAssistantPaymentDetails' doctors: who else operated.
+export const otTeam = pgTable(
+  'hospital_ot_team',
+  {
+    caseId: uuid('case_id')
+      .notNull()
+      .references(() => otCases.id, { onDelete: 'cascade' }),
+    doctorId: uuid('doctor_id')
+      .notNull()
+      .references(() => doctors.id, { onDelete: 'restrict' }),
+    role: text('role', { enum: OT_TEAM_ROLES }).notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.caseId, t.doctorId] }),
+    check('hospital_ot_team_role_ck', sql`${t.role} in ('assistant', 'anaesthesia_assistant')`),
   ],
 );

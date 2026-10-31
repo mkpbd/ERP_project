@@ -10,7 +10,12 @@ import type { Admission } from '../domain/admission.js';
 import { bedNights, billLines, chargeOf, IpdBill, type IpdBillLine } from '../domain/ipd-bill.js';
 import type { BillPayer } from '../domain/opd-bill.js';
 import { text } from '../domain/patient.js';
-import { DiagnosticBillRepository, type DoctorLedgerEntry, type IpdPolicy } from '../domain/repositories.js';
+import {
+  DiagnosticBillRepository,
+  OtCaseRepository,
+  type DoctorLedgerEntry,
+  type IpdPolicy,
+} from '../domain/repositories.js';
 import {
   AddIpdChargeCommand,
   CancelIpdBillCommand,
@@ -283,7 +288,10 @@ export class GetIpdPolicyHandler implements IQueryHandler<GetIpdPolicyQuery> {
  */
 @CommandHandler(AddIpdChargeCommand)
 export class AddIpdChargeHandler implements ICommandHandler<AddIpdChargeCommand> {
-  constructor(private readonly cashier: IpdCashier) {}
+  constructor(
+    private readonly cashier: IpdCashier,
+    private readonly operations: OtCaseRepository,
+  ) {}
 
   async execute({ actor, admissionId, input }: AddIpdChargeCommand) {
     const { cashier } = this;
@@ -298,6 +306,13 @@ export class AddIpdChargeHandler implements ICommandHandler<AddIpdChargeCommand>
         throw new DomainError('not_billable', `${service.name} is not given on the wards`);
       }
       if (input.doctorId) await cashier.desk.doctors([input.doctorId]);
+      if (input.otCaseId) {
+        const operation = (await this.operations.findById(input.otCaseId))?.toSnapshot();
+        if (!operation) throw new NotFoundError('ot_case');
+        if (operation.admissionId !== admissionId || operation.status === 'cancelled') {
+          throw new DomainError('invalid_ot_case', 'Charge an operation of this stay that is not cancelled');
+        }
+      }
       const today = opd.today();
       const chargedOn = input.chargedOn ?? today;
       const admittedOn = localToday(admission.toSnapshot().admittedAt, opd.settings.timeZone);
@@ -317,6 +332,7 @@ export class AddIpdChargeHandler implements ICommandHandler<AddIpdChargeCommand>
       await cashier.billing.insertCharge({
         ...charge,
         admissionId,
+        otCaseId: input.otCaseId ?? null,
         note: text(input.note, 200, 'note'),
         chargedBy: actor.userId,
       });

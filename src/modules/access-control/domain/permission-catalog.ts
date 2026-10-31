@@ -97,6 +97,17 @@ export const PERMISSION_CATALOG = [
       'Charge services to admitted patients, take and refund advances, make final bills and collect their dues',
   },
   { key: 'ipd:discount', description: "Give a final bill discount above the counter's limit" },
+  { key: 'ot:read', description: 'See the operation theatre board, operations and their notes' },
+  {
+    key: 'ot:request',
+    description: 'Ask for an operation for an admitted patient; change who operates and what before it is done',
+  },
+  { key: 'ot:schedule', description: 'Give operations an OT room and a time; start, finish and cancel them' },
+  { key: 'ot:note', description: 'Write operation notes (the surgeon signs their own)' },
+  {
+    key: 'ot:manage',
+    description: 'OT rooms, operations, OT and anaesthesia types and surgery procedures',
+  },
   { key: 'opd:read', description: 'See doctors, their chamber schedules and the appointment books' },
   { key: 'opd:manage', description: 'Keep doctors, specialities, chamber schedules and the days doctors are off' },
   { key: 'opd:bill', description: 'Bill consultations, collect their dues and cancel bills on their own day' },

@@ -13,6 +13,7 @@ import {
   OPD_READ,
 } from '../../application/hospital.constants.js';
 import { IPD_MANAGE, IPD_READ } from '../../application/ipd.messages.js';
+import { OT_MANAGE, OT_READ } from '../../application/ot.messages.js';
 import {
   bedCategories,
   beds,
@@ -27,6 +28,11 @@ import {
   services,
   specialities,
   wards,
+  otRooms,
+  operations,
+  otTypes,
+  anaesthesiaTypes,
+  surgeryProcedures,
 } from './hospital.schema.js';
 
 const fk = (table: string, column: string, referenced: string) => `${table}_${column}_${referenced}_id_fk`;
@@ -34,6 +40,7 @@ const taken = (code: string, message: string) => ({ code, message });
 
 export function hospitalRecordTypes(context: DbContext): RecordType[] {
   const ipd: [string, string] = [IPD_READ, IPD_MANAGE];
+  const ot: [string, string] = [OT_READ, OT_MANAGE];
   const diag: [string, string] = [DIAG_READ, DIAG_MANAGE];
   const record = (
     name: string,
@@ -190,6 +197,60 @@ export function hospitalRecordTypes(context: DbContext): RecordType[] {
         unique: { hospital_diagnostic_packages_name_uq: taken('package_name_taken', 'This package exists') },
       },
       diag,
+    ),
+    record(
+      R.otRoom,
+      otRooms,
+      {
+        orderBy: [otRooms.name],
+        filters: { isActive: otRooms.isActive },
+        search: [otRooms.name, otRooms.floor],
+        unique: { hospital_ot_rooms_name_uq: taken('ot_room_name_taken', 'This OT room exists') },
+      },
+      ot,
+    ),
+    record(
+      R.operation,
+      operations,
+      {
+        orderBy: [operations.name],
+        filters: { isActive: operations.isActive },
+        search: [operations.name],
+        unique: { hospital_operations_name_uq: taken('operation_name_taken', 'This operation exists') },
+      },
+      ot,
+    ),
+    record(
+      R.otType,
+      otTypes,
+      {
+        orderBy: [otTypes.name],
+        search: [otTypes.name],
+        unique: { hospital_ot_types_name_uq: taken('ot_type_name_taken', 'This OT type exists') },
+      },
+      ot,
+    ),
+    record(
+      R.anaesthesiaType,
+      anaesthesiaTypes,
+      {
+        orderBy: [anaesthesiaTypes.name],
+        search: [anaesthesiaTypes.name],
+        unique: {
+          hospital_anaesthesia_types_name_uq: taken('anaesthesia_type_name_taken', 'This anaesthesia type exists'),
+        },
+      },
+      ot,
+    ),
+    record(
+      R.surgeryProcedure,
+      surgeryProcedures,
+      {
+        orderBy: [surgeryProcedures.title],
+        search: [surgeryProcedures.title, surgeryProcedures.area],
+        unique: { hospital_surgery_procedures_title_uq: taken('procedure_title_taken', 'This procedure exists') },
+      },
+      ot,
     ),
   ];
 }

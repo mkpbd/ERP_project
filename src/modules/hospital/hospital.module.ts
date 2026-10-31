@@ -24,6 +24,8 @@ import { DiagnosticBillReadRepository } from './application/diagnostic.messages.
 import { IPD_BILLING_HANDLERS, IpdCashier } from './application/ipd-billing.handlers.js';
 import { IpdBillingReadRepository } from './application/ipd-billing.messages.js';
 import { IPD_HANDLERS } from './application/ipd.handlers.js';
+import { OT_HANDLERS } from './application/ot.handlers.js';
+import { OtReadRepository } from './application/ot.messages.js';
 import { AdmissionReadRepository } from './application/ipd.messages.js';
 import { OPD_HANDLERS } from './application/opd.handlers.js';
 import { OpdBillReadRepository } from './application/opd.messages.js';
@@ -37,6 +39,7 @@ import {
   AppointmentRepository,
   DiagnosticBillRepository,
   IpdBillingRepository,
+  OtCaseRepository,
   OpdBillRepository,
   PatientRepository,
 } from './domain/repositories.js';
@@ -76,6 +79,12 @@ import {
 } from './infrastructure/reports/statement.reports.js';
 import { IPD_BILLING_CONTROLLERS } from './presentation/ipd-billing.controllers.js';
 import { IPD_CONTROLLERS } from './presentation/ipd.controllers.js';
+import { OT_CONTROLLERS } from './presentation/ot.controllers.js';
+import { otConsentReport, otNoteReport, otRegisterReport } from './infrastructure/reports/ot.reports.js';
+import {
+  DrizzleOtCaseRepository,
+  DrizzleOtReadRepository,
+} from './infrastructure/persistence/drizzle-ot.repositories.js';
 import { ipdBillReport, ipdCollectionReport, ipdReceiptReport } from './infrastructure/reports/ipd-billing.reports.js';
 import {
   DrizzleOpdBillReadRepository,
@@ -124,6 +133,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     ...APPOINTMENT_CONTROLLERS,
     ...OPD_CONTROLLERS,
     ...IPD_CONTROLLERS,
+    ...OT_CONTROLLERS,
     ...IPD_BILLING_CONTROLLERS,
     ...DIAGNOSTIC_CONTROLLERS,
   ],
@@ -132,6 +142,7 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     ...APPOINTMENT_HANDLERS,
     ...OPD_HANDLERS,
     ...IPD_HANDLERS,
+    ...OT_HANDLERS,
     ...IPD_BILLING_HANDLERS,
     ...DIAGNOSTIC_HANDLERS,
     { provide: PatientRepository, useClass: DrizzlePatientRepository },
@@ -143,6 +154,8 @@ import { PATIENT_CONTROLLERS } from './presentation/patient.controllers.js';
     { provide: AdmissionRepository, useClass: DrizzleAdmissionRepository },
     { provide: AdmissionReadRepository, useClass: DrizzleAdmissionReadRepository },
     { provide: IpdBillingRepository, useClass: DrizzleIpdBillingRepository },
+    { provide: OtCaseRepository, useClass: DrizzleOtCaseRepository },
+    { provide: OtReadRepository, useClass: DrizzleOtReadRepository },
     { provide: IpdBillingReadRepository, useClass: DrizzleIpdBillingReadRepository },
     { provide: InpatientRegister, useClass: DrizzleInpatientRegister },
     { provide: DiagnosticOrders, useClass: DrizzleDiagnosticOrders },
@@ -173,6 +186,7 @@ export class HospitalModule implements OnModuleInit {
     private readonly users: UserDirectory,
     private readonly staff: StaffDirectory,
     private readonly admissions: AdmissionReadRepository,
+    private readonly operations: OtReadRepository,
     private readonly cashier: IpdCashier,
     private readonly ipdBills: IpdBillingReadRepository,
     private readonly diagnostics: DiagnosticBillReadRepository,
@@ -195,6 +209,9 @@ export class HospitalModule implements OnModuleInit {
     this.reports.register(admissionFormReport(this.admissions, this.organization));
     this.reports.register(inpatientCensusReport(this.admissions));
     this.reports.register(admissionRegisterReport(this.admissions));
+    this.reports.register(otRegisterReport(this.operations));
+    this.reports.register(otNoteReport(this.operations, this.organization));
+    this.reports.register(otConsentReport(this.operations, this.organization));
     this.reports.register(bedOccupancyReport(this.context));
     this.reports.register(ipdBillReport(this.cashier, this.admissions, this.organization, this.staff));
     this.reports.register(ipdReceiptReport(this.ipdBills, this.organization, this.users));

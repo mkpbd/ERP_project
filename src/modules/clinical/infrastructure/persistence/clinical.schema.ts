@@ -31,7 +31,7 @@ const decimal = (name: string) => numeric(name, { precision: 5, scale: 1, mode: 
 // The same lists as the domain's (kept literal here so drizzle-kit loads this file on its own).
 const RX_STATUSES = ['draft', 'signed', 'cancelled'] as const;
 const PHRASE_KINDS = ['complaint', 'history', 'examination', 'diagnosis', 'advice', 'dose'] as const;
-const NOTE_KINDS = ['round', 'consult', 'procedure', 'transfer', 'icu', 'handover'] as const;
+const NOTE_KINDS = ['round', 'consult', 'procedure', 'transfer', 'icu', 'handover', 'pre_op', 'post_op'] as const;
 const DELIVERY_MODES = ['normal', 'caesarean', 'assisted'] as const;
 const SEXES = ['male', 'female', 'other'] as const;
 const ROUTES = ['oral', 'iv', 'im', 'sc', 'topical', 'inhaled', 'rectal', 'other'] as const;

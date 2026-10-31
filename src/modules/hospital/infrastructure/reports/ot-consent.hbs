@@ -1,0 +1,26 @@
+{{#with data}}
+<p>
+  <b>{{operation.patientName}}</b> · UHID {{operation.uhidLabel}} · Admission {{operation.admissionNumber}} · Operation
+  {{operation.number}}
+</p>
+<p>
+  I, the undersigned, the patient or the patient's guardian, consent to the operation <b>{{operation.operationName}}</b>
+  {{#if operation.indication}}for {{operation.indication}}{{/if}}, to be done by <b>{{operation.surgeonName}}</b> and
+  the team of {{organization}}, under {{#if operation.anaesthesiaTypeName}}{{operation.anaesthesiaTypeName}}
+  {{else}}the{{/if}} anaesthesia{{#if operation.anaesthetistName}} given by {{operation.anaesthetistName}}{{/if}}.
+</p>
+<p>
+  The nature of the operation, its expected benefits, its risks, including the risks of anaesthesia, and the other
+  treatments possible have been explained to me in a language I understand, and my questions have been answered. I
+  consent to such further procedures, blood transfusion and anaesthesia as the doctors find necessary during the
+  operation in the patient's interest.
+</p>
+<table style="width: 100%; margin-top: 56px">
+  <tr>
+    <td style="width: 33%; text-align: center">______________________<br />Patient or guardian<br />(name and relation)</td>
+    <td style="width: 33%; text-align: center">______________________<br />Witness</td>
+    <td style="width: 33%; text-align: center">______________________<br />{{operation.surgeonName}}</td>
+  </tr>
+</table>
+<p style="margin-top: 24px">Date and time: ______________________</p>
+{{/with}}

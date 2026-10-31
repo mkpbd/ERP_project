@@ -1,0 +1,27 @@
+{{#with data}}
+{{#if rows.length}}
+<table class="report">
+  <thead>
+    <tr>
+      <th class="center" style="width: 24px">#</th><th>Operation</th><th>Booked</th><th>Room</th><th>UHID</th>
+      <th>Patient</th><th>Admission</th><th>Operation done</th><th>Surgeon</th><th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {{#each rows}}
+    <tr>
+      <td class="center">{{inc @index}}</td><td>{{number}}</td>
+      <td>{{#if scheduledFrom}}{{datetime scheduledFrom}} – {{time scheduledTo}}{{else}}wanted {{date requestedFor}}{{/if}}</td>
+      <td>{{otRoomName}}</td><td>{{uhid}}</td><td>{{patientName}}</td><td>{{admissionNumber}}</td>
+      <td>{{operationName}}</td><td>{{surgeonName}}</td><td>{{state}}</td>
+    </tr>
+    {{/each}}
+    <tr class="group-row">
+      <td colspan="10">{{rows.length}} operations · {{done}} done · {{open}} still open · {{cancelled}} cancelled</td>
+    </tr>
+  </tbody>
+</table>
+{{else}}
+<p>No operation in this period.</p>
+{{/if}}
+{{/with}}

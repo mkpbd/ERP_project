@@ -4,6 +4,7 @@ import type { Appointment, DoctorFees, Sitting } from './appointment.js';
 import type { DiagnosticBill } from './diagnostic-bill.js';
 import type { InvestigationBill, IpdBill, IpdCharge, StayDays } from './ipd-bill.js';
 import type { OpdBill, PaymentMethod } from './opd-bill.js';
+import type { OtCase } from './ot-case.js';
 import type { IdType, Patient } from './patient.js';
 
 export interface PatientMatch {
@@ -213,6 +214,8 @@ export interface IpdPayment {
 
 export interface ChargeEntry extends IpdCharge {
   readonly admissionId: string;
+  /** The operation it is charged for (step 15a). */
+  readonly otCaseId?: string | null;
   readonly note: string | null;
   readonly chargedBy: string;
 }
@@ -287,4 +290,27 @@ export abstract class DiagnosticBillRepository {
   ): Promise<{ rate: number; percent: number | null; amount: number | null } | null>;
   /** The admission's diagnostic bills with tests still billed, oldest first. */
   abstract indoorCharges(admissionId: string): Promise<InvestigationBill[]>;
+}
+
+export interface OtRoom {
+  readonly id: string;
+  readonly name: string;
+  readonly isActive: boolean;
+}
+
+/** The operation theatre (step 15a): operations of admitted patients and the rooms they are done in. */
+export abstract class OtCaseRepository {
+  abstract findById(id: string): Promise<OtCase | null>;
+  abstract findForUpdate(id: string): Promise<OtCase | null>;
+  abstract insert(otCase: OtCase): Promise<void>;
+  abstract update(otCase: OtCase): Promise<void>;
+  abstract room(id: string): Promise<OtRoom | null>;
+  /** Another operation booked in the room (scheduled or under way) whose time overlaps from–to. */
+  abstract clash(roomId: string, from: Date, to: Date, exceptId: string): Promise<{ number: string } | null>;
+  /** Whether each named master exists (and the operation is in use). */
+  abstract masters(ids: {
+    operationId: string;
+    otTypeId: string | null;
+    anaesthesiaTypeId: string | null;
+  }): Promise<{ operation: boolean; otType: boolean; anaesthesiaType: boolean }>;
 }

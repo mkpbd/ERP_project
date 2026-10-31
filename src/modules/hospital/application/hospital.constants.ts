@@ -21,6 +21,11 @@ export const HOSPITAL_RECORDS = {
   diagnosticDepartment: 'hospital_diagnostic_department',
   diagnosticTest: 'hospital_diagnostic_test',
   diagnosticPackage: 'hospital_diagnostic_package',
+  otRoom: 'hospital_ot_room',
+  operation: 'hospital_operation',
+  otType: 'hospital_ot_type',
+  anaesthesiaType: 'hospital_anaesthesia_type',
+  surgeryProcedure: 'hospital_surgery_procedure',
 } as const;
 
 /** Seeing the test catalogue and diagnostic bills. */

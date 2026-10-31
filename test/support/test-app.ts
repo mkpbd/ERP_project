@@ -68,6 +68,8 @@ export async function resetDatabase(app: INestApplication): Promise<void> {
       hospital_diagnostic_package_tests, hospital_diagnostic_packages, hospital_diagnostic_tests,
       hospital_diagnostic_departments, hospital_diagnostic_policy,
       hospital_ipd_payments, hospital_ipd_bill_lines, hospital_ipd_bills, hospital_ipd_charges, hospital_ipd_policy,
+      hospital_ot_team, hospital_ot_cases, hospital_ot_rooms, hospital_operations, hospital_ot_types,
+      hospital_anaesthesia_types, hospital_surgery_procedures,
       hospital_bed_stays, hospital_admission_doctors, hospital_admissions, hospital_beds, hospital_bed_categories,
       hospital_wards, hospital_uhid_uses, hospital_doctor_payments, hospital_doctor_ledger, hospital_opd_payments, hospital_opd_bill_lines, hospital_opd_bills,
       hospital_opd_policy, hospital_corporate_clients, hospital_services, hospital_service_groups, hospital_appointments, hospital_doctor_closures, hospital_doctor_schedules, hospital_doctors, hospital_specialities,

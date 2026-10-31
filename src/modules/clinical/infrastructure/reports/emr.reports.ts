@@ -15,6 +15,8 @@ const KIND_LABELS: Record<string, string> = {
   transfer: 'Transfer',
   icu: 'ICU course',
   handover: 'Handover',
+  pre_op: 'Pre-operative',
+  post_op: 'Post-operative',
 };
 
 /** The admission, its patient (with UHID label) and their doctor's details for a certificate or notes. */

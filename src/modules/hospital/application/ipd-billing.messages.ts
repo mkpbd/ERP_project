@@ -186,6 +186,8 @@ export interface ChargeInput {
   /** Left out: today. */
   readonly chargedOn: string | null;
   readonly note: string | null;
+  /** The operation of the stay it is charged for (step 15a); left out: none. */
+  readonly otCaseId?: string | null;
 }
 
 export class AddIpdChargeCommand extends Command<{ id: string; amount: number }> {

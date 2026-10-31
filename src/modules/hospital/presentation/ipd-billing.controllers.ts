@@ -60,6 +60,8 @@ class ChargeDto extends createZodDto(
     /** Left out: today. */
     chargedOn: day.nullable().default(null),
     note: z.string().trim().max(200).nullable().default(null),
+    /** The operation of this stay it is charged for. */
+    otCaseId: z.uuid().nullable().default(null),
   }),
 ) {}
 class ChargeParamDto extends createZodDto(z.object({ id: z.uuid(), chargeId: z.uuid() })) {}
