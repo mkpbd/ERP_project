@@ -32,7 +32,8 @@
     "db:seed:dev": "nest build && node dist/cli/seed-dev.js",
     "admin:bootstrap": "node dist/cli/bootstrap-admin.js",
     "audit:deps": "npm audit --omit=dev",
-    "etl": "tsx src/cli/etl.ts"
+    "etl": "nest build && node dist/cli/etl.js",
+    "etl:prod": "node dist/cli/etl.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",

@@ -45,6 +45,8 @@ import { noteRejection, type EtlContext, type Loader, type LoaderReport } from '
 import { isNew, namedLoader, NIL, pages } from './loader-kit.js';
 import { allocate, expiryDay, isAssetType } from './stock-records.js';
 
+/** The category and sub-category of items whose old sub-category is gone. */
+const GENERAL = 'General';
 const money = (value: unknown) => {
   const number = Number(value ?? 0);
   return Number.isFinite(number) && number > 0 ? Math.round(number * 100) / 100 : 0;
@@ -405,6 +407,34 @@ export function itemsLoader(db: DbContext): Loader {
     name: 'items',
     dependsOn: ['item-sub-groups', 'item-sub-categories', 'gl-accounts'],
     async run(context, report) {
+      let generalId: string | null = null;
+      let generalCount = 0;
+      /** The "General" sub-category of the "General" category, made once, for items whose old one is gone. */
+      const general = async (): Promise<string> => {
+        generalCount += 1;
+        if (generalId) return generalId;
+        let [category] = await db.db
+          .select({ id: itemCategories.id })
+          .from(itemCategories)
+          .where(sql`upper(${itemCategories.name}) = ${GENERAL.toUpperCase()}`);
+        if (!category) {
+          category = { id: randomUUID() };
+          await db.db.insert(itemCategories).values({ id: category.id, name: GENERAL });
+        }
+        const [found] = await db.db
+          .select({ id: itemSubCategories.id })
+          .from(itemSubCategories)
+          .where(
+            and(
+              eq(itemSubCategories.categoryId, category.id),
+              sql`upper(${itemSubCategories.name}) = ${GENERAL.toUpperCase()}`,
+            ),
+          );
+        generalId = found?.id ?? randomUUID();
+        if (!found)
+          await db.db.insert(itemSubCategories).values({ id: generalId, categoryId: category.id, name: GENERAL });
+        return generalId;
+      };
       const existing = new Map(
         (await db.db.select({ id: items.id, name: items.name, subGroupId: items.subGroupId }).from(items)).map(
           (row) => [`${row.subGroupId}|${row.name.toUpperCase()}`, row.id],
@@ -432,9 +462,10 @@ export function itemsLoader(db: DbContext): Loader {
       for (const row of rows) {
         if (!(await isNew(context, report, 'item', row.Id))) continue;
         const subGroupId = await context.ids.get('item-sub-group', row.SubGroupId);
-        const subCategoryId = await context.ids.get('item-sub-category', row.SubCategoryId);
-        if (!subGroupId || !subCategoryId) {
-          noteRejection(report, row.Id, subGroupId ? 'sub_category_not_brought' : 'sub_group_not_brought');
+        // The old sub-categories were often unset or gone: such an item goes under "General".
+        const subCategoryId = (await context.ids.get('item-sub-category', row.SubCategoryId)) ?? (await general());
+        if (!subGroupId) {
+          noteRejection(report, row.Id, 'sub_group_not_brought');
           continue;
         }
         const name = text(row.Name, 200);
@@ -462,6 +493,8 @@ export function itemsLoader(db: DbContext): Loader {
         }
         await context.ids.set('item', row.Id, id);
       }
+      if (generalCount)
+        report.notes.push(generalCount + ' item(s) whose old sub-category is gone went under ' + GENERAL);
     },
   };
 }

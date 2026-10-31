@@ -251,7 +251,7 @@ const books = {
       { Id: 'fy-1', FYear: 2025 },
       { Id: 'fy-2', FYear: 2026 },
     ],
-    ConsultantGlobalLedgers: [{ ConsultantId: DOCTOR, Debit: 1_000, Credit: 6_000 }],
+    ConsultantGlobalLedgers: [{ ConsultantId: DOCTOR, Debit: 1_000, Credit: 6_000, IsDoctor: 1 }],
     LoyalMembers: [
       { Id: 'lm-1', Name: 'Habib', MobileNo: '01711999999', Address: null, ReferranceName: null, IsDeleted: false },
       { Id: 'lm-2', Name: 'No Phone', MobileNo: null, Address: null, ReferranceName: null, IsDeleted: false },
@@ -942,8 +942,10 @@ class FakeSource extends LegacySource {
         .map((user) => ({ Id: user.Id, DoctorId: user.DoctorId }));
     } else if (sql.includes('[Identity].[Users]')) rows = page(tables.users, (user) => user.Id);
     else if (sql.includes('[Marketing].[DoctorFieldOfSpecialities]')) rows = tables.specialities;
-    else if (sql.includes('[Marketing].[Doctors]')) rows = page(tables.doctors, (doctor) => doctor.Id);
-    else if (sql.includes('[Hospital].[RegRecords]')) rows = page(tables.patients, (patient) => patient.UHID);
+    else if (sql.includes('[Account].[ConsultantGlobalLedgers]')) rows = books.tables['ConsultantGlobalLedgers']!;
+    else if (sql.includes('[Marketing].[Doctors]') && !sql.includes('[Account].')) {
+      rows = page(tables.doctors, (doctor) => doctor.Id);
+    } else if (sql.includes('[Hospital].[RegRecords]')) rows = page(tables.patients, (patient) => patient.UHID);
     else if (/\[(Hospital|Marketing)\]\.\[(\w+)\]/.test(sql)) {
       const [, schema, table] = /\[(Hospital|Marketing)\]\.\[(\w+)\]/.exec(sql)!;
       const found = open[`${schema}.${table}`];
@@ -1085,7 +1087,7 @@ describe('data migration', () => {
       'account-level4-heads': [5, 0, 0],
       'account-level5-heads': [5, 0, 0],
       'coa-descriptions': [1, 0, 0],
-      'gl-accounts': [9, 0, 1],
+      'gl-accounts': [10, 0, 0],
       'sub-ledger-types': [2, 0, 0],
       'sub-ledgers': [2, 0, 0],
       'cost-centers': [1, 0, 0],
@@ -1528,7 +1530,7 @@ describe('data migration', () => {
       'Records: Doctors': 'check',
       'Records: Patients': 'check',
       'Records: Staff': 'check',
-      'Records: GL accounts': 'check',
+      'Records: GL accounts': 'ok',
       'Records: Suppliers': 'ok',
       'Records: Pharmacy products': 'check',
       'Records: Store items': 'ok',

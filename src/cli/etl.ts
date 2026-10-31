@@ -93,7 +93,15 @@ try {
   }
 } catch (error) {
   failed = true;
-  console.error('The data migration failed:', error instanceof Error ? error.message : error);
+  // The database's own error (Drizzle wraps it), never the failed query's values: they are people's records.
+  const cause = error instanceof Error && error.cause instanceof Error ? error.cause : error;
+  const said = cause instanceof Error ? cause.message : String(cause);
+  const detail = cause as { detail?: string; constraint?: string; table?: string };
+  console.error(
+    'The data migration failed:',
+    said.split(/\nparams:/)[0]!.slice(0, 500),
+    [detail.table, detail.constraint, detail.detail].filter(Boolean).join(' · '),
+  );
 } finally {
   await source.close();
   await app.close();

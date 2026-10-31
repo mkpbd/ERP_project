@@ -297,7 +297,7 @@ export function patientsLoader(db: DbContext): Loader {
         [FullName], [AgeYear], [AgeMonth], [AgeDay], [Dob], [Sex], [FatherName], [MotherName], [SpouseName],
         [MaritalStatus], [Profession], [MobileNo], [Email], [CareOf], [HouseNo], [RoadNo], [Village], [Po],
         [ArearOrThana], [District], [Cpname], [Cpmobile], [Cpaddress], [RelationWithPatient], [BloodGroup],
-        [NationalId], [RegDate], [IsDeleted]
+        [NationalId], [RegDate], [CreatedOn], [IsDeleted]
         FROM [Hospital].[RegRecords] WHERE [UHID] > @after ORDER BY [UHID]`;
       for await (const page of pages<LegacyPatient & Record<string, unknown>>(
         context,

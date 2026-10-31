@@ -476,12 +476,30 @@ export function doctorPayablesLoader(db: DbContext): Loader {
       const cutOver = needsCutOver(context, report, 'doctors’ payables were');
       if (!cutOver) return;
       const on = dayBefore(cutOver);
-      const rows = await context.source.query<{ ConsultantId: string; Debit: number | null; Credit: number | null }>(
-        `SELECT CAST([ConsultantId] AS nvarchar(36)) AS [ConsultantId], SUM(CAST([Debit] AS decimal(19, 4))) AS [Debit],
-          SUM(CAST([Credit] AS decimal(19, 4))) AS [Credit] FROM [Account].[ConsultantGlobalLedgers]
-          WHERE [IsDeleted] = 0 AND [TranDate] < @cutOver GROUP BY [ConsultantId]`,
+      const rows = await context.source.query<{
+        ConsultantId: string;
+        Debit: number | null;
+        Credit: number | null;
+        IsDoctor: number;
+      }>(
+        `SELECT CAST(c.[ConsultantId] AS nvarchar(36)) AS [ConsultantId],
+          SUM(CAST(c.[Debit] AS decimal(19, 4))) AS [Debit], SUM(CAST(c.[Credit] AS decimal(19, 4))) AS [Credit],
+          MAX(CASE WHEN d.[Id] IS NULL THEN 0 ELSE 1 END) AS [IsDoctor]
+          FROM [Account].[ConsultantGlobalLedgers] c LEFT JOIN [Marketing].[Doctors] d ON d.[Id] = c.[ConsultantId]
+          WHERE c.[IsDeleted] = 0 AND c.[TranDate] < @cutOver GROUP BY c.[ConsultantId]`,
         { cutOver },
       );
+      // The old OPD billing wrote doctors' shares against ids that are no doctor (its known fault): then the ledger
+      // cannot say what each doctor is owed, and writing the doctors' own rows (mostly payments) would mislead.
+      const orphans = rows.filter((row) => Number(row.IsDoctor) === 0);
+      if (orphans.length) {
+        const earned = orphans.reduce((sum, row) => sum - netPaisa(row.Debit, row.Credit), 0);
+        report.read += rows.length;
+        report.notes.push(
+          `${orphans.length} old ledger key(s), ${(earned / 100).toFixed(2)} owed in all, are no doctor: what each doctor is owed cannot be taken from the old ledger. Nothing was written; enter each doctor's payable from Accounts`,
+        );
+        return;
+      }
       let total = 0;
       for (const row of rows) {
         const key = `${row.ConsultantId}:${cutOver}`;

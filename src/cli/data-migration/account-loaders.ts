@@ -172,10 +172,14 @@ function chartLevelLoader(
           }
           if (code && codes.has(code.toUpperCase())) {
             if (spec.codes) {
-              noteRejection(report, row.Id, 'code_taken');
-              continue;
+              // Two old rows shared the code: the second gets the code with a number, so what is under it comes too.
+              let n = 2;
+              while (codes.has(`${code}-${n}`.toUpperCase())) n += 1;
+              report.notes.push(`${name}: code ${code} is another's; coded ${code}-${n}`);
+              code = `${code}-${n}`;
+            } else {
+              code = null;
             }
-            code = null;
           }
           id = randomUUID();
           await spec.insert({ id, parentId, name, code });
@@ -384,7 +388,12 @@ export function glAccountsLoader(db: DbContext): Loader {
       for await (const page of pages<LegacyGeneralLedger & Record<string, unknown>>(context, query, (row) => row.Id)) {
         for (const row of page) {
           if (!(await isNew(context, report, 'gl-account', row.Id))) continue;
-          const result = glAccountRecord(row);
+          // An old account without a code is given one from its old id, to be recoded here.
+          const coded = text(row.GLCodeNo, 30) ? row : { ...row, GLCodeNo: `OLD-${row.Id.slice(0, 8).toUpperCase()}` };
+          if (coded !== row) {
+            report.notes.push(`${text(row.Name, 100) ?? row.Id}: no code in the old system; coded ${coded.GLCodeNo}`);
+          }
+          const result = glAccountRecord(coded);
           if (!result.ok) {
             noteRejection(report, row.Id, result.reason);
             continue;

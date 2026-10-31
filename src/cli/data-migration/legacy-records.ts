@@ -18,13 +18,19 @@ const clean = (value: unknown, max = 300): string | null => {
 
 const isoDay = (value: Date) => value.toISOString().slice(0, 10);
 
-/** 01XXXXXXXXX from the many ways the old records wrote a mobile; null when it is not one. */
+/** 01XXXXXXXXX from the many ways the old records wrote a mobile (Bangla digits too); null when there is none. */
 export function mobile(value: unknown): string | null {
-  const digits = asText(value)
-    .replace(/[^\d+]/g, '')
-    .replace(/^\+?880/, '0')
-    .replace(/^(1[3-9]\d{8})$/, '0$1');
-  return /^01[3-9]\d{8}$/.test(digits) ? digits : null;
+  // Bangla digits (০-৯) read as their numbers.
+  const written = asText(value).replace(/[০-৯]/g, (digit) => String(digit.charCodeAt(0) - 0x09e6));
+  const number = (part: string) => {
+    const digits = part
+      .replace(/[^\d+]/g, '')
+      .replace(/^\+?880/, '0')
+      .replace(/^(1[3-9]\d{8})$/, '0$1');
+    return /^01[3-9]\d{8}$/.test(digits) ? digits : null;
+  };
+  // The whole field as one number, else the first number among words or beside another ("01711… / 01811…").
+  return [written, ...written.split(/[,;/|&]|[^\d\s+().-]+/)].map(number).find(Boolean) ?? null;
 }
 
 export function sex(value: unknown): 'male' | 'female' | 'other' | null {
@@ -110,7 +116,9 @@ export interface LegacyPatient {
   RelationWithPatient: string | null;
   BloodGroup: string | null;
   NationalId: string | null;
-  RegDate: Date;
+  RegDate: Date | null;
+  /** When the row was saved: the registration day when the old RegDate was never set (0001-01-01). */
+  CreatedOn?: Date | null;
   IsDeleted: boolean | null;
 }
 
@@ -122,7 +130,9 @@ export function patientRecord(row: LegacyPatient) {
   if (!fullName) return reject<never>('no_name');
   const patientSex = sex(row.Sex);
   if (!patientSex) return reject<never>('unknown_sex');
-  const born = birth(row.Dob, { years: row.AgeYear, months: row.AgeMonth, days: row.AgeDay }, row.RegDate);
+  const registered = [row.RegDate, row.CreatedOn].find((day) => day && day.getUTCFullYear() > 1900);
+  if (!registered) return reject<never>('no_registration_date');
+  const born = birth(row.Dob, { years: row.AgeYear, months: row.AgeMonth, days: row.AgeDay }, registered);
   if (!born) return reject<never>('no_birth_or_age');
   const own = mobile(row.MobileNo);
   const contact = mobile(row.Cpmobile);
@@ -157,7 +167,7 @@ export function patientRecord(row: LegacyPatient) {
     contactRelation: clean(row.RelationWithPatient, 50),
     contactMobileNo: contact,
     contactAddress: clean(row.Cpaddress, 300),
-    registeredOn: isoDay(row.RegDate),
+    registeredOn: isoDay(registered),
     isActive: !row.IsDeleted,
     inactiveReason: row.IsDeleted ? 'Deleted in the old system' : null,
   });

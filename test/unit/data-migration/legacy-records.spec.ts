@@ -59,6 +59,14 @@ describe('old values', () => {
     expect(mobile('+880 1711-000000')).toBe('01711000000');
     expect(mobile('1811000000')).toBe('01811000000');
     expect(mobile('02-123456')).toBeNull();
+    // As the old records wrote them: Bangla digits, a number among words, the first of two.
+    expect([
+      mobile('০১৭১১-০০০০০০'),
+      mobile('Father: 01911 000000'),
+      mobile('01711000000 / 01811000000'),
+      mobile('N/A'),
+      mobile('01'),
+    ]).toEqual(['01711000000', '01911000000', '01711000000', null, null]);
     expect([sex('M'), sex('Female'), sex('TG'), sex('?')]).toEqual(['male', 'female', 'other', null]);
     expect([bloodGroup('O-ve'), bloodGroup('ab positive'), bloodGroup('A'), bloodGroup('B (+)')]).toEqual([
       'O-',
