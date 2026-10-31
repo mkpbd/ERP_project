@@ -7,8 +7,10 @@ import { DbContext } from '../../database/drizzle-transaction-manager.js';
 import { OrganizationProfile } from '../../shared/application/contracts/organization-profile.js';
 import { UserDirectory } from '../../shared/application/contracts/user-directory.js';
 import { PatientDocumentRegistry } from '../../shared/application/patient-documents.js';
+import { RecordTypeRegistry } from '../../shared/application/records.js';
 import { ReportRegistry } from '../../shared/application/reports.js';
 import { laboratoryDocuments } from './infrastructure/persistence/laboratory.patient-documents.js';
+import { laboratoryRecordTypes } from './infrastructure/persistence/laboratory.record-stores.js';
 import { IMAGING_HANDLERS } from './application/imaging.handlers.js';
 import { ImagingReadRepository } from './application/imaging.messages.js';
 import { LAB_HANDLERS } from './application/lab.handlers.js';
@@ -28,6 +30,7 @@ import {
 } from './infrastructure/persistence/drizzle-lab.repositories.js';
 import { imagingReport, labReport, reagentUsageReport } from './infrastructure/reports/lab.reports.js';
 import { ImagingController } from './presentation/imaging.controllers.js';
+import { LAB_MASTER_CONTROLLERS } from './presentation/lab-masters.controllers.js';
 import { LabController } from './presentation/lab.controllers.js';
 
 /**
@@ -36,10 +39,11 @@ import { LabController } from './presentation/lab.controllers.js';
  * results entered, verified by someone else, printed and handed over (step 10c); imaging studies with accession
  * numbers, reports written from templates and signed by the radiologist, whose reporting fee the hospital credits
  * through ReportingFees (step 10d); each test's reagents and films used up from the lab's store department through
- * DepartmentStock when reported (step 10e).
+ * DepartmentStock when reported (step 10e); tests reported as a culture with its antibiogram or as written text from
+ * templates, with the culture masters (step 15b).
  */
 @Module({
-  controllers: [LabController, ImagingController, ReagentController],
+  controllers: [LabController, ImagingController, ReagentController, ...LAB_MASTER_CONTROLLERS],
   providers: [
     ...LAB_HANDLERS,
     ...IMAGING_HANDLERS,
@@ -68,9 +72,11 @@ export class LaboratoryModule implements OnModuleInit {
     private readonly context: DbContext,
     private readonly stock: DepartmentStock,
     private readonly documents: PatientDocumentRegistry,
+    private readonly records: RecordTypeRegistry,
   ) {}
 
   onModuleInit(): void {
+    for (const type of laboratoryRecordTypes(this.context)) this.records.register(type);
     this.reports.register(labReport(this.read, this.orders, this.organization, this.users));
     this.reports.register(imagingReport(this.imaging, this.orders, this.organization));
     this.reports.register(reagentUsageReport(this.context, this.stock));

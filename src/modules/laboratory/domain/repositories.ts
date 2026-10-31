@@ -1,3 +1,4 @@
+import type { ReportForm } from './culture.js';
 import type { ImagingStudy, ImagingTemplate } from './imaging.js';
 import type { LabResult, LabSample, Parameter } from './lab.js';
 
@@ -6,6 +7,21 @@ export abstract class LabRepository {
   abstract parameters(testId: string): Promise<Parameter[]>;
   /** Replaces the test's parameters (values already entered keep their own copy). */
   abstract setParameters(testId: string, parameters: readonly Omit<Parameter, 'id'>[]): Promise<void>;
+  /** How the test is reported (values unless set otherwise). */
+  abstract form(testId: string): Promise<ReportForm>;
+  abstract setForm(testId: string, form: ReportForm): Promise<void>;
+  /** The tests set to a form other than values. */
+  abstract forms(testIds: readonly string[]): Promise<Map<string, ReportForm>>;
+  /** The names of culture masters by id (ids not found are left out). */
+  abstract cultureNames(ids: {
+    readonly organisms: readonly string[];
+    readonly antibiotics: readonly string[];
+    readonly growthTypes: readonly string[];
+  }): Promise<{
+    organisms: Map<string, string>;
+    antibiotics: Map<string, string>;
+    growthTypes: Map<string, string>;
+  }>;
   /** The next lab number serial of the day, counted under a row lock. */
   abstract nextSerial(day: string): Promise<number>;
   /** The bill's lines being worked on (on a sample not rejected). */

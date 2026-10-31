@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  boolean,
   check,
   date,
   index,
@@ -12,6 +13,7 @@ import {
   timestamp,
   uniqueIndex,
   uuid,
+  type AnyPgColumn,
 } from 'drizzle-orm/pg-core';
 import {
   diagnosticBills,
@@ -32,6 +34,8 @@ const measure = (name: string) => numeric(name, { precision: 14, scale: 4, mode:
 // The same lists as the domain's (kept literal here so drizzle-kit loads this file on its own).
 const SAMPLE_STATUSES = ['collected', 'received', 'rejected'] as const;
 const RESULT_STATUSES = ['pending', 'entered', 'verified', 'delivered', 'rejected'] as const;
+const REPORT_FORMS = ['values', 'culture', 'descriptive'] as const;
+const SENSITIVITIES = ['S', 'I', 'R'] as const;
 
 // Old Admin.InvoiceGenerators for lab numbers (SPGetNextLabNo): one counter per day.
 export const labSequences = pgTable('lab_sequences', {
@@ -152,11 +156,15 @@ export const labResults = pgTable(
     deliveredAt: tz('delivered_at'),
     /** Reagents used up when verified (short: the lab's store held too little). */
     reagents: text('reagents', { enum: ['used', 'short'] }),
+    /** How it was entered: values, a culture (lab_culture_reports) or a written report (narrative); null while pending. */
+    form: text('form', { enum: REPORT_FORMS }),
+    narrative: text('narrative'),
     version: integer('version').notNull(),
     createdAt: tz('created_at').notNull().defaultNow(),
     updatedAt: tz('updated_at').notNull().defaultNow(),
   },
   (t) => [
+    check('lab_results_narrative_ck', sql`(${t.narrative} is null) = (${t.form} is distinct from 'descriptive')`),
     // A bill's test is worked on once at a time (a rejected sample's test is collected again).
     uniqueIndex('lab_results_line_uq')
       .on(t.billId, t.line)
@@ -187,6 +195,155 @@ export const labResultValues = pgTable(
     flag: text('flag', { enum: ['low', 'high'] }),
   },
   (t) => [primaryKey({ columns: [t.resultId, t.position] })],
+);
+
+// How a lab test is reported when not by values against its parameters (no row: values).
+export const labTestForms = pgTable(
+  'lab_test_forms',
+  {
+    testId: uuid('test_id')
+      .primaryKey()
+      .references(() => diagnosticTests.id, { onDelete: 'cascade' }),
+    form: text('form', { enum: REPORT_FORMS }).notNull(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [check('lab_test_forms_form_ck', sql`${t.form} <> 'values'`)],
+);
+
+const nameLength = (table: string, column: AnyPgColumn, max: number) =>
+  check(`${table}_name_ck`, sql`char_length(${column}) between 1 and ${sql.raw(String(max))}`);
+
+// Old Diag.CSAntibiotics: the antibiotics of the antibiogram.
+export const labAntibiotics = pgTable(
+  'lab_antibiotics',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    /** Its class (Penicillins, Cephalosporins …), to order the antibiogram by. */
+    groupName: text('group_name'),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('lab_antibiotics_name_uq').on(t.name), nameLength('lab_antibiotics', t.name, 100)],
+);
+
+// Old Diag.MicroBioBacterias: the organisms a culture isolates.
+export const labOrganisms = pgTable(
+  'lab_organisms',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('lab_organisms_name_uq').on(t.name), nameLength('lab_organisms', t.name, 150)],
+);
+
+// Old Diag.CSGrowthTypes: how a culture grew (heavy growth, scanty growth, no growth after 48 hours …).
+export const labGrowthTypes = pgTable(
+  'lab_growth_types',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex('lab_growth_types_name_uq').on(t.name), nameLength('lab_growth_types', t.name, 100)],
+);
+
+// Old Diag.CSMessases: the usual closing remarks of a culture report, to pick from.
+export const labCultureMessages = pgTable(
+  'lab_culture_messages',
+  {
+    id: uuid('id').primaryKey(),
+    text: text('text').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lab_culture_messages_text_uq').on(t.text),
+    check('lab_culture_messages_text_ck', sql`char_length(${t.text}) between 1 and 500`),
+  ],
+);
+
+// Old Diag.PathologyTemplates: the usual wording of a written report (histopathology, cytology …) to start from.
+export const labReportTemplates = pgTable(
+  'lab_report_templates',
+  {
+    id: uuid('id').primaryKey(),
+    name: text('name').notNull(),
+    description: text('description'),
+    body: text('body').notNull(),
+    createdAt: tz('created_at').notNull().defaultNow(),
+    updatedAt: tz('updated_at').notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex('lab_report_templates_name_uq').on(t.name),
+    nameLength('lab_report_templates', t.name, 150),
+    check('lab_report_templates_body_ck', sql`char_length(${t.body}) between 1 and 20000`),
+  ],
+);
+
+// A culture result (old CSOthersValues and CSNoGrowthResults): the microscopy and how the culture grew, with names
+// copied from the masters.
+export const labCultureReports = pgTable('lab_culture_reports', {
+  resultId: uuid('result_id')
+    .primaryKey()
+    .references(() => labResults.id, { onDelete: 'cascade' }),
+  analyzer: text('analyzer'),
+  pusCells: text('pus_cells'),
+  epithelialCells: text('epithelial_cells'),
+  rbc: text('rbc'),
+  microscopyNote: text('microscopy_note'),
+  growth: boolean('growth').notNull(),
+  growthTypeId: uuid('growth_type_id').references(() => labGrowthTypes.id, { onDelete: 'set null' }),
+  growthType: text('growth_type'),
+  colonyCount: text('colony_count'),
+  incubation: text('incubation'),
+  media: text('media'),
+  message: text('message'),
+});
+
+// The organisms a culture isolated (old organisms A, B and C), in order.
+export const labCultureOrganisms = pgTable(
+  'lab_culture_organisms',
+  {
+    resultId: uuid('result_id')
+      .notNull()
+      .references(() => labResults.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    organismId: uuid('organism_id').references(() => labOrganisms.id, { onDelete: 'set null' }),
+    name: text('name').notNull(),
+  },
+  (t) => [
+    primaryKey({ columns: [t.resultId, t.position] }),
+    check('lab_culture_organisms_position_ck', sql`${t.position} between 1 and 3`),
+    index('lab_culture_organisms_organism_idx').on(t.organismId),
+  ],
+);
+
+// The antibiogram (old CSGrowths): each antibiotic's result against the organisms 1, 2 and 3.
+export const labCultureSensitivities = pgTable(
+  'lab_culture_sensitivities',
+  {
+    resultId: uuid('result_id')
+      .notNull()
+      .references(() => labResults.id, { onDelete: 'cascade' }),
+    position: smallint('position').notNull(),
+    antibioticId: uuid('antibiotic_id').references(() => labAntibiotics.id, { onDelete: 'set null' }),
+    antibiotic: text('antibiotic').notNull(),
+    zone: text('zone'),
+    result1: text('result_1', { enum: SENSITIVITIES }),
+    result2: text('result_2', { enum: SENSITIVITIES }),
+    result3: text('result_3', { enum: SENSITIVITIES }),
+  },
+  (t) => [
+    primaryKey({ columns: [t.resultId, t.position] }),
+    index('lab_culture_sensitivities_antibiotic_idx').on(t.antibioticId),
+    check('lab_culture_sensitivities_results_ck', sql`coalesce(${t.result1}, ${t.result2}, ${t.result3}) is not null`),
+  ],
 );
 
 // Old UNP.GetNextAccessionNumber: one counter per day for the imaging studies' accession numbers.

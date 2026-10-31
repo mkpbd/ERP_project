@@ -42,7 +42,7 @@ const newUser = (email: string) => makeUser({ id: randomUUID(), email, now });
 describe('migrations', () => {
   it('applied the reviewed migration set', async () => {
     const applied = await db.execute(sql`select count(*)::int as n from drizzle.__drizzle_migrations`);
-    expect(applied.rows[0]).toEqual({ n: 60 });
+    expect(applied.rows[0]).toEqual({ n: 61 });
     const tables = await db.execute(
       sql`select table_name from information_schema.tables where table_schema = 'public' order by table_name`,
     );
@@ -209,17 +209,26 @@ describe('migrations', () => {
       'job_applications',
       'job_circulars',
       'journal_types',
+      'lab_antibiotics',
+      'lab_culture_messages',
+      'lab_culture_organisms',
+      'lab_culture_reports',
+      'lab_culture_sensitivities',
+      'lab_growth_types',
       'lab_imaging_sequences',
       'lab_imaging_studies',
       'lab_imaging_templates',
+      'lab_organisms',
       'lab_parameter_ranges',
       'lab_parameters',
       'lab_reagent_uses',
+      'lab_report_templates',
       'lab_result_values',
       'lab_results',
       'lab_samples',
       'lab_sequences',
       'lab_stock_departments',
+      'lab_test_forms',
       'lab_test_reagents',
       'leave_application_approvals',
       'leave_applications',

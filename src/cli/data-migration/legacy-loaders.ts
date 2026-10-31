@@ -12,6 +12,7 @@ import { users } from '../../modules/identity/infrastructure/persistence/identit
 import { accountLoaders } from './account-loaders.js';
 import { accessLoaders } from './access-loaders.js';
 import { historyLoaders } from './history-loaders.js';
+import { labLoaders } from './lab-loaders.js';
 import { hrLoaders } from './hr-loaders.js';
 import { openLoaders } from './open-loaders.js';
 import { stockLoaders } from './stock-loaders.js';
@@ -371,5 +372,6 @@ export function legacyLoaders(db: DbContext): Loader[] {
     ...openLoaders(db),
     ...historyLoaders(db),
     ...accessLoaders(db),
+    ...labLoaders(db),
   ];
 }

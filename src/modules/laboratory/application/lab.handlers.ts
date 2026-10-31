@@ -8,6 +8,7 @@ import { AuditTrail } from '../../../shared/application/ports/audit-trail.js';
 import { Clock } from '../../../shared/application/ports/clock.js';
 import { TransactionManager } from '../../../shared/application/ports/transaction-manager.js';
 import { DomainError, ForbiddenError, NotFoundError } from '../../../shared/domain/errors.js';
+import { checkedCulture, checkedNarrative, type CultureReport, type ReportForm } from '../domain/culture.js';
 import { ageInDays, checkedTemplate, labNumber, LabResult, LabSample, rangeFor, resultValues } from '../domain/lab.js';
 import { LabRepository } from '../domain/repositories.js';
 import {
@@ -16,6 +17,8 @@ import {
   CollectSampleCommand,
   GetResultQuery,
   GetSampleQuery,
+  FindOrderQuery,
+  GetTestFormQuery,
   GetTestParametersQuery,
   LAB_COLLECT,
   LAB_MANAGE,
@@ -26,8 +29,12 @@ import {
   ListResultsQuery,
   LAB_SETTINGS,
   ListSamplesQuery,
+  SearchLabTestsQuery,
+  SetTestFormCommand,
   SetTestParametersCommand,
+  type CultureInput,
   type LabSettings,
+  type ResultChange,
   type OrderRef,
 } from './lab.messages.js';
 import { ReagentUser } from './reagent-use.js';
@@ -70,6 +77,37 @@ export class LabDesk {
     });
   }
 
+  /** A lab test of the hospital's catalogue (not_lab_test for an imaging test). */
+  async labTest(testId: string) {
+    const test = (await this.orders.tests([testId])).get(testId);
+    if (!test) throw new NotFoundError('diagnostic_test');
+    if (test.departmentKind !== 'lab') throw new DomainError('not_lab_test', `${test.name} is not done in a lab`);
+    return test;
+  }
+
+  /** A culture as entered, its masters' names copied (an id not found is refused). */
+  async culture(input: CultureInput): Promise<CultureReport> {
+    const names = await this.labs.cultureNames({
+      organisms: input.organismIds,
+      antibiotics: input.sensitivity.map((row) => row.antibioticId),
+      growthTypes: input.growthTypeId ? [input.growthTypeId] : [],
+    });
+    const named = (map: Map<string, string>, id: string, what: string) => {
+      const name = map.get(id);
+      if (!name) throw new DomainError('invalid_culture', `The ${what} is not in the list`);
+      return name;
+    };
+    return checkedCulture({
+      ...input,
+      growthType: input.growthTypeId ? named(names.growthTypes, input.growthTypeId, 'growth type') : null,
+      organisms: input.organismIds.map((id) => ({ organismId: id, name: named(names.organisms, id, 'organism') })),
+      sensitivity: input.sensitivity.map((row) => ({
+        ...row,
+        antibiotic: named(names.antibiotics, row.antibioticId, 'antibiotic'),
+      })),
+    });
+  }
+
   async order(billId: string): Promise<DiagnosticOrder> {
     const [order] = await this.orders.find([billId]);
     if (!order) throw new NotFoundError('diagnostic_bill');
@@ -109,9 +147,7 @@ export class SetTestParametersHandler implements ICommandHandler<SetTestParamete
     const { desk } = this;
     await desk.access.authorize(actor.userId, { permissions: [LAB_MANAGE] });
     const template = checkedTemplate(parameters);
-    const test = (await desk.orders.tests([testId])).get(testId);
-    if (!test) throw new NotFoundError('diagnostic_test');
-    if (test.departmentKind !== 'lab') throw new DomainError('not_lab_test', `${test.name} is not done in a lab`);
+    await desk.labTest(testId);
     await desk.tx.run(async () => {
       await desk.labs.setParameters(testId, template);
       await desk.record('test_parameters', 'set', actor, testId, { parameters: template.length });
@@ -126,6 +162,87 @@ export class GetTestParametersHandler implements IQueryHandler<GetTestParameters
   async execute({ actor, testId }: GetTestParametersQuery) {
     await this.desk.access.authorize(actor.userId, { permissions: [LAB_READ] });
     return this.desk.labs.parameters(testId);
+  }
+}
+
+/**
+ * How a lab test is reported (old: any pathology test could be given a C/S report or a descriptive one): values
+ * against its parameters, a culture with its antibiogram, or written text from templates. Results already entered
+ * keep their form.
+ */
+@CommandHandler(SetTestFormCommand)
+export class SetTestFormHandler implements ICommandHandler<SetTestFormCommand> {
+  constructor(private readonly desk: LabDesk) {}
+
+  async execute({ actor, testId, form }: SetTestFormCommand): Promise<void> {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [LAB_MANAGE] });
+    await desk.labTest(testId);
+    await desk.tx.run(async () => {
+      await desk.labs.setForm(testId, form);
+      await desk.record('test_form', 'set', actor, testId, { form });
+    });
+  }
+}
+
+@QueryHandler(GetTestFormQuery)
+export class GetTestFormHandler implements IQueryHandler<GetTestFormQuery> {
+  constructor(private readonly desk: LabDesk) {}
+
+  async execute({ actor, testId }: GetTestFormQuery) {
+    await this.desk.access.authorize(actor.userId, { permissions: [LAB_READ] });
+    return { form: await this.desk.labs.form(testId) };
+  }
+}
+
+@QueryHandler(SearchLabTestsQuery)
+export class SearchLabTestsHandler implements IQueryHandler<SearchLabTestsQuery> {
+  constructor(private readonly desk: LabDesk) {}
+
+  async execute({ actor, q }: SearchLabTestsQuery) {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [LAB_READ] });
+    const tests = (await desk.orders.searchTests(q, 50)).filter((test) => test.departmentKind === 'lab').slice(0, 20);
+    const forms = await desk.labs.forms(tests.map((test) => test.id));
+    return tests.map((test) => ({ id: test.id, name: test.name, form: forms.get(test.id) ?? ('values' as const) }));
+  }
+}
+
+/** Old sample collection's invoice search: the bill by its number, with what each lab department can collect. */
+@QueryHandler(FindOrderQuery)
+export class FindOrderHandler implements IQueryHandler<FindOrderQuery> {
+  constructor(private readonly desk: LabDesk) {}
+
+  async execute({ actor, number }: FindOrderQuery) {
+    const { desk } = this;
+    await desk.access.authorize(actor.userId, { permissions: [LAB_READ] });
+    const order = await desk.orders.byNumber(number);
+    if (!order) throw new NotFoundError('diagnostic_bill');
+    const inWork = await desk.labs.linesInWork(order.billId);
+    const departments = new Map<
+      string,
+      { departmentId: string; departmentName: string; tests: { line: number; testName: string; inWork: boolean }[] }
+    >();
+    for (const test of order.tests) {
+      if (test.departmentKind !== 'lab' || test.status === 'cancelled') continue;
+      const department = departments.get(test.departmentId) ?? {
+        departmentId: test.departmentId,
+        departmentName: test.departmentName,
+        tests: [],
+      };
+      department.tests.push({ line: test.line, testName: test.testName, inWork: inWork.has(test.line) });
+      departments.set(test.departmentId, department);
+    }
+    return {
+      billId: order.billId,
+      billNumber: order.billNumber,
+      billedAt: order.billedAt,
+      patientName: order.patient.name,
+      uhid: order.patient.uhid,
+      sex: order.patient.sex,
+      dateOfBirth: order.patient.dateOfBirth,
+      departments: [...departments.values()],
+    };
   }
 }
 
@@ -252,7 +369,16 @@ export class ChangeSampleHandler implements ICommandHandler<ChangeSampleCommand>
   }
 }
 
-/** Old pathology result entry and finalisation: values entered against the template, verified by someone else. */
+const FORM_NAMES: Record<ReportForm, string> = { values: 'values', culture: 'a culture', descriptive: 'written text' };
+/** The form each kind of entry is for. */
+const ENTRY_FORMS = { enter: 'values', 'enter-culture': 'culture', 'enter-text': 'descriptive' } as const;
+const isEntry = (change: ResultChange): change is Extract<ResultChange, { kind: keyof typeof ENTRY_FORMS }> =>
+  change.kind in ENTRY_FORMS;
+
+/**
+ * Old pathology result entry and finalisation, C/S report and descriptive report entry: values against the template, a
+ * culture with its antibiogram or written text, verified by someone else.
+ */
 @CommandHandler(ChangeResultCommand)
 export class ChangeResultHandler implements ICommandHandler<ChangeResultCommand> {
   constructor(
@@ -262,19 +388,30 @@ export class ChangeResultHandler implements ICommandHandler<ChangeResultCommand>
 
   async execute({ actor, id, version, change }: ChangeResultCommand): Promise<void> {
     const { desk } = this;
-    await desk.access.authorize(actor.userId, { permissions: [change.kind === 'enter' ? LAB_RESULT : LAB_VERIFY] });
+    await desk.access.authorize(actor.userId, { permissions: [isEntry(change) ? LAB_RESULT : LAB_VERIFY] });
     await desk.tx.run(async () => {
       const result = await desk.labs.resultForUpdate(id);
       if (!result) throw new NotFoundError('result');
       result.assertVersion(version);
       const snapshot = result.toSnapshot();
       const now = desk.clock.now();
+      if (isEntry(change)) {
+        const sample = await desk.labs.sampleForUpdate(snapshot.sampleId);
+        if (sample?.status !== 'received') {
+          throw new DomainError('sample_state', 'The sample must be taken in by the lab first');
+        }
+        const form = await desk.labs.form(snapshot.testId);
+        if (form !== ENTRY_FORMS[change.kind])
+          throw new DomainError('wrong_form', `The test is reported as ${FORM_NAMES[form]}`);
+      }
       switch (change.kind) {
+        case 'enter-culture':
+          result.enterCulture(await desk.culture(change.culture), change.comment, actor.userId, now);
+          break;
+        case 'enter-text':
+          result.enterNarrative(checkedNarrative(change.narrative), change.comment, actor.userId, now);
+          break;
         case 'enter': {
-          const sample = await desk.labs.sampleForUpdate(snapshot.sampleId);
-          if (sample?.status !== 'received') {
-            throw new DomainError('sample_state', 'The sample must be taken in by the lab first');
-          }
           const parameters = await desk.labs.parameters(snapshot.testId);
           if (parameters.length === 0) throw new DomainError('no_template', 'The test has no parameters yet');
           const order = await desk.order(snapshot.billId);
@@ -311,7 +448,7 @@ export class ChangeResultHandler implements ICommandHandler<ChangeResultCommand>
       await desk.labs.updateResult(result);
       await desk.record(
         'result',
-        { enter: 'entered', verify: 'verified', unverify: 'unverified' }[change.kind],
+        isEntry(change) ? 'entered' : { verify: 'verified', unverify: 'unverified' }[change.kind],
         actor,
         id,
         {
@@ -370,7 +507,10 @@ export class GetResultHandler implements IQueryHandler<GetResultQuery> {
     const [withOrder] = await desk.withOrders([result]);
     const order = await desk.order(result.billId);
     const ageDays = ageInDays(order.patient.dateOfBirth, desk.today());
-    const template = (await desk.labs.parameters(result.testId)).map((parameter) => {
+    // A pending result is entered in the test's form; one entered keeps the form it was entered in.
+    const form = result.form ?? (await desk.labs.form(result.testId));
+    const parameters = form === 'values' ? await desk.labs.parameters(result.testId) : [];
+    const template = parameters.map((parameter) => {
       const range = rangeFor(parameter, order.patient.sex, ageDays);
       return {
         parameterId: parameter.id,
@@ -382,7 +522,7 @@ export class GetResultHandler implements IQueryHandler<GetResultQuery> {
         normalText: range?.normalText ?? null,
       };
     });
-    return { ...withOrder!, template };
+    return { ...withOrder!, form, template };
   }
 }
 
@@ -390,6 +530,10 @@ export const LAB_HANDLERS = [
   LabDesk,
   SetTestParametersHandler,
   GetTestParametersHandler,
+  SetTestFormHandler,
+  GetTestFormHandler,
+  SearchLabTestsHandler,
+  FindOrderHandler,
   CollectSampleHandler,
   ChangeSampleHandler,
   ChangeResultHandler,

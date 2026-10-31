@@ -34,6 +34,10 @@ import {
 } from '../../src/modules/hr/infrastructure/persistence/leave.schema.js';
 import { users } from '../../src/modules/identity/infrastructure/persistence/identity.schema.js';
 import {
+  labAntibiotics,
+  labReportTemplates,
+} from '../../src/modules/laboratory/infrastructure/persistence/laboratory.schema.js';
+import {
   pfLedgerEntries,
   staffDues,
   staffSalaries,
@@ -890,6 +894,31 @@ const oldFigures: Record<string, number> = {
   pf: 50_000,
 };
 
+/** The old culture masters and written report templates (step 15b). */
+const labMasters: Record<string, Record<string, unknown>[]> = {
+  CSAntibiotics: [
+    { Id: 'ab-1', Name: 'Ciprofloxacin' },
+    // The same antibiotic typed again: one here.
+    { Id: 'ab-2', Name: ' CIPROFLOXACIN ' },
+    { Id: 'ab-3', Name: 'Meropenem' },
+  ],
+  MicroBioBacterias: [
+    { Id: 'mb-1', Name: 'Escherichia coli' },
+    { Id: 'mb-2', Name: '' },
+  ],
+  CSGrowthTypes: [{ Id: 'gt-1', Name: 'Heavy growth' }],
+  CSMessases: [{ Id: 'cm-1', Name: 'Repeat the culture after the course of antibiotics.' }],
+  PathologyTemplates: [
+    {
+      Id: 'pt-1',
+      Name: 'Fibroadenoma breast',
+      Description: '<p>Breast lump</p>',
+      TemplateContent: '<p><b>GROSS:</b> A firm grey-white nodule.</p><p>MICROSCOPY:&nbsp;No malignancy.</p>',
+    },
+    { Id: 'pt-2', Name: 'Blank', Description: null, TemplateContent: '<p>&nbsp;</p>' },
+  ],
+};
+
 /** The old database as the loaders query it: tables by name, pages by key. */
 class FakeSource extends LegacySource {
   readonly queries: string[] = [];
@@ -903,8 +932,11 @@ class FakeSource extends LegacySource {
         .slice(0, params['n'] as number);
     let rows: Record<string, unknown>[];
     const clinical = /\[(Diag|Rx|EMR)\]\.\[(\w+)\]/.exec(sql);
+    const labMaster =
+      /FROM \[Diag\]\.\[(CSAntibiotics|MicroBioBacterias|CSGrowthTypes|CSMessases|PathologyTemplates)\]/.exec(sql);
     const reconciling = /\/\* reconcile:([\w:-]+) \*\//.exec(sql)?.[1];
     if (reconciling === 'books') rows = books.balances;
+    else if (labMaster) rows = labMasters[labMaster[1]!]!;
     else if (sql.includes('[Diag].[DiscountGroupDetails]')) {
       // Each client's discount group, test by test: one percent for Grameenphone, two for Robi.
       rows = [
@@ -1622,6 +1654,32 @@ describe('data migration', () => {
 
     const again = await etl(false, access);
     expect(again.reports.every((entry) => entry.written === 0)).toBe(true);
+  });
+
+  it('brings the culture masters and the written reports’ templates over', async () => {
+    const lab = {
+      only: ['lab-antibiotics', 'lab-organisms', 'lab-growth-types', 'lab-culture-messages', 'lab-report-templates'],
+    };
+    const run = await etl(false, lab);
+    expect(counts(run)).toEqual({
+      'lab-antibiotics': [2, 0, 0],
+      'lab-organisms': [1, 0, 1],
+      'lab-growth-types': [1, 0, 0],
+      'lab-culture-messages': [1, 0, 0],
+      'lab-report-templates': [1, 0, 1],
+    });
+    const db = t.app.get(DbContext).db;
+    expect((await db.select({ name: labAntibiotics.name }).from(labAntibiotics)).map((row) => row.name).sort()).toEqual(
+      ['Ciprofloxacin', 'Meropenem'],
+    );
+    // The old editor's HTML is kept as text, a paragraph a line.
+    expect(
+      await db
+        .select({ description: labReportTemplates.description, body: labReportTemplates.body })
+        .from(labReportTemplates),
+    ).toEqual([{ description: 'Breast lump', body: 'GROSS: A firm grey-white nodule.\nMICROSCOPY: No malignancy.' }]);
+    const again = await etl(false, lab);
+    expect(counts(again)['lab-antibiotics']).toEqual([0, 3, 0]);
   });
 
   it('leaves the opening balances out without a cut-over day', async () => {

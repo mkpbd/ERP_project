@@ -13,6 +13,11 @@
   .lab table.values td { padding: 1mm 1.5mm; border-bottom: 0.1mm solid #ddd; }
   .lab .out { font-weight: 700; }
   .lab .note { font-size: 8.5pt; color: #333; margin-top: 1.5mm; }
+  .lab .narrative { white-space: pre-wrap; line-height: 1.45; }
+  .lab .cs { margin: 1mm 0; }
+  .lab .cs b { display: inline-block; min-width: 30mm; }
+  .lab table.values td.sir { text-align: center; font-weight: 700; }
+  .lab table.values th.sir { text-align: center; }
   .lab .sign { margin-top: 18mm; display: flex; justify-content: space-between; }
   .lab .sign div { text-align: center; min-width: 55mm; border-top: 0.2mm solid #000; padding-top: 1mm; }
 </style>
@@ -35,6 +40,29 @@
   </table>
   {{#each tests}}
   <h3>{{testName}}</h3>
+  {{#if culture}}
+  {{#with culture}}
+  {{#if hasMicroscopy}}
+  <div class="cs"><b>Microscopy</b>{{#each microscopy}}{{#unless @first}} · {{/unless}}{{name}}: {{value}}{{/each}}{{#if analyzer}} <span class="note">({{analyzer}})</span>{{/if}}</div>
+  {{#if microscopyNote}}<div class="cs note">{{microscopyNote}}</div>{{/if}}
+  {{/if}}
+  <div class="cs"><b>Culture</b>{{#if growth}}{{#if growthType}}{{growthType}}: {{/if}}{{#each organisms}}{{#unless @first}}, {{/unless}}<i>{{name}}</i>{{/each}} isolated{{else}}{{#if growthType}}{{growthType}}{{else}}No growth{{/if}}{{/if}}</div>
+  {{#each details}}<div class="cs"><b>{{name}}</b>{{value}}</div>{{/each}}
+  {{#if rows.length}}
+  <table class="values" style="margin-top: 2mm">
+    <thead><tr><th>Antibiotic</th>{{#if hasZone}}<th style="width: 14%">Zone (mm)</th>{{/if}}{{#each organisms}}<th class="sir" style="width: 18%"><i>{{name}}</i></th>{{/each}}</tr></thead>
+    <tbody>
+      {{#each rows}}
+      <tr><td>{{antibiotic}}</td>{{#if ../hasZone}}<td>{{zone}}</td>{{/if}}{{#each results}}<td class="sir">{{this}}</td>{{/each}}</tr>
+      {{/each}}
+    </tbody>
+  </table>
+  {{/if}}
+  {{#if message}}<div class="cs" style="margin-top: 2mm">{{message}}</div>{{/if}}
+  {{/with}}
+  {{else if narrative}}
+  <div class="narrative">{{narrative}}</div>
+  {{else}}
   <table class="values">
     <thead><tr><th style="width: 34%">Test</th><th style="width: 16%">Result</th><th style="width: 6%"></th><th style="width: 14%">Unit</th><th>Normal range</th></tr></thead>
     <tbody>
@@ -49,10 +77,12 @@
       {{/each}}
     </tbody>
   </table>
+  {{/if}}
   {{#if comment}}<div class="note"><b>Comment:</b> {{comment}}</div>{{/if}}
   {{/each}}
   {{#if pending}}<p class="note">{{pending}} test(s) of this sample will follow in another report.</p>{{/if}}
-  <p class="note">H: above the normal range · L: below it.</p>
+  {{#if hasValues}}<p class="note">H: above the normal range · L: below it.</p>{{/if}}
+  {{#if hasCulture}}<p class="note">S: sensitive · I: intermediate · R: resistant.</p>{{/if}}
   <div class="sign">
     <div>Medical technologist</div>
     <div>{{verifiers}}<br />Verified by</div>

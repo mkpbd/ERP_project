@@ -22,13 +22,18 @@ import {
   ChangeResultCommand,
   ChangeSampleCommand,
   CollectSampleCommand,
+  FindOrderQuery,
   GetResultQuery,
   GetSampleQuery,
+  GetTestFormQuery,
   GetTestParametersQuery,
   ListResultsQuery,
   ListSamplesQuery,
+  SearchLabTestsQuery,
+  SetTestFormCommand,
   SetTestParametersCommand,
 } from '../application/lab.messages.js';
+import { MAX_ANTIBIOTICS, MAX_NARRATIVE, MAX_ORGANISMS, REPORT_FORMS, SENSITIVITIES } from '../domain/culture.js';
 
 const version = z.int().min(1);
 const day = z.iso.date();
@@ -99,6 +104,63 @@ class EnterDto extends createZodDto(
       .max(60),
     comment: z.string().trim().max(1000).nullable().default(null),
   }),
+) {}
+const comment = z.string().trim().max(1000).nullable().default(null);
+const optionalText = (max: number) => z.string().trim().max(max).nullable().default(null);
+class TestFormDto extends createZodDto(z.strictObject({ form: z.enum(REPORT_FORMS) })) {}
+class TestFormResponseDto extends responseDto({ form: z.enum(REPORT_FORMS) }) {}
+class TestSearchDto extends createZodDto(z.object({ q: z.string().trim().min(1).max(100) })) {}
+class TestSearchResponseDto extends responseDto({
+  items: z.array(z.object({ id: z.uuid(), name: z.string(), form: z.enum(REPORT_FORMS) })),
+}) {}
+class OrderNumberDto extends createZodDto(z.object({ number: z.string().trim().min(1).max(40) })) {}
+class CollectableOrderResponseDto extends responseDto({
+  billId: z.uuid(),
+  billNumber: z.string(),
+  billedAt: z.date(),
+  patientName: z.string(),
+  uhid: z.int(),
+  sex: z.string(),
+  dateOfBirth: z.string(),
+  departments: z.array(
+    z.object({
+      departmentId: z.uuid(),
+      departmentName: z.string(),
+      tests: z.array(z.object({ line: z.int(), testName: z.string(), inWork: z.boolean() })),
+    }),
+  ),
+}) {}
+class EnterCultureDto extends createZodDto(
+  z.strictObject({
+    version,
+    analyzer: optionalText(100),
+    pusCells: optionalText(50),
+    epithelialCells: optionalText(50),
+    rbc: optionalText(50),
+    microscopyNote: optionalText(500),
+    growth: z.boolean(),
+    growthTypeId: z.uuid().nullable().default(null),
+    /** The organisms isolated, in order (the antibiogram's results follow it). */
+    organismIds: z.array(z.uuid()).max(MAX_ORGANISMS).default([]),
+    colonyCount: optionalText(100),
+    incubation: optionalText(100),
+    media: optionalText(200),
+    message: optionalText(1000),
+    sensitivity: z
+      .array(
+        z.strictObject({
+          antibioticId: z.uuid(),
+          zone: optionalText(20),
+          results: z.array(z.enum(SENSITIVITIES).nullable()).max(MAX_ORGANISMS),
+        }),
+      )
+      .max(MAX_ANTIBIOTICS)
+      .default([]),
+    comment,
+  }),
+) {}
+class EnterTextDto extends createZodDto(
+  z.strictObject({ version, narrative: z.string().max(MAX_NARRATIVE), comment }),
 ) {}
 class SampleListQueryDto extends createZodDto(
   z.object({
@@ -175,7 +237,34 @@ const recordShape = {
   deliveredTo: z.string().nullable(),
   deliveredAt: z.date().nullable(),
   reagents: z.enum(['used', 'short']).nullable(),
+  form: z.enum(REPORT_FORMS).nullable(),
   values: z.array(z.object(valueShape)),
+  culture: z
+    .object({
+      analyzer: z.string().nullable(),
+      pusCells: z.string().nullable(),
+      epithelialCells: z.string().nullable(),
+      rbc: z.string().nullable(),
+      microscopyNote: z.string().nullable(),
+      growth: z.boolean(),
+      growthTypeId: z.uuid().nullable(),
+      growthType: z.string().nullable(),
+      organisms: z.array(z.object({ organismId: z.uuid().nullable(), name: z.string() })),
+      colonyCount: z.string().nullable(),
+      incubation: z.string().nullable(),
+      media: z.string().nullable(),
+      message: z.string().nullable(),
+      sensitivity: z.array(
+        z.object({
+          antibioticId: z.uuid().nullable(),
+          antibiotic: z.string(),
+          zone: z.string().nullable(),
+          results: z.array(z.enum(SENSITIVITIES).nullable()),
+        }),
+      ),
+    })
+    .nullable(),
+  narrative: z.string().nullable(),
 };
 class CollectedResponseDto extends responseDto({ id: z.uuid(), labNumber: z.string(), tests: z.int() }) {}
 class SampleChangedResponseDto extends responseDto({ results: z.int() }) {}
@@ -188,6 +277,8 @@ class SampleResponseDto extends responseDto({
 class ResultPageResponseDto extends responseDto({ items: z.array(z.object(resultShape)), ...pageMetaShape }) {}
 class ResultResponseDto extends responseDto({
   ...recordShape,
+  /** The form to enter it in: the one it was entered in, else the test's. */
+  form: z.enum(REPORT_FORMS),
   template: z.array(
     z.object({
       parameterId: z.uuid(),
@@ -224,6 +315,41 @@ export class LabController {
   @ApiNoContentResponse()
   async setParameters(@CurrentUser() actor: Actor, @Param() params: TestParamDto, @Body() dto: TestParametersDto) {
     await this.commandBus.execute(new SetTestParametersCommand(actor, params.testId, dto.parameters));
+  }
+
+  @Get('tests')
+  @RequirePermissions('lab:read')
+  @ApiOperation({ summary: 'Lab tests by name or code (up to 20), with how each is reported' })
+  @ApiOkResponse({ type: TestSearchResponseDto })
+  async tests(@CurrentUser() actor: Actor, @Query() query: TestSearchDto) {
+    return { items: await this.queryBus.execute(new SearchLabTestsQuery(actor, query.q)) };
+  }
+
+  @Get('orders/:number')
+  @RequirePermissions('lab:read')
+  @ApiOperation({ summary: "A bill by its number, with each lab department's tests and whether each is in work" })
+  @ApiOkResponse({ type: CollectableOrderResponseDto })
+  order(@CurrentUser() actor: Actor, @Param() params: OrderNumberDto) {
+    return this.queryBus.execute(new FindOrderQuery(actor, params.number));
+  }
+
+  @Get('tests/:testId/form')
+  @RequirePermissions('lab:read')
+  @ApiOkResponse({ type: TestFormResponseDto })
+  form(@CurrentUser() actor: Actor, @Param() params: TestParamDto) {
+    return this.queryBus.execute(new GetTestFormQuery(actor, params.testId));
+  }
+
+  @Put('tests/:testId/form')
+  @RequirePermissions('lab:manage')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary:
+      'How a lab test is reported: values against its parameters, a culture with its antibiogram, or written text',
+  })
+  @ApiNoContentResponse()
+  async setForm(@CurrentUser() actor: Actor, @Param() params: TestParamDto, @Body() dto: TestFormDto) {
+    await this.commandBus.execute(new SetTestFormCommand(actor, params.testId, dto.form));
   }
 
   @Get('samples')
@@ -304,6 +430,35 @@ export class LabController {
       new ChangeResultCommand(actor, params.id, dto.version, {
         kind: 'enter',
         values: dto.values,
+        comment: dto.comment,
+      }),
+    );
+  }
+
+  @Put('results/:id/culture')
+  @RequirePermissions('lab:result')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Enter or correct a culture (microscopy, growth, organisms, antibiogram) before verification',
+  })
+  @ApiNoContentResponse()
+  async enterCulture(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: EnterCultureDto) {
+    const { version: seen, comment: remark, ...culture } = dto;
+    await this.commandBus.execute(
+      new ChangeResultCommand(actor, params.id, seen, { kind: 'enter-culture', culture, comment: remark }),
+    );
+  }
+
+  @Put('results/:id/text')
+  @RequirePermissions('lab:result')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Enter or correct a written report (histopathology, cytology …) before verification' })
+  @ApiNoContentResponse()
+  async enterText(@CurrentUser() actor: Actor, @Param() params: IdParamDto, @Body() dto: EnterTextDto) {
+    await this.commandBus.execute(
+      new ChangeResultCommand(actor, params.id, dto.version, {
+        kind: 'enter-text',
+        narrative: dto.narrative,
         comment: dto.comment,
       }),
     );

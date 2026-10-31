@@ -90,7 +90,7 @@ It is refused (`not_verified`) while nothing of the sample is verified.
 
 * **Sample tubes and barcodes per tube, sample carriers.**
 * **Lab machine interfaces (LIS).**
-* **Culture and sensitivity, histopathology and other free-text reports.**
+* **Culture and sensitivity, histopathology and other free-text reports.** Done in [step 15b](15b-culture-and-written-reports.md).
 * **Report delivery by SMS or the patient portal.**
 * **Lab worklist and turnaround reports.**
 

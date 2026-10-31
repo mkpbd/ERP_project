@@ -1,6 +1,7 @@
 # Step 15a — Operation theatre
 
-Status: **done** (2026-10-31). Previous: [step 14c](14c-rehearsal-1.md) · Screens: [step 16a](16a-ot-screens.md).
+Status: **done** (2026-10-31). Previous: [step 14c](14c-rehearsal-1.md) · Screens: [step 16a](16a-ot-screens.md) · Next:
+[step 15b](15b-culture-and-written-reports.md).
 
 The first gap the page-by-page check of the old UI found (14c): the old system's operation theatre had no API here.
 

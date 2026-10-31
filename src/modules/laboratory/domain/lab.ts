@@ -1,4 +1,5 @@
 import { ConflictError, DomainError, ForbiddenError } from '../../../shared/domain/errors.js';
+import type { CultureReport, ReportForm } from './culture.js';
 
 export const MAX_PARAMETERS = 60;
 export type SampleStatus = 'collected' | 'received' | 'rejected';
@@ -248,7 +249,12 @@ export interface ResultProps {
   deliveredAt: Date | null;
   /** Reagents used up when first verified (short: the store held too little); null before. */
   reagents: 'used' | 'short' | null;
+  /** How it was entered (null while pending). */
+  form: ReportForm | null;
   values: ResultValue[];
+  culture: CultureReport | null;
+  /** A written report's text. */
+  narrative: string | null;
   version: number;
   createdAt: Date;
   updatedAt: Date;
@@ -282,7 +288,10 @@ export class LabResult {
       deliveredBy: null,
       deliveredAt: null,
       reagents: null,
+      form: null,
       values: [],
+      culture: null,
+      narrative: null,
       version: 1,
       createdAt: params.at,
       updatedAt: params.at,
@@ -305,13 +314,39 @@ export class LabResult {
 
   /** The values (all of a numeric test's numbers), entered or corrected before verification. */
   enter(values: readonly ResultValue[], comment: string | null, by: string, at: Date): void {
-    if (this.props.status !== 'pending' && this.props.status !== 'entered') {
-      throw new DomainError('result_state', `A ${this.props.status} result is not entered again`);
-    }
+    this.assertEnterable();
     if (values.every((value) => value.value === null)) {
       throw new DomainError('invalid_values', 'Enter the result');
     }
-    this.props.values = [...values];
+    this.entered({ form: 'values', values: [...values], culture: null, narrative: null }, comment, by, at);
+  }
+
+  /** A culture with its antibiogram (checked by checkedCulture), entered or corrected before verification. */
+  enterCulture(culture: CultureReport, comment: string | null, by: string, at: Date): void {
+    this.assertEnterable();
+    this.entered({ form: 'culture', values: [], culture, narrative: null }, comment, by, at);
+  }
+
+  /** A written report (checked by checkedNarrative), entered or corrected before verification. */
+  enterNarrative(narrative: string, comment: string | null, by: string, at: Date): void {
+    this.assertEnterable();
+    this.entered({ form: 'descriptive', values: [], culture: null, narrative }, comment, by, at);
+  }
+
+  private assertEnterable(): void {
+    if (this.props.status !== 'pending' && this.props.status !== 'entered') {
+      throw new DomainError('result_state', `A ${this.props.status} result is not entered again`);
+    }
+  }
+
+  /** Whatever was entered before is replaced, in whichever form. */
+  private entered(
+    content: Pick<ResultProps, 'form' | 'values' | 'culture' | 'narrative'>,
+    comment: string | null,
+    by: string,
+    at: Date,
+  ): void {
+    Object.assign(this.props, content);
     this.props.comment = text(comment, 1000, 'comment');
     this.props.status = 'entered';
     this.props.enteredBy = by;

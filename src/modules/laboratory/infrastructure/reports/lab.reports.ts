@@ -11,6 +11,7 @@ import { DomainError, NotFoundError } from '../../../../shared/domain/errors.js'
 import { code39Svg } from '../../../../shared/infrastructure/reports/code39.js';
 import type { ImagingReadRepository } from '../../application/imaging.messages.js';
 import type { LabReadRepository } from '../../application/lab.messages.js';
+import type { CultureReport } from '../../domain/culture.js';
 import { ageInDays } from '../../domain/lab.js';
 import { labReagentUses } from '../persistence/laboratory.schema.js';
 
@@ -23,6 +24,32 @@ function rangeText(value: { low: number | null; high: number | null; normalText:
   if (value.high !== null) return `< ${value.high}`;
   if (value.low !== null) return `> ${value.low}`;
   return null;
+}
+
+/** A culture as printed: the microscopy that was read, the organisms as columns of the antibiogram. */
+function cultureView(culture: CultureReport) {
+  const microscopy = (
+    [
+      ['Pus cells', culture.pusCells],
+      ['Epithelial cells', culture.epithelialCells],
+      ['RBC', culture.rbc],
+    ] as const
+  ).flatMap(([name, value]) => (value ? [{ name, value }] : []));
+  const details = (
+    [
+      ['Colony count', culture.colonyCount],
+      ['Incubation', culture.incubation],
+      ['Culture media', culture.media],
+    ] as const
+  ).flatMap(([name, value]) => (value ? [{ name, value }] : []));
+  return {
+    ...culture,
+    microscopy,
+    hasMicroscopy: microscopy.length > 0 || !!culture.microscopyNote || !!culture.analyzer,
+    details,
+    hasZone: culture.sensitivity.some((row) => row.zone),
+    rows: culture.sensitivity.map((row) => ({ ...row, results: row.results.map((result) => result ?? '') })),
+  };
 }
 
 /**
@@ -40,7 +67,9 @@ export function labReport(
     key: 'laboratory.lab-report',
     title: 'Laboratory report',
     group: 'Laboratory',
-    description: "A sample's verified results with units, normal ranges and flags, signed by the verifier.",
+    description:
+      "A sample's verified results (values with units, normal ranges and flags; cultures with their antibiogram; " +
+      'written reports), signed by the verifier.',
     params: z.strictObject({ sampleId: z.uuid() }),
     async load(params, report) {
       const sample = await read.sample(params.sampleId);
@@ -70,6 +99,7 @@ export function labReport(
         tests: ready.map((result) => ({
           ...result,
           testName: order.tests.find((test) => test.line === result.line)?.testName ?? null,
+          culture: result.culture ? cultureView(result.culture) : null,
           values: result.values.map((value) => ({
             ...value,
             range: rangeText(value),
@@ -77,6 +107,8 @@ export function labReport(
           })),
         })),
         pending: sample.results.filter((result) => result.status === 'entered' || result.status === 'pending').length,
+        hasValues: ready.some((result) => result.values.length > 0),
+        hasCulture: ready.some((result) => result.culture?.growth),
         verifiers: verifiers.join(', '),
         barcode: code39Svg(sample.labNumber),
       };
